@@ -23,6 +23,7 @@ import { useAppStore } from "@/lib/store";
 import EmotionChart from "./EmotionChart";
 import ConversationHistory from "./ConversationHistory";
 import MessageAttributionEditor from "./MessageAttributionEditor";
+import ModuleHistoryPanel from "./ModuleHistoryPanel";
 import { parseConversation, formatMessagesForLLM } from "@/lib/parse-conversation";
 import { EXAMPLE_CATEGORIES, type ExampleConversation } from "@/lib/example-conversations";
 import { ALL_MBTI_TYPES } from "@/lib/mbti-questions";
@@ -138,6 +139,8 @@ export default function AnalyzeTab() {
 
   // The final formatted conversation sent to the API
   const [formattedConversation, setFormattedConversation] = useState("");
+  // Original raw text before attribution (preserved for re-analysis)
+  const [originalRawText, setOriginalRawText] = useState("");
 
   // Example selector
   const [showExamples, setShowExamples] = useState(false);
@@ -146,7 +149,7 @@ export default function AnalyzeTab() {
   // History panel
   const [showHistory, setShowHistory] = useState(false);
 
-  const { addConversation, addProfile, profiles, conversations, mbtiResults } = useAppStore();
+  const { addConversation, addProfile, profiles, conversations, mbtiResults, addModuleHistory } = useAppStore();
 
   // Auto-populate selfMBTI from stored test results
   const latestMBTI = mbtiResults[0];
@@ -213,6 +216,7 @@ export default function AnalyzeTab() {
     setError("");
     setResult(null);
     setSaved(false);
+    setOriginalRawText(conversation.trim());
 
     const parseResult = parseConversation(conversation.trim());
 
@@ -291,6 +295,19 @@ export default function AnalyzeTab() {
 
       const data = await res.json();
       setResult(data.analysis);
+
+      // Auto-save to module history
+      if (data.analysis) {
+        const name = overrideTargetName || targetName.trim() || "对方";
+        addModuleHistory("analyze", {
+          id: uuidv4(),
+          title: `与${name}的对话分析`,
+          createdAt: new Date().toISOString(),
+          module: "analyze",
+          data: { result: data.analysis, conversation: convoText, targetName: name, context: context.trim() },
+          summary: data.analysis.summary?.slice(0, 60) || "对话分析完成",
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "未知错误");
     } finally {
@@ -310,7 +327,7 @@ export default function AnalyzeTab() {
       participants: ["我", name],
       messages: [],
       createdAt: new Date().toISOString(),
-      rawText: conversation,
+      rawText: originalRawText || conversation,
       targetName: name,
       context: context || undefined,
       analysis: {

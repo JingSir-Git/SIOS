@@ -20,6 +20,11 @@ import {
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { EQ_EXAMPLE_CATEGORIES, type EQExample } from "@/lib/eq-examples";
+import { parseConversation, formatMessagesForLLM } from "@/lib/parse-conversation";
+import MessageAttributionEditor from "./MessageAttributionEditor";
+import ModuleHistoryPanel from "./ModuleHistoryPanel";
+import type { ChatMessage } from "@/lib/types";
+import { v4 as uuidv4 } from "uuid";
 
 interface EQItem {
   messageIndex: number;
@@ -55,8 +60,11 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: React.ElementType; 
 };
 
 
+type EQStage = "input" | "attribution" | "results";
+
 export default function EQTrainingTab() {
-  const { profiles, conversations, preSelectedProfileId, clearPreSelection } = useAppStore();
+  const { profiles, conversations, preSelectedProfileId, clearPreSelection, addModuleHistory } = useAppStore();
+  const [stage, setStage] = useState<EQStage>("input");
   const [conversation, setConversation] = useState("");
   const [selectedProfileId, setSelectedProfileId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -65,6 +73,7 @@ export default function EQTrainingTab() {
   const [showExamples, setShowExamples] = useState(false);
   const [showConversations, setShowConversations] = useState(false);
   const [activeExampleCategory, setActiveExampleCategory] = useState(EQ_EXAMPLE_CATEGORIES[0].id);
+  const [parsedMessages, setParsedMessages] = useState<ChatMessage[]>([]);
 
   // Pick up cross-tab pre-selection
   useEffect(() => {
@@ -96,18 +105,47 @@ export default function EQTrainingTab() {
     setError("");
   };
 
-  const handleReview = async () => {
+  // ---- Step 1: Parse and decide whether to show attribution ----
+  const handlePreprocess = () => {
     if (!conversation.trim()) return;
+    setError("");
+    setResult(null);
+
+    const parseResult = parseConversation(conversation.trim());
+
+    if (parseResult.needsAttribution) {
+      setParsedMessages(parseResult.messages);
+      setStage("attribution");
+    } else {
+      const formatted = formatMessagesForLLM(parseResult.messages);
+      runReview(formatted);
+    }
+  };
+
+  // ---- Step 2: Attribution confirmed ----
+  const handleAttributionConfirm = (
+    messages: ChatMessage[],
+    speakers: { id: string; name: string; role: string }[]
+  ) => {
+    const formatted = formatMessagesForLLM(messages);
+    setConversation(formatted);
+    void speakers; // speakers info available if needed
+    runReview(formatted);
+  };
+
+  // ---- Core review call ----
+  const runReview = async (convoText: string) => {
     setLoading(true);
     setError("");
     setResult(null);
+    setStage("results");
 
     try {
       const res = await fetch("/api/eq-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: conversation.trim(),
+          messages: convoText,
           targetProfile: selectedProfile
             ? {
                 name: selectedProfile.name,
@@ -129,12 +167,27 @@ export default function EQTrainingTab() {
 
       const data = await res.json();
       setResult(data.report);
+
+      // Auto-save to module history
+      if (data.report) {
+        addModuleHistory("eq-training", {
+          id: uuidv4(),
+          title: `EQ复盘 — ${data.report.overallScore}分`,
+          createdAt: new Date().toISOString(),
+          module: "eq-training",
+          data: { result: data.report, conversation: convoText },
+          summary: `得分${data.report.overallScore}，${data.report.items?.length || 0}条建议`,
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "未知错误");
     } finally {
       setLoading(false);
     }
   };
+
+  // Legacy direct handler (kept for backward compat)
+  const handleReview = () => handlePreprocess();
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return "text-emerald-400";
@@ -151,10 +204,25 @@ export default function EQTrainingTab() {
   return (
     <div className="flex flex-col h-full">
       <div className="border-b border-zinc-800 px-6 py-4">
-        <h1 className="text-lg font-semibold text-zinc-100">情商训练</h1>
-        <p className="text-xs text-zinc-500 mt-1">
-          基于你的真实对话场景，精准提升共情能力和表达精度
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-semibold text-zinc-100">情商训练</h1>
+            <p className="text-xs text-zinc-500 mt-1">
+              基于你的真实对话场景，精准提升共情能力和表达精度
+            </p>
+          </div>
+          <ModuleHistoryPanel
+            module="eq-training"
+            label="情商训练"
+            onLoadEntry={(entry) => {
+              const d = entry.data as { result: EQResult; conversation: string };
+              if (d.result) setResult(d.result);
+              if (d.conversation) setConversation(d.conversation);
+              setStage("results");
+              setError("");
+            }}
+          />
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -246,8 +314,17 @@ export default function EQTrainingTab() {
             </div>
           </div>
 
+          {/* Attribution Editor */}
+          {stage === "attribution" && (
+            <MessageAttributionEditor
+              messages={parsedMessages}
+              onConfirm={handleAttributionConfirm}
+              onBack={() => setStage("input")}
+            />
+          )}
+
           {/* Input */}
-          <div className="space-y-3">
+          {stage !== "attribution" && <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs text-zinc-400">
                 粘贴你参与的一段对话（重点关注你的表现）
@@ -340,7 +417,7 @@ export default function EQTrainingTab() {
                 </>
               )}
             </button>
-          </div>
+          </div>}
 
           {/* Error */}
           {error && (

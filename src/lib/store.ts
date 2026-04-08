@@ -18,6 +18,18 @@ import type {
   MBTITestResult,
 } from "./types";
 
+// ---- Theme & Preferences Types ----
+export type ThemeKey = "dark" | "light" | "green-eye" | "sepia" | "blue-night";
+
+export interface ModuleHistoryEntry {
+  id: string;
+  title: string;
+  createdAt: string;
+  module: string;
+  data: unknown; // the full result object
+  summary?: string; // short summary for list display
+}
+
 // ============================================================
 // State Interface
 // ============================================================
@@ -83,6 +95,18 @@ interface AppState {
   toggleSidebar: () => void;
   activeTab: string;
   setActiveTab: (tab: string) => void;
+
+  // ---- User Preferences ----
+  fontSize: number; // 12-20, default 14
+  setFontSize: (size: number) => void;
+  theme: ThemeKey;
+  setTheme: (theme: ThemeKey) => void;
+
+  // ---- Module History ----
+  moduleHistory: Record<string, ModuleHistoryEntry[]>;
+  addModuleHistory: (module: string, entry: ModuleHistoryEntry) => void;
+  getModuleHistory: (module: string) => ModuleHistoryEntry[];
+  clearModuleHistory: (module: string) => void;
 
   // ---- Cross-Tab Navigation ----
   preSelectedProfileId: string | null;
@@ -366,6 +390,28 @@ export const useAppStore = create<AppState>()(
       activeTab: "analyze",
       setActiveTab: (tab) => set({ activeTab: tab }),
 
+      // ---- User Preferences ----
+      fontSize: 14,
+      setFontSize: (size) => set({ fontSize: Math.min(20, Math.max(12, size)) }),
+      theme: "dark" as ThemeKey,
+      setTheme: (theme) => set({ theme }),
+
+      // ---- Module History ----
+      moduleHistory: {},
+      addModuleHistory: (module, entry) =>
+        set((state) => {
+          const existing = state.moduleHistory[module] || [];
+          const updated = [entry, ...existing].slice(0, 10); // keep last 10
+          return { moduleHistory: { ...state.moduleHistory, [module]: updated } };
+        }),
+      getModuleHistory: (module) => get().moduleHistory[module] || [],
+      clearModuleHistory: (module) =>
+        set((state) => {
+          const updated = { ...state.moduleHistory };
+          delete updated[module];
+          return { moduleHistory: updated };
+        }),
+
       // ---- Cross-Tab Navigation ----
       preSelectedProfileId: null,
       navigateToTab: (tab, profileId) =>
@@ -389,6 +435,9 @@ export const useAppStore = create<AppState>()(
         conversations: state.conversations,
         relationships: state.relationships,
         mbtiResults: state.mbtiResults,
+        fontSize: state.fontSize,
+        theme: state.theme,
+        moduleHistory: state.moduleHistory,
       }),
     }
   )

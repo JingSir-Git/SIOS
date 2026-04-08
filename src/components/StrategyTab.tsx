@@ -18,6 +18,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { STRATEGY_EXAMPLE_CATEGORIES, type StrategyExample } from "@/lib/strategy-examples";
+import ModuleHistoryPanel from "./ModuleHistoryPanel";
+import { v4 as uuidv4 } from "uuid";
 
 interface StrategyPoint {
   topic: string;
@@ -39,7 +41,7 @@ interface StrategyResult {
 }
 
 export default function StrategyTab() {
-  const { profiles, preSelectedProfileId, clearPreSelection } = useAppStore();
+  const { profiles, preSelectedProfileId, clearPreSelection, addModuleHistory } = useAppStore();
   const [selectedProfileId, setSelectedProfileId] = useState("");
 
   // Pick up cross-tab pre-selection
@@ -104,6 +106,18 @@ export default function StrategyTab() {
 
       const data = await res.json();
       setResult(data);
+
+      // Auto-save to module history
+      if (data) {
+        addModuleHistory("strategy", {
+          id: uuidv4(),
+          title: `策略: ${objective.trim().slice(0, 30)}`,
+          createdAt: new Date().toISOString(),
+          module: "strategy",
+          data: { result: data, objective: objective.trim(), context: context.trim() },
+          summary: data.objective?.slice(0, 50) || "策略方案",
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "未知错误");
     } finally {
@@ -140,11 +154,24 @@ ${result.redLines.map((r) => `- ${r}`).join("\n")}`;
 
   return (
     <div className="flex flex-col h-full">
-      <div className="border-b border-zinc-800 px-6 py-4">
-        <h1 className="text-lg font-semibold text-zinc-100">对话策略规划</h1>
-        <p className="text-xs text-zinc-500 mt-1">
-          基于对方画像，为即将到来的重要对话制定完整策略方案
-        </p>
+      <div className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-zinc-100">对话策略规划</h1>
+          <p className="text-xs text-zinc-500 mt-1">
+            基于对方画像，为即将到来的重要对话制定完整策略方案
+          </p>
+        </div>
+        <ModuleHistoryPanel
+          module="strategy"
+          label="策略规划"
+          onLoadEntry={(entry) => {
+            const d = entry.data as { result: StrategyResult; objective: string; context: string };
+            if (d.result) setResult(d.result);
+            if (d.objective) setObjective(d.objective);
+            if (d.context) setContext(d.context);
+            setError("");
+          }}
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto">

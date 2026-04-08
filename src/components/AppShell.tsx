@@ -16,6 +16,8 @@ import KeyboardShortcuts from "./KeyboardShortcuts";
 import OnboardingTour from "./OnboardingTour";
 import HydrationGuard from "./HydrationGuard";
 import ErrorBoundary from "./ErrorBoundary";
+import ThemeProvider from "./ThemeProvider";
+import UserPreferences from "./UserPreferences";
 import { cn } from "@/lib/utils";
 
 export default function AppShell() {
@@ -45,11 +47,12 @@ export default function AppShell() {
         return (
           <div className="flex flex-col h-full">
             <div className="border-b border-zinc-800 px-6 py-4">
-              <h1 className="text-lg font-semibold text-zinc-100">数据管理</h1>
-              <p className="text-xs text-zinc-500 mt-1">导出、导入和管理你的所有数据。本地优先，安全可控。</p>
+              <h1 className="text-lg font-semibold text-zinc-100">设置</h1>
+              <p className="text-xs text-zinc-500 mt-1">个性化偏好、数据管理。本地优先，安全可控。</p>
             </div>
             <div className="flex-1 overflow-y-auto">
-              <div className="max-w-2xl mx-auto px-6 py-6">
+              <div className="max-w-2xl mx-auto px-6 py-6 space-y-8">
+                <UserPreferences />
                 <DataManager />
               </div>
             </div>
@@ -62,6 +65,7 @@ export default function AppShell() {
 
   return (
     <HydrationGuard>
+      <ThemeProvider>
       <div className="flex h-screen bg-zinc-950 text-zinc-100">
         <KeyboardShortcuts />
         <OnboardingTour />
@@ -77,6 +81,7 @@ export default function AppShell() {
           </ErrorBoundary>
         </main>
       </div>
+      </ThemeProvider>
     </HydrationGuard>
   );
 }

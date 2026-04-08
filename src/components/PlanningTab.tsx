@@ -21,7 +21,10 @@ import {
   Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAppStore } from "@/lib/store";
 import { PLANNING_EXAMPLE_CATEGORIES, type PlanningExample } from "@/lib/planning-examples";
+import ModuleHistoryPanel from "./ModuleHistoryPanel";
+import { v4 as uuidv4 } from "uuid";
 
 interface PlanMilestone {
   id: string;
@@ -91,6 +94,7 @@ const PRIORITY_LABELS: Record<string, string> = {
 };
 
 export default function PlanningTab() {
+  const { addModuleHistory } = useAppStore();
   const [objective, setObjective] = useState("");
   const [context, setContext] = useState("");
   const [constraints, setConstraints] = useState("");
@@ -147,6 +151,18 @@ export default function PlanningTab() {
       const data = await res.json();
       setResult(data);
       setExpandedPhase(0);
+
+      // Auto-save to module history
+      if (data) {
+        addModuleHistory("planning", {
+          id: uuidv4(),
+          title: data.title || `规划: ${objective.trim().slice(0, 30)}`,
+          createdAt: new Date().toISOString(),
+          module: "planning",
+          data: { result: data, objective: objective.trim(), context: context.trim(), domain, timeScale },
+          summary: `${data.phases?.length || 0}个阶段·${data.milestones?.length || 0}个里程碑`,
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "未知错误");
     } finally {
@@ -203,14 +219,29 @@ ${result.reviewSchedule}`;
 
   return (
     <div className="flex flex-col h-full">
-      <div className="border-b border-zinc-800 px-6 py-4">
-        <h1 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
-          <CalendarClock className="h-5 w-5 text-emerald-400" />
-          规划制定
-        </h1>
-        <p className="text-xs text-zinc-500 mt-1">
-          从日常任务到人生战略——AI帮你制定可执行的行动方案，小到几小时的行程，大到几年的长期规划
-        </p>
+      <div className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
+            <CalendarClock className="h-5 w-5 text-emerald-400" />
+            规划制定
+          </h1>
+          <p className="text-xs text-zinc-500 mt-1">
+            从日常任务到人生战略——AI帮你制定可执行的行动方案，小到几小时的行程，大到几年的长期规划
+          </p>
+        </div>
+        <ModuleHistoryPanel
+          module="planning"
+          label="规划制定"
+          onLoadEntry={(entry) => {
+            const d = entry.data as { result: PlanResult; objective: string; context: string; domain: string; timeScale: string };
+            if (d.result) { setResult(d.result); setExpandedPhase(0); }
+            if (d.objective) setObjective(d.objective);
+            if (d.context) setContext(d.context);
+            if (d.domain) setDomain(d.domain);
+            if (d.timeScale) setTimeScale(d.timeScale);
+            setError("");
+          }}
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto">

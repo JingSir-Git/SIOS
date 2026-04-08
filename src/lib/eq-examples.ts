@@ -109,7 +109,7 @@ export const EQ_EXAMPLE_CATEGORIES: EQExampleCategory[] = [
 我：不是信任的问题...算了，我回去想想吧。`,
       },
       {
-        id: "eq-parent-career",
+        id: "eq-parent-marriage",
         label: "父母催婚",
         description: "父母关于婚恋问题的施压",
         category: "relationship",
