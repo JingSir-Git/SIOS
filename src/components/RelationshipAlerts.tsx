@@ -23,6 +23,72 @@ interface Alert {
   description: string;
   action: string;
   topicSuggestions?: string[];
+  timingSuggestion?: string;
+}
+
+/** Analyze conversation timestamps + profile patterns to suggest best communication timing */
+function analyzeBestTiming(
+  profileConversations: { createdAt: string }[],
+  responseSpeed?: string
+): string | undefined {
+  if (profileConversations.length < 2) return undefined;
+
+  // Analyze conversation time-of-day distribution
+  const hourCounts: Record<number, number> = {};
+  const dayOfWeekCounts: Record<number, number> = {};
+  const sentimentByHour: Record<number, number[]> = {};
+
+  for (const conv of profileConversations) {
+    const d = new Date(conv.createdAt);
+    const hour = d.getHours();
+    const dow = d.getDay(); // 0=Sun
+    hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+    dayOfWeekCounts[dow] = (dayOfWeekCounts[dow] || 0) + 1;
+    // Use hour bucket for sentiment proxy (more conversations at a time = likely preferred)
+    if (!sentimentByHour[hour]) sentimentByHour[hour] = [];
+    sentimentByHour[hour].push(1);
+  }
+
+  // Find peak hour range
+  let peakHour = 14; // default afternoon
+  let peakCount = 0;
+  for (const [h, c] of Object.entries(hourCounts)) {
+    if (c > peakCount) { peakCount = c; peakHour = parseInt(h); }
+  }
+
+  // Find peak day
+  const dayNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+  let peakDay = 3; // Wed default
+  let peakDayCount = 0;
+  for (const [d, c] of Object.entries(dayOfWeekCounts)) {
+    if (c > peakDayCount) { peakDayCount = c; peakDay = parseInt(d); }
+  }
+
+  // Determine time-of-day label
+  const timeLabel = peakHour < 10 ? "上午早间" : peakHour < 12 ? "上午" : peakHour < 14 ? "中午" : peakHour < 17 ? "下午" : peakHour < 20 ? "傍晚" : "晚间";
+
+  // Build suggestion
+  const parts: string[] = [];
+  parts.push(`历史对话多集中在${dayNames[peakDay]}${timeLabel}（${peakHour}时左右）`);
+
+  if (responseSpeed) {
+    if (responseSpeed.includes("快") || responseSpeed.includes("即时") || responseSpeed.includes("秒")) {
+      parts.push("对方回复较快，可随时发起");
+    } else if (responseSpeed.includes("慢") || responseSpeed.includes("延迟")) {
+      parts.push("对方回复较慢，建议预留充足时间");
+    }
+  }
+
+  // Weekend vs weekday insight
+  const weekdayTotal = [1,2,3,4,5].reduce((a, d) => a + (dayOfWeekCounts[d] || 0), 0);
+  const weekendTotal = [0,6].reduce((a, d) => a + (dayOfWeekCounts[d] || 0), 0);
+  if (weekendTotal > weekdayTotal * 0.8 && weekendTotal > 1) {
+    parts.push("周末沟通频率较高");
+  } else if (weekdayTotal > 0 && weekendTotal === 0) {
+    parts.push("仅工作日有互动记录");
+  }
+
+  return parts.join("；");
 }
 
 const ALERT_CONFIG: Record<
@@ -108,6 +174,12 @@ export default function RelationshipAlerts() {
         profileConversations as { analysis?: { semanticContent?: { coreTopics?: string[]; hiddenAgenda?: string }; nextStepSuggestions?: string[]; keyMoments?: { description?: string }[] } }[]
       );
 
+      // Analyze best communication timing
+      const timingSuggestion = analyzeBestTiming(
+        profileConversations,
+        profile.patterns?.responseSpeed
+      );
+
       // Alert: No contact in over 14 days
       if (lastConversation || profile.lastInteraction) {
         const lastContact = lastConversation
@@ -138,6 +210,7 @@ export default function RelationshipAlerts() {
             description: `上次互动已过去${daysSince}天，关系可能正在疏远`,
             action: smartAction,
             topicSuggestions: topicSuggestions.length > 1 ? topicSuggestions.slice(1) : undefined,
+            timingSuggestion,
           });
         } else if (daysSince > 14) {
           const topics = profile.communicationStyle?.preferredTopics || [];
@@ -158,6 +231,7 @@ export default function RelationshipAlerts() {
             description: `建议保持适当的联系频率以维护关系`,
             action: smartAction,
             topicSuggestions: topicSuggestions.length > 1 ? topicSuggestions.slice(1) : undefined,
+            timingSuggestion,
           });
         }
       }
@@ -185,6 +259,7 @@ export default function RelationshipAlerts() {
             description: `距上次对话${daysSince}天，正是自然跟进的好时机${contextHint}`,
             action: topicSuggestions[0],
             topicSuggestions: topicSuggestions.slice(1),
+            timingSuggestion,
           });
         }
       }
@@ -307,6 +382,12 @@ export default function RelationshipAlerts() {
                     <ChevronRight className="h-2.5 w-2.5" />
                     <span>{alert.action}</span>
                   </div>
+                  {alert.timingSuggestion && (
+                    <div className="flex items-center gap-1 mt-1.5 text-[9px] opacity-50">
+                      <Clock className="h-2 w-2 shrink-0 text-cyan-400" />
+                      <span className="text-cyan-300/70">⏰ {alert.timingSuggestion}</span>
+                    </div>
+                  )}
                   {alert.topicSuggestions && alert.topicSuggestions.length > 0 && (
                     <div className="mt-1.5 space-y-0.5">
                       {alert.topicSuggestions.map((s, i) => (

@@ -37,19 +37,19 @@ const THEMES: Record<ThemeKey, ThemeVars> = {
     "--accent": "#8b5cf6",
     "--accent-muted": "rgba(139, 92, 246, 0.15)",
   },
-  "soft-light": {
-    "--bg-primary": "#f5f0e8",
-    "--bg-secondary": "#ebe5da",
-    "--bg-tertiary": "#ddd6c8",
-    "--bg-card": "rgba(235, 229, 218, 0.7)",
-    "--border-primary": "#c8bfb0",
-    "--border-secondary": "#ddd6c8",
-    "--text-primary": "#2c2620",
-    "--text-secondary": "#5a5248",
-    "--text-tertiary": "#8a7f72",
-    "--text-muted": "#b0a594",
-    "--accent": "#8b6914",
-    "--accent-muted": "rgba(139, 105, 20, 0.12)",
+  "violet-dark": {
+    "--bg-primary": "#110e1a",
+    "--bg-secondary": "#1a1525",
+    "--bg-tertiary": "#251e33",
+    "--bg-card": "rgba(26, 21, 37, 0.6)",
+    "--border-primary": "#3a2e50",
+    "--border-secondary": "#251e33",
+    "--text-primary": "#e0dae8",
+    "--text-secondary": "#a898c0",
+    "--text-tertiary": "#7a6a9a",
+    "--text-muted": "#554878",
+    "--accent": "#a78bfa",
+    "--accent-muted": "rgba(167, 139, 250, 0.15)",
   },
   "green-eye": {
     "--bg-primary": "#1a2e1a",
@@ -97,7 +97,7 @@ const THEMES: Record<ThemeKey, ThemeVars> = {
 
 export const THEME_LABELS: Record<ThemeKey, { label: string; preview: string }> = {
   dark: { label: "深色模式", preview: "#09090b" },
-  "soft-light": { label: "柔光模式", preview: "#f5f0e8" },
+  "violet-dark": { label: "深紫护眼", preview: "#110e1a" },
   "green-eye": { label: "护眼绿", preview: "#1a2e1a" },
   sepia: { label: "暖色护眼", preview: "#2c2416" },
   "blue-night": { label: "深蓝夜", preview: "#0d1b2a" },
@@ -123,7 +123,7 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
     root.setAttribute("data-theme", theme);
 
     // Set color-scheme for native elements (scrollbar, inputs, etc.)
-    root.style.colorScheme = theme === "soft-light" ? "light" : "dark";
+    root.style.colorScheme = "dark";
   }, [fontSize, theme]);
 
   return <>{children}</>;

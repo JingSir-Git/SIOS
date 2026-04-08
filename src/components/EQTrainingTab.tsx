@@ -23,6 +23,7 @@ import { EQ_EXAMPLE_CATEGORIES, type EQExample } from "@/lib/eq-examples";
 import { parseConversation, formatMessagesForLLM } from "@/lib/parse-conversation";
 import MessageAttributionEditor from "./MessageAttributionEditor";
 import ModuleHistoryPanel from "./ModuleHistoryPanel";
+import { EQRadarChart, EQGrowthCurve } from "./EQScoreCharts";
 import type { ChatMessage } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -63,7 +64,7 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: React.ElementType; 
 type EQStage = "input" | "attribution" | "results";
 
 export default function EQTrainingTab() {
-  const { profiles, conversations, preSelectedProfileId, clearPreSelection, addModuleHistory } = useAppStore();
+  const { profiles, conversations, preSelectedProfileId, clearPreSelection, addModuleHistory, addEQScore } = useAppStore();
   const [stage, setStage] = useState<EQStage>("input");
   const [conversation, setConversation] = useState("");
   const [selectedProfileId, setSelectedProfileId] = useState("");
@@ -168,16 +169,28 @@ export default function EQTrainingTab() {
       const data = await res.json();
       setResult(data.report);
 
-      // Auto-save to module history
+      // Auto-save to module history + EQ score tracking
       if (data.report) {
+        const entryId = uuidv4();
         addModuleHistory("eq-training", {
-          id: uuidv4(),
+          id: entryId,
           title: `EQ复盘 — ${data.report.overallScore}分`,
           createdAt: new Date().toISOString(),
           module: "eq-training",
           data: { result: data.report, conversation: convoText },
           summary: `得分${data.report.overallScore}，${data.report.items?.length || 0}条建议`,
         });
+
+        // Persist EQ score for growth tracking
+        if (data.report.dimensionScores) {
+          addEQScore({
+            id: entryId,
+            overallScore: data.report.overallScore,
+            dimensionScores: data.report.dimensionScores,
+            createdAt: new Date().toISOString(),
+            profileName: selectedProfile?.name,
+          });
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "未知错误");
@@ -449,11 +462,12 @@ export default function EQTrainingTab() {
                 </div>
               </div>
 
-              {/* Dimension Scores */}
+              {/* Radar Chart + Dimension Scores */}
               {result.dimensionScores && (
                 <div className="rounded-lg border border-zinc-800 p-5">
                   <h3 className="text-sm font-semibold text-zinc-200 mb-4">能力维度评分</h3>
-                  <div className="space-y-3">
+                  <EQRadarChart scores={result.dimensionScores} />
+                  <div className="space-y-3 mt-4">
                     {[
                       { key: "empathyAccuracy" as const, label: "共情准确度", icon: "💗" },
                       { key: "expressionPrecision" as const, label: "表达精度", icon: "🎯" },
@@ -598,6 +612,9 @@ export default function EQTrainingTab() {
                   })}
                 </div>
               )}
+
+              {/* EQ Growth Curve */}
+              <EQGrowthCurve />
             </div>
           )}
         </div>

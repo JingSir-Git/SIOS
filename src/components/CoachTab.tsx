@@ -43,8 +43,10 @@ export default function CoachTab() {
   const [tips, setTips] = useState<CoachingTip[]>([]);
   const [suggestedReply, setSuggestedReply] = useState("");
   const [currentDynamic, setCurrentDynamic] = useState("");
+  const [scriptTemplates, setScriptTemplates] = useState<{scenario: string; script: string; rationale: string}[]>([]);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedScript, setCopiedScript] = useState<number | null>(null);
   const [showExamples, setShowExamples] = useState(false);
   const [activeExampleCategory, setActiveExampleCategory] = useState(COACH_EXAMPLE_CATEGORIES[0].id);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -66,6 +68,7 @@ export default function CoachTab() {
     setTips([]);
     setSuggestedReply("");
     setCurrentDynamic("");
+    setScriptTemplates([]);
     setShowExamples(false);
   };
 
@@ -106,6 +109,7 @@ export default function CoachTab() {
       if (data.tips) setTips(data.tips);
       if (data.suggestedReply) setSuggestedReply(data.suggestedReply);
       if (data.currentDynamic) setCurrentDynamic(data.currentDynamic);
+      if (data.scriptTemplates) setScriptTemplates(data.scriptTemplates);
     } catch (err) {
       console.error(err);
     } finally {
@@ -117,6 +121,12 @@ export default function CoachTab() {
     navigator.clipboard.writeText(suggestedReply);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyScript = (text: string, idx: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedScript(idx);
+    setTimeout(() => setCopiedScript(null), 2000);
   };
 
   return (
@@ -435,6 +445,36 @@ export default function CoachTab() {
               <p className="text-xs text-zinc-300 leading-relaxed italic">
                 &ldquo;{suggestedReply}&rdquo;
               </p>
+            </div>
+          )}
+
+          {/* Script Templates */}
+          {scriptTemplates.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <BookOpen className="h-3 w-3 text-cyan-400" />
+                <span className="text-[10px] font-medium text-cyan-300">参考话术</span>
+              </div>
+              {scriptTemplates.map((st, i) => (
+                <div key={i} className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-cyan-400 font-medium">{st.scenario}</span>
+                    <button
+                      onClick={() => copyScript(st.script, i)}
+                      className="flex items-center gap-1 text-[9px] text-cyan-400 hover:text-cyan-300"
+                    >
+                      {copiedScript === i ? <Check className="h-2.5 w-2.5" /> : <Copy className="h-2.5 w-2.5" />}
+                      {copiedScript === i ? "已复制" : "复制"}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-zinc-200 leading-relaxed font-medium">
+                    &ldquo;{st.script}&rdquo;
+                  </p>
+                  <p className="text-[10px] text-zinc-500 leading-relaxed">
+                    {st.rationale}
+                  </p>
+                </div>
+              ))}
             </div>
           )}
         </div>

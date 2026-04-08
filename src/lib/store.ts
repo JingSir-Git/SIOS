@@ -16,10 +16,11 @@ import type {
   DimensionKey,
   ProfileSnapshot,
   MBTITestResult,
+  EQScoreEntry,
 } from "./types";
 
 // ---- Theme & Preferences Types ----
-export type ThemeKey = "dark" | "soft-light" | "green-eye" | "sepia" | "blue-night";
+export type ThemeKey = "dark" | "violet-dark" | "green-eye" | "sepia" | "blue-night";
 
 export interface ModuleHistoryEntry {
   id: string;
@@ -81,6 +82,10 @@ interface AppState {
   mbtiResults: MBTITestResult[];
   addMBTIResult: (result: MBTITestResult) => void;
   getLatestMBTI: () => MBTITestResult | undefined;
+
+  // ---- EQ Score Tracking ----
+  eqScores: EQScoreEntry[];
+  addEQScore: (entry: EQScoreEntry) => void;
 
   // ---- Profile Merge ----
   mergeProfiles: (keepId: string, mergeId: string) => void;
@@ -250,6 +255,14 @@ export const useAppStore = create<AppState>()(
 
       getLatestMBTI: () => get().mbtiResults[0],
 
+      // ---- EQ Score Tracking ----
+      eqScores: [],
+
+      addEQScore: (entry) =>
+        set((state) => ({
+          eqScores: [entry, ...state.eqScores],
+        })),
+
       // ---- Profile Merge ----
       mergeProfiles: (keepId, mergeId) =>
         set((state) => {
@@ -325,6 +338,7 @@ export const useAppStore = create<AppState>()(
           conversations: state.conversations,
           relationships: state.relationships,
           mbtiResults: state.mbtiResults,
+          eqScores: state.eqScores,
         };
       },
 
@@ -343,6 +357,7 @@ export const useAppStore = create<AppState>()(
             conversations: data.conversations,
             relationships: data.relationships,
             mbtiResults: data.mbtiResults || [],
+            eqScores: (data as unknown as Record<string, unknown>).eqScores as EQScoreEntry[] || [],
           });
         } else {
           // Merge mode: add items that don't already exist (by id)
@@ -362,11 +377,17 @@ export const useAppStore = create<AppState>()(
           const existingMbtiIds = new Set(state.mbtiResults.map((r) => r.id));
           const newMbti = (data.mbtiResults || []).filter((r) => !existingMbtiIds.has(r.id));
 
+          // Merge EQ scores
+          const existingEqIds = new Set(state.eqScores.map((e) => e.id));
+          const importedEq = ((data as unknown as Record<string, unknown>).eqScores as EQScoreEntry[] || []);
+          const newEq = importedEq.filter((e) => !existingEqIds.has(e.id));
+
           set({
             profiles: [...state.profiles, ...newProfiles],
             conversations: [...state.conversations, ...newConvos],
             relationships: [...state.relationships, ...newRels],
             mbtiResults: [...state.mbtiResults, ...newMbti],
+            eqScores: [...state.eqScores, ...newEq],
           });
         }
 
@@ -381,6 +402,7 @@ export const useAppStore = create<AppState>()(
           coachingTips: [],
           liveChatMessages: [],
           mbtiResults: [],
+          eqScores: [],
         }),
 
       // ---- UI ----
@@ -435,6 +457,7 @@ export const useAppStore = create<AppState>()(
         conversations: state.conversations,
         relationships: state.relationships,
         mbtiResults: state.mbtiResults,
+        eqScores: state.eqScores,
         fontSize: state.fontSize,
         theme: state.theme,
         moduleHistory: state.moduleHistory,

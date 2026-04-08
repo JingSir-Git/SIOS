@@ -288,7 +288,14 @@ ${messages}`;
     }
   ],
   "suggestedReply": "给出一个推荐的回复话术，直接可以复制使用",
-  "currentDynamic": "当前对话动态和力量对比的简要描述（80-150字）"
+  "currentDynamic": "当前对话动态和力量对比的简要描述（80-150字）",
+  "scriptTemplates": [
+    {
+      "scenario": "适用场景（如：化解僵局、表达关切、推进目标、缓和气氛）",
+      "script": "可以直接使用或微调的完整话术——自然口语化，符合当前对话语境",
+      "rationale": "为什么这句话此刻有效——心理学机制简述"
+    }
+  ]
 }`;
 
   return prompt;

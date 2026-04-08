@@ -502,6 +502,20 @@ export interface SimulateResponse {
   emotionalState: string;
 }
 
+export interface EQScoreEntry {
+  id: string;
+  overallScore: number;
+  dimensionScores: {
+    empathyAccuracy: number;
+    expressionPrecision: number;
+    timingControl: number;
+    strategyEffectiveness: number;
+    relationshipMaintenance: number;
+  };
+  createdAt: string;
+  profileName?: string; // associated person if any
+}
+
 export interface EQReviewRequest {
   messages: string;
   targetProfile?: PersonProfile;

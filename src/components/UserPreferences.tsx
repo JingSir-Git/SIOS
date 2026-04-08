@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const THEME_KEYS: ThemeKey[] = ["dark", "soft-light", "green-eye", "sepia", "blue-night"];
+const THEME_KEYS: ThemeKey[] = ["dark", "violet-dark", "green-eye", "sepia", "blue-night"];
 
 export default function UserPreferences() {
   const { fontSize, setFontSize, theme, setTheme } = useAppStore();

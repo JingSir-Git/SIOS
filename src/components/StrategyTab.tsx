@@ -28,6 +28,12 @@ interface StrategyPoint {
   expectedResistance: string;
 }
 
+interface ScriptTemplate {
+  scenario: string;
+  script: string;
+  rationale: string;
+}
+
 interface StrategyResult {
   objective: string;
   openingMoves: string[];
@@ -36,6 +42,7 @@ interface StrategyResult {
   batna: string;
   redLines: string[];
   psychologicalTactics: string[];
+  scriptTemplates?: ScriptTemplate[];
   estimatedDifficulty: string;
   successProbability: number;
 }
@@ -58,6 +65,7 @@ export default function StrategyTab() {
   const [error, setError] = useState("");
   const [expandedPoint, setExpandedPoint] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedScript, setCopiedScript] = useState<number | null>(null);
   const [showExamples, setShowExamples] = useState(false);
   const [activeExampleCategory, setActiveExampleCategory] = useState(STRATEGY_EXAMPLE_CATEGORIES[0].id);
 
@@ -441,6 +449,42 @@ ${result.redLines.map((r) => `- ${r}`).join("\n")}`;
                   <div className="space-y-1.5">
                     {result.psychologicalTactics.map((t, i) => (
                       <p key={i} className="text-xs text-zinc-400 leading-relaxed">💡 {t}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Script Templates 参考话术 */}
+              {result.scriptTemplates && result.scriptTemplates.length > 0 && (
+                <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <BookOpen className="h-4 w-4 text-cyan-400" />
+                    <h4 className="text-xs font-medium text-cyan-300">参考话术 · 可直接使用</h4>
+                  </div>
+                  <div className="space-y-3">
+                    {result.scriptTemplates.map((st, i) => (
+                      <div key={i} className="rounded-lg border border-cyan-500/10 bg-zinc-900/50 p-3 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-cyan-400 font-medium">{st.scenario}</span>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(st.script);
+                              setCopiedScript(i);
+                              setTimeout(() => setCopiedScript(null), 2000);
+                            }}
+                            className="flex items-center gap-1 text-[9px] text-cyan-400 hover:text-cyan-300 transition-colors"
+                          >
+                            {copiedScript === i ? <Check className="h-2.5 w-2.5" /> : <Copy className="h-2.5 w-2.5" />}
+                            {copiedScript === i ? "已复制" : "复制"}
+                          </button>
+                        </div>
+                        <p className="text-xs text-zinc-200 leading-relaxed font-medium">
+                          &ldquo;{st.script}&rdquo;
+                        </p>
+                        <p className="text-[10px] text-zinc-500 leading-relaxed">
+                          {st.rationale}
+                        </p>
+                      </div>
                     ))}
                   </div>
                 </div>

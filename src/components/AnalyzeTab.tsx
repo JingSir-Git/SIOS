@@ -24,6 +24,7 @@ import EmotionChart from "./EmotionChart";
 import ConversationHistory from "./ConversationHistory";
 import MessageAttributionEditor from "./MessageAttributionEditor";
 import ModuleHistoryPanel from "./ModuleHistoryPanel";
+import ScenarioShortcuts from "./ScenarioShortcuts";
 import { parseConversation, formatMessagesForLLM } from "@/lib/parse-conversation";
 import { EXAMPLE_CATEGORIES, type ExampleConversation } from "@/lib/example-conversations";
 import { ALL_MBTI_TYPES } from "@/lib/mbti-questions";
@@ -149,7 +150,7 @@ export default function AnalyzeTab() {
   // History panel
   const [showHistory, setShowHistory] = useState(false);
 
-  const { addConversation, addProfile, updateProfile, snapshotProfile, profiles, conversations, mbtiResults, addModuleHistory } = useAppStore();
+  const { addConversation, addProfile, updateProfile, snapshotProfile, profiles, conversations, mbtiResults, addModuleHistory, navigateToTab } = useAppStore();
 
   // Auto-populate selfMBTI from stored test results
   const latestMBTI = mbtiResults[0];
@@ -574,6 +575,15 @@ export default function AnalyzeTab() {
               onClose={() => setShowHistory(false)}
               onLoadConversation={loadFromHistory}
               onReAnalyze={reAnalyzeFromHistory}
+            />
+          )}
+
+          {/* ===== Scenario Shortcuts — show when no conversation entered ===== */}
+          {stage === "input" && !conversation.trim() && (
+            <ScenarioShortcuts
+              onNavigate={(tab, context, goal) => {
+                navigateToTab(tab);
+              }}
             />
           )}
 

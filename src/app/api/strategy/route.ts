@@ -68,7 +68,14 @@ ${objective}`;
   "riskMitigation": ["风险1及对策", "风险2及对策"],
   "batna": "如果谈判失败，你的最佳替代方案是什么",
   "redLines": ["绝不能让步的底线1", "底线2"],
-  "psychologicalTactics": ["可以使用的心理策略1", "策略2"]
+  "psychologicalTactics": ["可以使用的心理策略1", "策略2"],
+  "scriptTemplates": [
+    {
+      "scenario": "适用场景（如：开场白、关键转折、僵局破冰、收尾确认）",
+      "script": "可以直接使用或微调的完整话术，要自然、口语化、符合对方沟通风格",
+      "rationale": "为什么这句话有效——结合对方画像的心理学解释"
+    }
+  ]
 }`;
 
     const raw = await callLLM({

@@ -25,6 +25,7 @@ import {
   HeartHandshake,
   GraduationCap,
   UserCircle,
+  Share2,
 } from "lucide-react";
 import { cn, getConfidenceLabel, getConfidenceColor, formatDate } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
@@ -34,6 +35,8 @@ import RelationshipTrends from "./RelationshipTrends";
 import ProfileMerge from "./ProfileMerge";
 import SubjectiveImpressionEditor from "./SubjectiveImpressionEditor";
 import SelfProfileTab from "./SelfProfileTab";
+import ProfileEvolutionChart from "./ProfileEvolutionChart";
+import ProfileShareFusion from "./ProfileShareFusion";
 import { TEMPLATE_CATEGORIES, type ProfileTemplate } from "@/lib/profile-templates";
 import type { PersonProfile, ConversationSession } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
@@ -542,6 +545,7 @@ function ProfileDetail({
   const { navigateToTab } = useAppStore();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showConversations, setShowConversations] = useState(false);
+  const [showShareFusion, setShowShareFusion] = useState(false);
 
   return (
     <div className="flex flex-col h-full">
@@ -627,7 +631,27 @@ function ProfileDetail({
               <GraduationCap className="h-3.5 w-3.5" />
               复盘与此人的对话
             </button>
+            <button
+              onClick={() => setShowShareFusion(!showShareFusion)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs transition-colors",
+                showShareFusion
+                  ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-300"
+                  : "border-cyan-500/20 bg-cyan-500/5 text-cyan-300 hover:bg-cyan-500/10"
+              )}
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              画像共享与融合
+            </button>
           </div>
+
+          {/* Share & Fusion Panel */}
+          {showShareFusion && (
+            <ProfileShareFusion
+              profile={profile}
+              onClose={() => setShowShareFusion(false)}
+            />
+          )}
 
           {/* Radar Chart */}
           <div className="rounded-lg border border-zinc-800 p-5">
@@ -636,6 +660,9 @@ function ProfileDetail({
             </h3>
             <RadarChart dimensions={profile.dimensions} />
           </div>
+
+          {/* Profile Evolution Timeline */}
+          <ProfileEvolutionChart profile={profile} />
 
           {/* Dimension Details */}
           <div className="rounded-lg border border-zinc-800 p-5">
