@@ -19,7 +19,7 @@ import type {
 } from "./types";
 
 // ---- Theme & Preferences Types ----
-export type ThemeKey = "dark" | "light" | "green-eye" | "sepia" | "blue-night";
+export type ThemeKey = "dark" | "soft-light" | "green-eye" | "sepia" | "blue-night";
 
 export interface ModuleHistoryEntry {
   id: string;

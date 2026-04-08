@@ -50,23 +50,23 @@ body {
   background: var(--border-primary, #3f3f46);
 }
 
-/* Light theme overrides for Tailwind dark classes */
-[data-theme="light"] .bg-zinc-900 { background-color: #f4f4f5 !important; }
-[data-theme="light"] .bg-zinc-900\/50 { background-color: rgba(244, 244, 245, 0.7) !important; }
-[data-theme="light"] .bg-zinc-800 { background-color: #e4e4e7 !important; }
-[data-theme="light"] .bg-zinc-800\/50 { background-color: rgba(228, 228, 231, 0.5) !important; }
-[data-theme="light"] .bg-zinc-800\/70 { background-color: rgba(228, 228, 231, 0.7) !important; }
-[data-theme="light"] .border-zinc-800 { border-color: #d4d4d8 !important; }
-[data-theme="light"] .border-zinc-700 { border-color: #d4d4d8 !important; }
-[data-theme="light"] .border-zinc-700\/50 { border-color: rgba(212, 212, 216, 0.5) !important; }
-[data-theme="light"] .text-zinc-100 { color: #18181b !important; }
-[data-theme="light"] .text-zinc-200 { color: #27272a !important; }
-[data-theme="light"] .text-zinc-300 { color: #3f3f46 !important; }
-[data-theme="light"] .text-zinc-400 { color: #52525b !important; }
-[data-theme="light"] .text-zinc-500 { color: #71717a !important; }
-[data-theme="light"] .text-zinc-600 { color: #a1a1aa !important; }
-[data-theme="light"] .text-white { color: #18181b !important; }
-[data-theme="light"] .placeholder\:text-zinc-600::placeholder { color: #a1a1aa !important; }
+/* Soft-light theme overrides for Tailwind dark classes */
+[data-theme="soft-light"] .bg-zinc-900 { background-color: #ebe5da !important; }
+[data-theme="soft-light"] .bg-zinc-900\/50 { background-color: rgba(235, 229, 218, 0.7) !important; }
+[data-theme="soft-light"] .bg-zinc-800 { background-color: #ddd6c8 !important; }
+[data-theme="soft-light"] .bg-zinc-800\/50 { background-color: rgba(221, 214, 200, 0.5) !important; }
+[data-theme="soft-light"] .bg-zinc-800\/70 { background-color: rgba(221, 214, 200, 0.7) !important; }
+[data-theme="soft-light"] .border-zinc-800 { border-color: #c8bfb0 !important; }
+[data-theme="soft-light"] .border-zinc-700 { border-color: #c8bfb0 !important; }
+[data-theme="soft-light"] .border-zinc-700\/50 { border-color: rgba(200, 191, 176, 0.5) !important; }
+[data-theme="soft-light"] .text-zinc-100 { color: #2c2620 !important; }
+[data-theme="soft-light"] .text-zinc-200 { color: #3d3530 !important; }
+[data-theme="soft-light"] .text-zinc-300 { color: #5a5248 !important; }
+[data-theme="soft-light"] .text-zinc-400 { color: #706758 !important; }
+[data-theme="soft-light"] .text-zinc-500 { color: #8a7f72 !important; }
+[data-theme="soft-light"] .text-zinc-600 { color: #b0a594 !important; }
+[data-theme="soft-light"] .text-white { color: #2c2620 !important; }
+[data-theme="soft-light"] .placeholder\:text-zinc-600::placeholder { color: #b0a594 !important; }
 
 /* Green eye-care theme overrides */
 [data-theme="green-eye"] .bg-zinc-900 { background-color: #223322 !important; }

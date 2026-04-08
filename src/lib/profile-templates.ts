@@ -534,8 +534,8 @@ export const TEMPLATE_CATEGORIES: TemplateCategory[] = [
     templates: [
       {
         id: "doctor",
-        label: "医生",
-        description: "就医问诊的医疗专业人员",
+        label: "我的主治医生",
+        description: "你作为患者面对的医生——难点在于如何向专业人士表达症状、理解方案、争取权益",
         category: "service",
         tags: ["其他"],
         dimensions: {
@@ -552,8 +552,8 @@ export const TEMPLATE_CATEGORIES: TemplateCategory[] = [
           overallType: "专业权威型",
           strengths: ["专业知识", "诊断能力", "经验丰富"],
           weaknesses: ["时间有限沟通简短", "可能过于技术化"],
-          triggerPoints: ["不遵医嘱", "自行诊断", "质疑专业"],
-          preferredTopics: ["症状描述", "治疗方案", "注意事项"],
+          triggerPoints: ["患者不遵医嘱", "自行网上诊断", "质疑专业判断"],
+          preferredTopics: ["症状描述", "治疗方案选择", "用药注意事项"],
         },
         patterns: {
           responseSpeed: "繁忙时较慢",
@@ -563,8 +563,8 @@ export const TEMPLATE_CATEGORIES: TemplateCategory[] = [
       },
       {
         id: "lawyer",
-        label: "律师",
-        description: "法律咨询或代理律师",
+        label: "我的律师",
+        description: "你作为当事人/委托人面对的律师——难点在于如何表述清楚事实、理解法律建议、控制费用",
         category: "service",
         tags: ["其他"],
         dimensions: {
@@ -592,8 +592,8 @@ export const TEMPLATE_CATEGORIES: TemplateCategory[] = [
       },
       {
         id: "landlord",
-        label: "房东",
-        description: "租房关系中的房屋所有者",
+        label: "我的房东",
+        description: "你作为租客面对的房东——难点在于押金纠纷、维修推诳、涨租压力、合同条款争议",
         category: "service",
         tags: ["其他"],
         dimensions: {
@@ -621,8 +621,8 @@ export const TEMPLATE_CATEGORIES: TemplateCategory[] = [
       },
       {
         id: "interviewer",
-        label: "面试官",
-        description: "求职过程中的面试评估者",
+        label: "我的面试官",
+        description: "你作为求职者面对的面试官——难点在于如何展示价值、应对刷钻问题、谈判薪资",
         category: "service",
         tags: ["其他"],
         dimensions: {

@@ -149,7 +149,7 @@ export default function AnalyzeTab() {
   // History panel
   const [showHistory, setShowHistory] = useState(false);
 
-  const { addConversation, addProfile, profiles, conversations, mbtiResults, addModuleHistory } = useAppStore();
+  const { addConversation, addProfile, updateProfile, snapshotProfile, profiles, conversations, mbtiResults, addModuleHistory } = useAppStore();
 
   // Auto-populate selfMBTI from stored test results
   const latestMBTI = mbtiResults[0];
@@ -321,6 +321,11 @@ export default function AnalyzeTab() {
     const name = targetName.trim() || "对方";
     const convoId = uuidv4();
 
+    // Dynamic profile update: only update the direct conversation partner (targetName).
+    // Third parties mentioned in the conversation are NEVER updated.
+    const existingProfile = profiles.find((p) => p.name === name);
+    const profileId = existingProfile?.id || (result.profileUpdate ? uuidv4() : undefined);
+
     addConversation({
       id: convoId,
       title: `与${name}的对话分析`,
@@ -330,6 +335,7 @@ export default function AnalyzeTab() {
       rawText: originalRawText || conversation,
       targetName: name,
       context: context || undefined,
+      linkedProfileId: profileId,
       analysis: {
         id: uuidv4(),
         conversationId: convoId,
@@ -339,23 +345,112 @@ export default function AnalyzeTab() {
     });
 
     if (result.profileUpdate) {
-      const existingProfile = profiles.find(
-        (p) => p.name === name
-      );
+      const pu = result.profileUpdate;
+      const newDims = pu.dimensions || {};
 
-      if (!existingProfile) {
-        const pu = result.profileUpdate;
-        const dims = pu.dimensions || {};
+      if (existingProfile) {
+        // ---- Dynamic merge into existing profile ----
+        // 1. Snapshot current state before updating
+        snapshotProfile(existingProfile.id, `对话分析更新: ${name}`);
+
+        // 2. Confidence-weighted merge for each dimension
+        const mergedDimensions = { ...existingProfile.dimensions };
+        const dimLabels: Record<string, string> = {
+          assertiveness: "强势程度", cooperativeness: "合作倾向",
+          decisionSpeed: "决策速度", emotionalStability: "情绪稳定性",
+          openness: "开放性", empathy: "共情能力",
+          riskTolerance: "风险承受", formalityLevel: "正式程度",
+        };
+
+        for (const key of Object.keys(dimLabels)) {
+          const existing = mergedDimensions[key as keyof typeof mergedDimensions];
+          const incoming = newDims[key];
+          if (!incoming) continue;
+
+          const oldConf = existing?.confidence ?? 10;
+          const newConf = incoming.confidence ?? 10;
+          const totalConf = oldConf + newConf;
+
+          // Weighted average: higher confidence data has more influence
+          const mergedValue = Math.round(
+            ((existing?.value ?? 50) * oldConf + (incoming.value ?? 50) * newConf) / totalConf
+          );
+          const mergedConfidence = Math.min(totalConf, 100);
+
+          // Append new evidence, deduplicate
+          const existingEvidence = existing?.evidence ?? [];
+          const newEvidence = incoming.evidence ?? [];
+          const allEvidence = [...existingEvidence];
+          for (const e of newEvidence) {
+            if (!allEvidence.includes(e)) allEvidence.push(e);
+          }
+          // Keep only the most recent 10 evidence items
+          const trimmedEvidence = allEvidence.slice(-10);
+
+          mergedDimensions[key as keyof typeof mergedDimensions] = {
+            ...existing,
+            label: key,
+            labelZh: dimLabels[key],
+            value: mergedValue,
+            confidence: mergedConfidence,
+            evidence: trimmedEvidence,
+          };
+        }
+
+        // 3. Merge communication style: prefer newer non-empty values
+        const mergedCommStyle = { ...existingProfile.communicationStyle };
+        if (pu.communicationStyle) {
+          if (pu.communicationStyle.overallType) mergedCommStyle.overallType = pu.communicationStyle.overallType;
+          if (pu.communicationStyle.strengths?.length) {
+            const set = new Set([...mergedCommStyle.strengths, ...pu.communicationStyle.strengths]);
+            mergedCommStyle.strengths = [...set].slice(0, 8);
+          }
+          if (pu.communicationStyle.weaknesses?.length) {
+            const set = new Set([...mergedCommStyle.weaknesses, ...pu.communicationStyle.weaknesses]);
+            mergedCommStyle.weaknesses = [...set].slice(0, 8);
+          }
+          if (pu.communicationStyle.triggerPoints?.length) {
+            const set = new Set([...(mergedCommStyle.triggerPoints || []), ...pu.communicationStyle.triggerPoints]);
+            mergedCommStyle.triggerPoints = [...set].slice(0, 8);
+          }
+          if (pu.communicationStyle.preferredTopics?.length) {
+            const set = new Set([...(mergedCommStyle.preferredTopics || []), ...pu.communicationStyle.preferredTopics]);
+            mergedCommStyle.preferredTopics = [...set].slice(0, 8);
+          }
+        }
+
+        // 4. Update patterns: prefer newer non-empty values
+        const mergedPatterns = { ...existingProfile.patterns };
+        if (pu.patterns) {
+          if (pu.patterns.responseSpeed) mergedPatterns.responseSpeed = pu.patterns.responseSpeed as string;
+          if (pu.patterns.conflictStyle) mergedPatterns.conflictStyle = pu.patterns.conflictStyle as string;
+          if (pu.patterns.decisionStyle) mergedPatterns.decisionStyle = pu.patterns.decisionStyle as string;
+          if (pu.patterns.persuasionVulnerability?.length) {
+            const set = new Set([...(mergedPatterns.persuasionVulnerability || []), ...(pu.patterns.persuasionVulnerability as string[])]);
+            mergedPatterns.persuasionVulnerability = [...set].slice(0, 8);
+          }
+        }
+
+        // 5. Apply merged update — only the direct conversation partner
+        updateProfile(existingProfile.id, {
+          dimensions: mergedDimensions,
+          communicationStyle: mergedCommStyle,
+          patterns: mergedPatterns,
+          conversationCount: existingProfile.conversationCount + 1,
+          lastInteraction: new Date().toISOString(),
+        });
+      } else {
+        // ---- Create new profile for this conversation partner ----
         const makeDim = (key: string, labelZh: string) => ({
           label: key,
           labelZh,
-          value: dims[key]?.value ?? 50,
-          confidence: dims[key]?.confidence ?? 10,
-          evidence: dims[key]?.evidence ?? [],
+          value: newDims[key]?.value ?? 50,
+          confidence: newDims[key]?.confidence ?? 10,
+          evidence: newDims[key]?.evidence ?? [],
         });
 
         addProfile({
-          id: uuidv4(),
+          id: profileId!,
           name,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
