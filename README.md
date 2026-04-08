@@ -1,36 +1,297 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SIOS — Social Intelligence OS  (v5)
 
-## Getting Started
+> 社交智能操作系统：Memory × Negotiation 的融合。
+> 将人际交互从「凭直觉」升级为「数据驱动」。
 
-First, run the development server:
+**在正确的时间，用正确的方式，对正确的人，说正确的话。**
+
+---
+
+## 核心架构
+
+### 贝叶斯渐进式画像引擎
+每一句话都是一次贝叶斯更新。系统从对话中提取无意识行为模式——用词选择、句式风格、语气词频率——这些最难伪装的信号，构建动态人格画像。置信度诚实反映证据充分程度，永远不会到 100%。
+
+### 五层信号提取框架
+从浅到深，逐层解锁：
+1. **表层语言特征** — 即使 1 句话也能开始提取（用词正式程度、句长、标点习惯、表情偏好）
+2. **话语结构特征** — 2-3 句话后可提取（先说结论还是铺垫、反问频率、转折词使用）
+3. **互动模式特征** — 3-5 轮对话后可提取（回复速度、主动提问、冲突处理模式）
+4. **内容语义特征** — 5-10 轮对话后可提取（核心主题、归因风格、时间表达、价值信号）
+5. **元认知特征** — 低频但高价值信号（自我修正、不确定性表达、情绪自我觉察）
+
+### 双视角画像系统
+每个人物画像由两部分构成：
+- **AI 分析视角** — 基于对话数据的客观行为建模（8维人格 + 贝叶斯置信度）
+- **用户主观视角** — 你对此人的个人印象、关系描述、信任度、未解决问题
+
+### 证据链 & 画像版本控制
+每个画像判断都可追溯到具体的对话原文。画像随着新证据自动演进，历史版本完整保留。
+
+---
+
+## 十大功能模块
+
+### 1. 对话分析 (Conversation Analysis) — `Ctrl+1`
+粘贴对话 → 五层深度分析 → 情绪曲线 + 关键转折点 + 策略洞察 + MBTI推测 + 画像自动生成。
+- 支持结构化对话（`我：...`）和无标记对话（微信直接粘贴）
+- 智能归因编辑器：自动猜测说话人，支持手动修正
+- 可选 MBTI 参考输入，辅助人格分析
+- 对话原文持久化存储，支持历史浏览和重新分析
+- 内置 9 大类 30+ 示例对话（职场、亲密关系、商务、创业融资、危机沟通等）
+
+### 2. 人物画像 (Person Profiles) — `Ctrl+2`
+8 维人格雷达图 + 置信度 + 沟通风格 + 行为模式 + 情绪触发点 + 有效说服策略。
+- 6 大类预设画像模板，快速创建典型人物
+- **双视角画像**：AI分析 + 用户主观印象（关系、信任度、情绪态度、未解决问题）
+- **自我画像**：分析你在所有对话中的沟通模式、语言指纹、情绪模式、说服策略、盲点
+- **关系温度趋势**：多对话情感轨迹可视化（Recharts面积图），自动判定升温/稳定/降温
+- **智能关系维护提醒**：基于对话内容的话题建议 + 主观印象联动 + 主动跟进时机
+- **智能去重合并**：模糊名称匹配 + 置信度择优合并
+- 画像随每次对话分析自动增量更新
+- 跨模块一键导航：直接跳转到教练/模拟/策略/心理分析/情商复盘
+
+### 3. 实时教练 (Real-time Coach) — `Ctrl+3`
+对话进行中，AI 顾问在耳边低语：机会信号 / 风险预警 / 深层洞察 / 话术建议。
+- 融入博弈论思维——考虑多步后果和权衡
+- 可关联已有画像，针对性更强
+- 内置 6 大类 20+ 教练场景（职场谈判、情感沟通、创业融资、危机处理等）
+
+### 4. 模拟对练 (Simulation Arena) — `Ctrl+4`
+与对方的 AI 数字分身进行高真实度对话演练。
+- 三级难度（初级配合 / 中级协商 / 高级强硬）
+- 每轮附带幕后教练提示 + 对方情绪状态追踪
+- 内置 6 大类 15+ 模拟场景（商务、情感、创业、政务等）
+
+### 5. 情商训练 (EQ Training) — `Ctrl+5`
+逐句精准复盘 + 5 维能力评分（共情准确度、表达精度、时机把握、策略有效性、关系维护）。
+- 不是鸡汤，而是基于心理学机制的精确训练
+- **画像融合复盘**：关联人物画像，AI结合对方性格数据进行更精准的情商分析
+- **历史对话载入**：从对话历史中直接载入真实对话进行复盘，按人物筛选
+- 跨模块导航：从画像页一键跳转复盘与特定人物的对话
+- 内置 8 大类 20+ 训练场景（职场、服务、创业融资、家庭代际、高难度极端情境等）
+
+### 6. 策略规划 (Strategy Planner) — `Ctrl+6`
+为即将到来的重要对话制定完整策略：开场方式、关键议题攻略、备选方案、风险控制、BATNA、红线、心理策略。
+- 内置 6 大类 15+ 策略场景（职业发展、商业合作、创业融资、危机逆境、社交人脉等）
+
+### 7. 心理顾问 (Psychology Counselor) — `Ctrl+7`
+基于关系网络和人物画像数据，提供个性化心理疏导与关系优化建议。
+- 六步分析框架：情绪识别 → 需求解码 → 模式识别 → 认知审视 → 资源盘点 → 行动建议
+- 自动整合已有画像数据，提供精准人际关系洞察
+- 自我描述输入，帮助 AI 更好理解你的性格和沟通方式
+- 跨模块聚焦：从画像页一键跳转，聚焦分析特定人物关系
+- 专业边界提醒：涉及严重心理问题时建议寻求专业帮助
+
+### 8. 规划制定 (Action Planner) — `Ctrl+8`
+输入目标 → AI生成多阶段行动计划，包含里程碑、时间线、资源需求、风险预警。
+- 支持 7 大领域（日常、学习、职业、商业、项目、政务、人生）
+- 支持 5 种时间尺度（小时级、天级、周级、月级、年级）
+- 高级选项：预算约束、偏好设置、自定义约束条件
+- 内置 6 大类 15+ 规划模板
+
+### 9. MBTI 人格测试 (MBTI Personality Test) — `Ctrl+9`
+三种深度模式，从快速定位到精准画像：
+- **快速模式**（24题 / 3分钟）— 经典核心题目，适合时间紧张
+- **标准模式**（48题 / 8分钟）— 增加深层认知题，推荐使用
+- **完整模式**（93题 / 15分钟）— 极深层场景题，最精准
+- 16 种 MBTI 类型详细报告：认知功能栈、优势/盲点、沟通风格、冲突处理、压力反应、成长建议、同类型名人
+- **结果持久化**：测试记录永久保存，历史结果随时回顾
+- **全系统联动**：MBTI结果自动注入对话分析和自我画像，无需重复输入
+
+### 10. 数据管理 (Data & Settings) — `Ctrl+0`
+导出、导入和管理所有数据。
+- 完整数据导出/导入（JSON格式，支持迁移）
+- 合并导入或替换导入两种模式
+- 一键清空所有数据
+
+### 附加功能
+- **智能消息归因**：粘贴未标记聊天记录，AI自动猜测说话人，可视化编辑器支持手动修正
+- **对话历史管理**：浏览、搜索、重新分析历史对话，支持原文回溯
+- **跨模块导航**：从画像页一键跳转到教练/模拟/策略/心理分析，自动预选目标人物
+- **键盘快捷键**：Ctrl+1~9 + Ctrl+0 快速切换全部 10 个模块
+- **新手引导**：非阻断式浮窗导览，9步快速了解所有功能
+- **关系维护提醒**：自动检测长时间未联系的重要关系，含话题建议和主观印象联动
+- **关系温度趋势**：Recharts可视化多对话情感轨迹，自动升温/降温判定
+- **自我沟通画像**：分析用户跨所有对话的沟通风格、语言指纹、情绪模式与成长建议
+
+---
+
+## 技术栈
+
+| 层级 | 技术 |
+|------|------|
+| **框架** | Next.js 16.2.2 (App Router + Turbopack) |
+| **前端** | React 19 + TailwindCSS 4 + Lucide Icons |
+| **图表** | Recharts（雷达图、情绪曲线） |
+| **状态** | Zustand + localStorage 持久化 |
+| **LLM** | MiniMax-M2.7-highspeed (Anthropic SDK 兼容) |
+| **类型** | TypeScript 5 strict mode |
+
+---
+
+## 快速开始
 
 ```bash
+# 安装依赖
+npm install
+
+# 配置环境变量
+cp .env.example .env.local
+# 编辑 .env.local，填入你的 API 密钥：
+#   ANTHROPIC_BASE_URL=https://api.minimaxi.com/anthropic
+#   ANTHROPIC_API_KEY=你的密钥
+
+# 启动开发服务器
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# 构建生产版本
+npm run build
+npm start
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+访问 http://localhost:3000 即可使用。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 项目结构
 
-## Learn More
+```
+src/
+├── app/
+│   ├── api/
+│   │   ├── analyze/route.ts          # 对话分析 API（五层信号提取 + MBTI推测）
+│   │   ├── coach/route.ts            # 实时教练 API（博弈论 + 话术建议）
+│   │   ├── simulate/route.ts         # 模拟对练 API（数字分身 + 教练提示）
+│   │   ├── eq-review/route.ts        # 情商复盘 API（5维评分 + 逐句分析）
+│   │   ├── strategy/route.ts         # 策略规划 API（BATNA + 心理策略）
+│   │   ├── psychology/route.ts       # 心理顾问 API（六步分析框架）
+│   │   ├── planning/route.ts         # 规划制定 API（多阶段行动计划）
+│   │   └── self-profile/route.ts     # 自我画像 API（沟通模式分析）
+│   ├── globals.css                   # 全局样式（深色主题）
+│   ├── layout.tsx                    # 根布局
+│   └── page.tsx                      # 入口页面
+├── components/
+│   ├── AppShell.tsx                  # 应用外壳 + Tab路由
+│   ├── Sidebar.tsx                   # 侧边导航栏（10个模块）
+│   ├── KeyboardShortcuts.tsx         # 键盘快捷键（Ctrl+1~9, Ctrl+0）
+│   ├── OnboardingTour.tsx            # 新手引导浮窗（9步功能导览）
+│   ├── AnalyzeTab.tsx                # 对话分析页（原文持久化 + 历史管理）
+│   ├── ProfilesTab.tsx               # 人物画像页（双视角 + 去重合并 + 跨模块导航）
+│   ├── CoachTab.tsx                  # 实时教练页（交互式指导）
+│   ├── SimulateTab.tsx               # 模拟对练页（三级难度）
+│   ├── EQTrainingTab.tsx             # 情商训练页（5维评分）
+│   ├── StrategyTab.tsx               # 策略规划页（完整策略生成）
+│   ├── PsychologyTab.tsx             # 心理顾问页（六步分析 + 画像融合）
+│   ├── PlanningTab.tsx               # 规划制定页（多域多尺度规划）
+│   ├── MBTITab.tsx                   # MBTI测试页（3模式 + 详细报告）
+│   ├── SubjectiveImpressionEditor.tsx # 主观印象编辑器（双视角画像）
+│   ├── ProfileMerge.tsx              # 画像去重合并（模糊匹配 + 智能合并）
+│   ├── ConversationHistory.tsx       # 对话历史浏览（重新分析）
+│   ├── MessageAttributionEditor.tsx  # 智能消息归因编辑器
+│   ├── RelationshipAlerts.tsx        # 关系维护提醒（话题建议 + 智能跟进）
+│   ├── RelationshipTrends.tsx        # 关系温度趋势（Recharts面积图）
+│   ├── SelfProfileTab.tsx            # 自我沟通画像（跨对话模式分析）
+│   ├── DataManager.tsx               # 数据管理（导出/导入/清空）
+│   ├── ErrorBoundary.tsx             # 错误边界组件
+│   ├── HydrationGuard.tsx            # SSR水合保护
+│   ├── RadarChart.tsx                # 8维人格雷达图
+│   └── EmotionChart.tsx              # 情绪曲线图
+└── lib/
+    ├── types.ts                      # 核心类型（贝叶斯模型 + 证据链 + 主观印象）
+    ├── extract-json.ts               # 鲁棒JSON提取（多重修复策略）
+    ├── api-client.ts                 # MiniMax LLM 客户端（Anthropic SDK）
+    ├── prompts.ts                    # 系统提示词（分析 + 教练 + 心理顾问 + 自我画像）
+    ├── store.ts                      # Zustand全局状态（关系图 + 版本控制 + MBTI持久化 + 跨模块导航）
+    ├── parse-conversation.ts         # 对话解析器（智能归因）
+    ├── example-conversations.ts      # 分析示例（9类30+场景）
+    ├── coach-examples.ts             # 教练示例（6类20+场景）
+    ├── simulate-examples.ts          # 对练示例（6类15+场景）
+    ├── eq-examples.ts                # 情商示例（8类20+场景）
+    ├── strategy-examples.ts          # 策略示例（6类15+场景）
+    ├── planning-examples.ts          # 规划模板（6类15+场景）
+    ├── profile-templates.ts          # 画像模板（6类预设人物）
+    ├── mbti-questions.ts             # MBTI题库（93题3模式 + 16型详细报告）
+    └── utils.ts                      # 工具函数
+```
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 示例场景覆盖
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+系统内置 **120+ 真实场景**，覆盖以下领域：
 
-## Deploy on Vercel
+| 领域 | 场景举例 |
+|------|---------|
+| **职场沟通** | 加薪谈判、绩效面谈、跨部门协作、向上汇报 |
+| **商务谈判** | B2B销售、合同谈判、供应商议价、跨国商务 |
+| **创业融资** | VC路演、Term Sheet博弈、联创分歧、天使投资 |
+| **危机处理** | 媒体危机公关、裁员沟通、客户投诉、数据泄露 |
+| **情感关系** | 亲密关系冲突、家庭代际矛盾、婆媳边界、朋友调解 |
+| **政务场景** | 政府汇报、招商引资、公务接待、政策协商 |
+| **专业领域** | 医患沟通、律师谈判、教育场景、公务员拒绝请托 |
+| **高难度** | 安慰丧亲、公开批评应对、离婚调解、极端情绪管理 |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 隐私架构
+
+隐私是产品的核心信任基础，从第一天起就按最高标准设计：
+
+- **本地优先**: 所有画像和对话数据存储在用户本地浏览器（localStorage）
+- **按需调用**: API 调用仅在用户主动操作时发生，不做后台数据同步
+- **零收集**: 不收集任何用户行为数据、不追踪、不上报
+- **完全控制**: 画像和对话数据用户可随时查看、导出、删除
+- **未来规划**: 服务器版本将实现端到端加密 + 用户数据完全隔离
+
+---
+
+## 产品路线图
+
+### ✅ Phase 1 — 对话分析工具（已完成）
+单次粘贴对话 → 五层分析 + 画像生成。验证用户是否愿意为"理解他人"付费。
+
+### ✅ Phase 2 — 记忆体 + 全功能矩阵（已完成）
+持续画像积累 + 9大功能模块 + 120+示例场景 + MBTI人格系统。
+
+### ✅ Phase 3 — 数据飞轮 + 体验升级（已完成）
+- 数据导出/导入（支持未来服务器迁移）
+- 键盘快捷键系统（Ctrl+1~9, Ctrl+0）
+- 会话历史管理 + 原文持久化 + 重新分析
+- 画像去重合并（模糊名称匹配 + 置信度择优）
+- 跨模块一键导航（画像 → 教练/模拟/策略/心理）
+- 非阻断式新手引导浮窗
+
+### ✅ Phase 4 — 深度模块扩展（已完成）
+- 双视角画像系统（AI分析 + 用户主观印象）
+- 心理顾问模块（六步分析框架 + 画像融合）
+- MBTI 三模式测试（24/48/93题）+ 16型详细报告
+- 全模块快捷键覆盖（10个模块 Ctrl+0~9）
+
+### ✅ Phase 5 — 智能融合 + 自我认知（已完成）
+- EQ训练画像融合（关联人物画像 + 历史对话载入 + 画像数据注入复盘）
+- MBTI结果持久化（测试记录存储 + 历史回顾 + 全系统自动联动）
+- 关系温度趋势（多对话情感轨迹可视化 + 自动升温/降温判定）
+- 智能关系维护（话题建议从对话内容提取 + 主观印象联动 + 主动跟进时机）
+- 自我沟通画像（跨所有对话分析用户沟通模式、语言指纹、盲点与成长建议）
+- 对话分析MBTI自动填入（从测试结果自动注入，无需手动选择）
+
+### 📋 Phase 6 — 服务器部署 + 多用户
+- 用户认证与数据隔离
+- 端到端加密
+- 云端同步 + 本地缓存
+- 多设备协同
+
+### 📋 Phase 7 — 平台化
+- 开放 API
+- 垂直场景插件（婚恋、亲子、跨文化、销售）
+- AI 情商教练课程产品
+
+---
+
+## 设计哲学
+
+> **情商的本质是理解他人并建立真实连接，不是操纵。**
+
+系统始终引导用户寻找双赢方案，而非单方面利用对方弱点。
+AI 的输出从第一天就传递正确的价值观——帮你成为更好的沟通者，而不是更好的操控者。
