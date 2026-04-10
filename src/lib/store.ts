@@ -158,6 +158,27 @@ interface AppState {
   toasts: ToastItem[];
   addToast: (toast: Omit<ToastItem, "id" | "createdAt">) => void;
   removeToast: (id: string) => void;
+
+  // ---- API Settings ----
+  apiSettings: {
+    baseURL: string;
+    apiKey: string;
+    model: string;
+    customModels: string[]; // user-defined model names
+  };
+  updateApiSettings: (updates: Partial<AppState["apiSettings"]>) => void;
+  addCustomModel: (model: string) => void;
+  removeCustomModel: (model: string) => void;
+
+  // ---- Data Privacy (GDPR) ----
+  privacySettings: {
+    dataEncryptionEnabled: boolean;
+    autoDeleteAfterDays: number; // 0 = never
+    anonymizeExports: boolean;
+  };
+  updatePrivacySettings: (updates: Partial<AppState["privacySettings"]>) => void;
+  purgeAllPersonalData: () => void;
+  exportAnonymizedData: () => DataExport;
 }
 
 // ============================================================
@@ -599,6 +620,92 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           toasts: state.toasts.filter((t) => t.id !== id),
         })),
+
+      // ---- API Settings ----
+      apiSettings: {
+        baseURL: "",
+        apiKey: "",
+        model: "",
+        customModels: [],
+      },
+      updateApiSettings: (updates) =>
+        set((state) => ({
+          apiSettings: { ...state.apiSettings, ...updates },
+        })),
+      addCustomModel: (model) =>
+        set((state) => ({
+          apiSettings: {
+            ...state.apiSettings,
+            customModels: state.apiSettings.customModels.includes(model)
+              ? state.apiSettings.customModels
+              : [...state.apiSettings.customModels, model],
+          },
+        })),
+      removeCustomModel: (model) =>
+        set((state) => ({
+          apiSettings: {
+            ...state.apiSettings,
+            customModels: state.apiSettings.customModels.filter((m) => m !== model),
+          },
+        })),
+
+      // ---- Data Privacy (GDPR) ----
+      privacySettings: {
+        dataEncryptionEnabled: false,
+        autoDeleteAfterDays: 0,
+        anonymizeExports: false,
+      },
+      updatePrivacySettings: (updates) =>
+        set((state) => ({
+          privacySettings: { ...state.privacySettings, ...updates },
+        })),
+      purgeAllPersonalData: () =>
+        set(() => ({
+          profiles: [],
+          conversations: [],
+          relationships: [],
+          coachingTips: [],
+          liveChatMessages: [],
+          mbtiResults: [],
+          eqScores: [],
+          moduleHistory: {},
+          profileMemories: [],
+          playbookVersions: [],
+        })),
+      exportAnonymizedData: () => {
+        const state = get();
+        const anonymize = (name: string) => `用户${name.length}${name.charCodeAt(0) % 100}`;
+        return {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          profiles: state.profiles.map((p) => ({
+            ...p,
+            name: anonymize(p.name),
+            notes: "",
+          })),
+          conversations: state.conversations.map((c) => ({
+            ...c,
+            rawText: "[已脱敏]",
+            messages: c.messages.map((m) => ({ ...m, content: "[已脱敏]", senderName: anonymize(m.senderName) })),
+            participants: c.participants.map(anonymize),
+            targetName: anonymize(c.targetName || ""),
+          })),
+          relationships: state.relationships.map((r) => ({
+            ...r,
+            notes: "",
+          })),
+          mbtiResults: state.mbtiResults,
+          eqScores: state.eqScores,
+          moduleHistory: {},
+          coachingTips: [],
+          playbookVersions: [],
+          profileMemories: state.profileMemories.map((m) => ({
+            ...m,
+            content: "[已脱敏]",
+            sourceQuote: undefined,
+          })),
+        };
+      },
     }),
     {
       name: "social-intelligence-os",
@@ -623,6 +730,8 @@ export const useAppStore = create<AppState>()(
         moduleHistory: state.moduleHistory,
         profileMemories: state.profileMemories,
         playbookVersions: state.playbookVersions,
+        apiSettings: state.apiSettings,
+        privacySettings: state.privacySettings,
       }),
     }
   )

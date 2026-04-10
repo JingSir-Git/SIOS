@@ -21,6 +21,7 @@ import ThemeProvider from "./ThemeProvider";
 import UserPreferences from "./UserPreferences";
 import ToastContainer from "./ToastContainer";
 import QuickAssistPanel from "./QuickAssistPanel";
+import RealtimeAssistant from "./RealtimeAssistant";
 import PWAInstallPrompt from "./PWAInstallPrompt";
 import { cn } from "@/lib/utils";
 
@@ -94,6 +95,17 @@ export default function AppShell() {
           </TabPane>
           <TabPane id="planning" active={activeTab === "planning"}>
             <PlanningTab />
+          </TabPane>
+          <TabPane id="realtime" active={activeTab === "realtime"}>
+            <div className="flex flex-col h-full">
+              <div className="border-b border-zinc-800 px-6 py-4">
+                <h1 className="text-lg font-semibold text-zinc-100">实时助手</h1>
+                <p className="text-xs text-zinc-500 mt-1">RAG记忆增强 · 情绪预测 · 实时回复建议</p>
+              </div>
+              <div className="flex-1 overflow-hidden px-6 py-4">
+                <RealtimeAssistant />
+              </div>
+            </div>
           </TabPane>
           <TabPane id="dashboard" active={activeTab === "dashboard"}>
             <DashboardTab />

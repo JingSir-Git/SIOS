@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
+import { apiFetch } from "@/lib/api-fetch";
 import StreamingIndicator from "./StreamingIndicator";
 import type { PersonProfile, ConversationSession } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
@@ -349,9 +350,8 @@ export default function PlaybookGenerator({ profile, linkedConversations, isOpen
       const controller = new AbortController();
       abortRef.current = controller;
 
-      const res = await fetch("/api/playbook", {
+      const res = await apiFetch("/api/playbook", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           profileData,
           conversationSummaries: JSON.stringify(convoSummaries, null, 2),

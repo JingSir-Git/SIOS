@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
+import { apiFetch } from "@/lib/api-fetch";
 import { SIMULATE_EXAMPLE_CATEGORIES, type SimulateExample } from "@/lib/simulate-examples";
 
 interface SimMessage {
@@ -135,9 +136,8 @@ export default function SimulateTab() {
 情绪触发点: ${selectedProfile.communicationStyle?.triggerPoints?.join("、") || "未知"}`;
       }
 
-      const res = await fetch("/api/simulate?stream=true", {
+      const res = await apiFetch("/api/simulate?stream=true", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           profileDescription,
           scenario: scenario.trim(),

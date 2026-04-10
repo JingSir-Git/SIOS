@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
+import { apiFetch } from "@/lib/api-fetch";
 
 interface PsyMessage {
   id: string;
@@ -139,9 +140,8 @@ export default function PsychologyTab() {
     setMessages((prev) => [...prev, { id: counselorMsgId, role: "counselor", content: "" }]);
 
     try {
-      const res = await fetch("/api/psychology?stream=true", {
+      const res = await apiFetch("/api/psychology?stream=true", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: currentInput,
           profilesSummary: buildProfilesSummary() || undefined,

@@ -20,6 +20,8 @@ import { useAppStore } from "@/lib/store";
 import { STRATEGY_EXAMPLE_CATEGORIES, type StrategyExample } from "@/lib/strategy-examples";
 import StreamingIndicator from "./StreamingIndicator";
 import { formatMemoriesForPrompt } from "@/lib/memory-utils";
+import { retrieveRAGContext } from "@/lib/rag-memory";
+import { apiFetch } from "@/lib/api-fetch";
 import ModuleHistoryPanel from "./ModuleHistoryPanel";
 import { v4 as uuidv4 } from "uuid";
 
@@ -123,13 +125,13 @@ export default function StrategyTab() {
       if (selectedProfile) {
         const memories = getActiveMemoriesForProfile(selectedProfile.id);
         if (memories.length > 0) {
-          profileInfo += `\n\n${formatMemoriesForPrompt(memories, selectedProfile)}`;
+          const ragCtx = retrieveRAGContext(memories, objective, selectedProfile);
+          profileInfo += `\n\n${ragCtx || formatMemoriesForPrompt(memories, selectedProfile)}`;
         }
       }
 
-      const res = await fetch("/api/strategy?stream=true", {
+      const res = await apiFetch("/api/strategy?stream=true", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           objective: objective.trim(),
           context: context.trim() || undefined,

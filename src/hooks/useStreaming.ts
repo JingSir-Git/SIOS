@@ -5,6 +5,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 
 interface SSEEvent {
   type: "progress" | "result" | "error" | "done";
@@ -89,9 +90,8 @@ export function useStreaming<T = unknown>(
         const separator = url.includes("?") ? "&" : "?";
         const streamUrl = `${url}${separator}stream=true`;
 
-        const res = await fetch(streamUrl, {
+        const res = await apiFetch(streamUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
           signal: controller.signal,
         });

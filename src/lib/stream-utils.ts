@@ -2,7 +2,7 @@
 // Server-side SSE streaming utilities
 // ============================================================
 
-import { callLLMStreaming, type LLMMessage } from "./api-client";
+import { callLLMStreaming, type LLMMessage, type LLMConfig } from "./api-client";
 import { extractJSON } from "./extract-json";
 
 /**
@@ -35,11 +35,13 @@ export function createStreamingResponse({
   messages,
   maxTokens = 8000,
   postProcess,
+  config,
 }: {
   system: string;
   messages: LLMMessage[];
   maxTokens?: number;
   postProcess?: (parsed: Record<string, unknown>) => Record<string, unknown>;
+  config?: LLMConfig;
 }): Response {
   const encoder = new TextEncoder();
   let cancelled = false;
@@ -67,6 +69,7 @@ export function createStreamingResponse({
             // Send progress every chunk (frontend will throttle display)
             enqueue({ type: "progress", text });
           },
+          config,
         });
 
         // Parse the complete response
@@ -87,6 +90,7 @@ export function createStreamingResponse({
               }],
               maxTokens: Math.min(maxTokens, 16000),
               onChunk: () => {},
+              config,
             });
             const repairResult = extractJSON(repairRaw);
             if (repairResult.data) {

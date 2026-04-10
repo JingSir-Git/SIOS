@@ -20,6 +20,7 @@ import {
   BarChart3,
   Menu,
   X,
+  Zap,
 } from "lucide-react";
 
 export const NAV_ITEMS = [
@@ -70,6 +71,12 @@ export const NAV_ITEMS = [
     label: "规划制定",
     sublabel: "Life & Work Planner",
     icon: CalendarClock,
+  },
+  {
+    id: "realtime",
+    label: "实时助手",
+    sublabel: "Realtime Assistant",
+    icon: Zap,
   },
   {
     id: "dashboard",

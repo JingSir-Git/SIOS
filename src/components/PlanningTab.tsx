@@ -25,6 +25,7 @@ import { useAppStore } from "@/lib/store";
 import { PLANNING_EXAMPLE_CATEGORIES, type PlanningExample } from "@/lib/planning-examples";
 import ModuleHistoryPanel from "./ModuleHistoryPanel";
 import StreamingIndicator from "./StreamingIndicator";
+import { apiFetch } from "@/lib/api-fetch";
 import { v4 as uuidv4 } from "uuid";
 
 interface PlanMilestone {
@@ -143,9 +144,8 @@ export default function PlanningTab() {
     abortRef.current = controller;
 
     try {
-      const res = await fetch("/api/planning?stream=true", {
+      const res = await apiFetch("/api/planning?stream=true", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           objective: objective.trim(),
           context: context.trim() || undefined,

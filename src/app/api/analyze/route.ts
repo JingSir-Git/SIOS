@@ -3,7 +3,7 @@
 // ============================================================
 
 import { NextRequest } from "next/server";
-import { callLLM } from "@/lib/api-client";
+import { callLLM, extractLLMConfig } from "@/lib/api-client";
 import { extractJSON } from "@/lib/extract-json";
 import { createStreamingResponse } from "@/lib/stream-utils";
 import {
@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { conversation, context, existingProfile, targetName, mbtiInfo } = body;
     const isStream = request.nextUrl.searchParams.get("stream") === "true";
+    const llmConfig = extractLLMConfig(request);
 
     if (!conversation || typeof conversation !== "string") {
       return Response.json(
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
         system: ANALYSIS_SYSTEM_PROMPT,
         messages: llmMessages,
         maxTokens: 16000,
+        config: llmConfig,
         postProcess: (parsed) => ({
           analysis: {
             ...parsed,
@@ -56,6 +58,7 @@ export async function POST(request: NextRequest) {
       system: ANALYSIS_SYSTEM_PROMPT,
       messages: llmMessages,
       maxTokens: 16000,
+      config: llmConfig,
     });
 
     const { data: analysis, error: parseError } = extractJSON(raw);

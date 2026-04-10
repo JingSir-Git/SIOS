@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
+import { apiFetch } from "@/lib/api-fetch";
 import { formatMemoriesForPrompt } from "@/lib/memory-utils";
 
 interface QuickCoachResult {
@@ -75,9 +76,8 @@ ${memoryText ? `\nAI记忆:\n${memoryText}` : ""}`;
 
       const mbtiContext = latestMBTI ? `\n我的MBTI类型: ${latestMBTI.type}` : "";
 
-      const res = await fetch("/api/coach?stream=true", {
+      const res = await apiFetch("/api/coach?stream=true", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: [
             { role: "other", content: incomingMessage.trim() },

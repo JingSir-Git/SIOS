@@ -8,6 +8,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import ApiSettingsPanel from "./ApiSettingsPanel";
+import PrivacySettingsPanel from "./PrivacySettingsPanel";
 
 const THEME_KEYS: ThemeKey[] = ["dark", "violet-dark", "green-eye", "sepia", "blue-night"];
 
@@ -118,6 +120,16 @@ export default function UserPreferences() {
         <p className="text-[10px] text-zinc-600 mt-3">
           选择你偏好的界面配色方案。护眼模式可降低长时间使用的视觉疲劳。
         </p>
+      </div>
+
+      {/* API Settings */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+        <ApiSettingsPanel />
+      </div>
+
+      {/* Privacy & GDPR */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+        <PrivacySettingsPanel />
       </div>
     </div>
   );

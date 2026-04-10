@@ -3,7 +3,7 @@
 // ============================================================
 
 import { NextRequest } from "next/server";
-import { callLLM } from "@/lib/api-client";
+import { callLLM, extractLLMConfig } from "@/lib/api-client";
 import { extractJSON } from "@/lib/extract-json";
 import { createStreamingResponse } from "@/lib/stream-utils";
 
@@ -81,12 +81,14 @@ ${objective}`;
 
     const llmMessages = [{ role: "user" as const, content: userPrompt }];
     const isStream = request.nextUrl.searchParams.get("stream") === "true";
+    const llmConfig = extractLLMConfig(request);
 
     if (isStream) {
       return createStreamingResponse({
         system: STRATEGY_SYSTEM_PROMPT,
         messages: llmMessages,
         maxTokens: 6000,
+        config: llmConfig,
       });
     }
 
@@ -94,6 +96,7 @@ ${objective}`;
       system: STRATEGY_SYSTEM_PROMPT,
       messages: llmMessages,
       maxTokens: 6000,
+      config: llmConfig,
     });
 
     const { data: strategy, error: parseError } = extractJSON(raw);

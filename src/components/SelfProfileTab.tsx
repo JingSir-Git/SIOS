@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
+import { apiFetch } from "@/lib/api-fetch";
 import StreamingIndicator from "./StreamingIndicator";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -108,9 +109,8 @@ export default function SelfProfileTab() {
         .map((c) => c.rawText!)
         .filter(Boolean);
 
-      const res = await fetch("/api/self-profile?stream=true", {
+      const res = await apiFetch("/api/self-profile?stream=true", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversationTexts: texts,
           mbtiType: latestMBTI?.type || undefined,

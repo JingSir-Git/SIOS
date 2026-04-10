@@ -20,6 +20,8 @@ import type { CoachingTip } from "@/lib/types";
 import { COACH_EXAMPLE_CATEGORIES, type CoachExample } from "@/lib/coach-examples";
 import StreamingIndicator from "./StreamingIndicator";
 import { formatMemoriesForPrompt } from "@/lib/memory-utils";
+import { retrieveRAGContext } from "@/lib/rag-memory";
+import { apiFetch } from "@/lib/api-fetch";
 
 interface Message {
   id: string;
@@ -120,13 +122,13 @@ export default function CoachTab() {
       if (selectedProfile) {
         const memories = getActiveMemoriesForProfile(selectedProfile.id);
         if (memories.length > 0) {
-          memoryContext = formatMemoriesForPrompt(memories, selectedProfile);
+          memoryContext = retrieveRAGContext(memories, formatted, selectedProfile) ||
+            formatMemoriesForPrompt(memories, selectedProfile);
         }
       }
 
-      const res = await fetch("/api/coach?stream=true", {
+      const res = await apiFetch("/api/coach?stream=true", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: formatted,
           targetProfile: selectedProfile || undefined,

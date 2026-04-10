@@ -34,6 +34,8 @@ import type { EmotionPoint, ChatMessage } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import StreamingIndicator from "./StreamingIndicator";
 import { extractMemoriesFromAnalysis, formatMemoriesForPrompt } from "@/lib/memory-utils";
+import { retrieveRAGContext } from "@/lib/rag-memory";
+import { apiFetch } from "@/lib/api-fetch";
 
 // ---- Types ----
 
@@ -315,15 +317,16 @@ export default function AnalyzeTab() {
       if (existingProfile) {
         const memories = getActiveMemoriesForProfile(existingProfile.id);
         if (memories.length > 0) {
-          memoryContext = formatMemoriesForPrompt(memories, existingProfile);
+          // Use RAG scoring to inject only the most relevant memories
+          memoryContext = retrieveRAGContext(memories, convoText, existingProfile) ||
+            formatMemoriesForPrompt(memories, existingProfile);
         }
       }
     }
 
     try {
-      const res = await fetch("/api/analyze?stream=true", {
+      const res = await apiFetch("/api/analyze?stream=true", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversation: convoText,
           targetName: finalTargetName,

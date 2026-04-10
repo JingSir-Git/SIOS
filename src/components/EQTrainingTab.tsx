@@ -28,6 +28,7 @@ import CoachEvolution from "./CoachEvolution";
 import type { ChatMessage } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import StreamingIndicator from "./StreamingIndicator";
+import { apiFetch } from "@/lib/api-fetch";
 
 interface EQItem {
   messageIndex: number;
@@ -156,9 +157,8 @@ export default function EQTrainingTab() {
     abortRef.current = controller;
 
     try {
-      const res = await fetch("/api/eq-review?stream=true", {
+      const res = await apiFetch("/api/eq-review?stream=true", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: convoText,
           targetProfile: selectedProfile

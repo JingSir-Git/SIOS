@@ -3,7 +3,7 @@
 // ============================================================
 
 import { NextRequest } from "next/server";
-import { callLLM } from "@/lib/api-client";
+import { callLLM, extractLLMConfig } from "@/lib/api-client";
 import { extractJSON } from "@/lib/extract-json";
 import { createStreamingResponse } from "@/lib/stream-utils";
 import {
@@ -55,12 +55,14 @@ export async function POST(request: NextRequest) {
     messages.push({ role: "user", content: userMessage });
 
     const isStream = request.nextUrl.searchParams.get("stream") === "true";
+    const llmConfig = extractLLMConfig(request);
 
     if (isStream) {
       return createStreamingResponse({
         system: systemPrompt,
         messages,
         maxTokens: 4000,
+        config: llmConfig,
       });
     }
 
@@ -68,6 +70,7 @@ export async function POST(request: NextRequest) {
       system: systemPrompt,
       messages,
       maxTokens: 4000,
+      config: llmConfig,
     });
 
     const { data: simulation } = extractJSON(raw);

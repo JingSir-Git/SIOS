@@ -41,4 +41,11 @@ copyDir(
   path.join(standaloneDir, ".next", "static")
 );
 
+// Copy .env.local → .next/standalone/.env.local (if exists)
+const envFile = path.join(root, ".env.local");
+if (fs.existsSync(envFile)) {
+  fs.copyFileSync(envFile, path.join(standaloneDir, ".env.local"));
+  console.log("✓ .env.local copied to standalone output");
+}
+
 console.log("✓ Static assets copied to standalone output");

@@ -1,19 +1,50 @@
 // ============================================================
-// MiniMax API Client (Anthropic SDK compatible)
+// LLM API Client — supports dynamic user-provided configuration
+// ============================================================
+// Priority: request-level config > env vars > defaults
 // ============================================================
 
 import Anthropic from "@anthropic-ai/sdk";
 
-let clientInstance: Anthropic | null = null;
+/** Runtime config passed from API routes (sourced from user settings or env) */
+export interface LLMConfig {
+  baseURL?: string;
+  apiKey?: string;
+  model?: string;
+}
 
-function getClient(): Anthropic {
-  if (!clientInstance) {
-    clientInstance = new Anthropic({
-      baseURL: process.env.ANTHROPIC_BASE_URL || "https://api.minimaxi.com/anthropic",
-      apiKey: process.env.ANTHROPIC_API_KEY || "",
-    });
+// Cache clients by baseURL+apiKey to avoid re-creating on every request
+const clientCache = new Map<string, Anthropic>();
+
+function getClient(config?: LLMConfig): Anthropic {
+  const baseURL = config?.baseURL || process.env.ANTHROPIC_BASE_URL || "https://api.minimaxi.com/anthropic";
+  const apiKey = config?.apiKey || process.env.ANTHROPIC_API_KEY || "";
+
+  if (!apiKey) {
+    throw new Error(
+      "未配置API Key。请在设置中填写API Key，或在服务器环境变量 ANTHROPIC_API_KEY 中配置。"
+    );
   }
-  return clientInstance;
+
+  const cacheKey = `${baseURL}::${apiKey.slice(0, 8)}`;
+  let client = clientCache.get(cacheKey);
+  if (!client) {
+    client = new Anthropic({ baseURL, apiKey });
+    clientCache.set(cacheKey, client);
+  }
+  return client;
+}
+
+function getModel(config?: LLMConfig): string {
+  return config?.model || process.env.ANTHROPIC_MODEL || "MiniMax-M2.7-highspeed";
+}
+
+/** Extract LLM config from request headers (set by frontend) */
+export function extractLLMConfig(request: Request): LLMConfig {
+  const baseURL = request.headers.get("x-llm-base-url") || undefined;
+  const apiKey = request.headers.get("x-llm-api-key") || undefined;
+  const model = request.headers.get("x-llm-model") || undefined;
+  return { baseURL, apiKey, model };
 }
 
 export interface LLMMessage {
@@ -26,14 +57,16 @@ export async function callLLM({
   messages,
   maxTokens = 8000,
   temperature,
+  config,
 }: {
   system: string;
   messages: LLMMessage[];
   maxTokens?: number;
   temperature?: number;
+  config?: LLMConfig;
 }): Promise<string> {
-  const client = getClient();
-  const model = process.env.ANTHROPIC_MODEL || "MiniMax-M2.7-highspeed";
+  const client = getClient(config);
+  const model = getModel(config);
 
   const response = await client.messages.create({
     model,
@@ -60,14 +93,16 @@ export async function callLLMStreaming({
   messages,
   maxTokens = 8000,
   onChunk,
+  config,
 }: {
   system: string;
   messages: LLMMessage[];
   maxTokens?: number;
   onChunk: (text: string) => void;
+  config?: LLMConfig;
 }): Promise<string> {
-  const client = getClient();
-  const model = process.env.ANTHROPIC_MODEL || "MiniMax-M2.7-highspeed";
+  const client = getClient(config);
+  const model = getModel(config);
 
   const stream = client.messages.stream({
     model,

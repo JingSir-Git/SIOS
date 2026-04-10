@@ -3,6 +3,7 @@
 // ============================================================
 
 import { NextRequest } from "next/server";
+import { extractLLMConfig } from "@/lib/api-client";
 import { createStreamingResponse } from "@/lib/stream-utils";
 import {
   PLAYBOOK_SYSTEM_PROMPT,
@@ -30,11 +31,14 @@ export async function POST(request: NextRequest) {
 
     const llmMessages = [{ role: "user" as const, content: userPrompt }];
 
+    const llmConfig = extractLLMConfig(request);
+
     // Always stream for playbook — it's a large generation
     return createStreamingResponse({
       system: PLAYBOOK_SYSTEM_PROMPT,
       messages: llmMessages,
       maxTokens: 8000,
+      config: llmConfig,
     });
   } catch (err: unknown) {
     console.error("[/api/playbook] error:", err);
