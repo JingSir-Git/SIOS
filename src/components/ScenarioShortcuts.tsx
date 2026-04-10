@@ -113,9 +113,8 @@ export default function ScenarioShortcuts({ onNavigate }: Props) {
   const handleClick = (s: ScenarioShortcut) => {
     if (onNavigate) {
       onNavigate(s.targetTab, s.prefillContext, s.prefillGoal);
-    } else {
-      navigateToTab(s.targetTab);
     }
+    navigateToTab(s.targetTab, undefined, { context: s.prefillContext, goal: s.prefillGoal });
   };
 
   return (

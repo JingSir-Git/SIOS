@@ -127,3 +127,21 @@ body {
   background: rgba(139, 92, 246, 0.3);
   color: #fafafa;
 }
+
+/* Safe area padding for iOS notch / home indicator */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Mobile responsive utilities */
+@media (max-width: 767px) {
+  /* Reduce padding on mobile for more content space */
+  .px-6 { padding-left: 1rem; padding-right: 1rem; }
+
+  /* Full-width modals on mobile */
+  .max-w-3xl, .max-w-2xl, .max-w-xl {
+    max-width: 100% !important;
+    margin-left: 0.5rem;
+    margin-right: 0.5rem;
+  }
+}

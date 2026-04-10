@@ -5,6 +5,7 @@
 import { NextRequest } from "next/server";
 import { callLLM } from "@/lib/api-client";
 import { extractJSON } from "@/lib/extract-json";
+import { createStreamingResponse } from "@/lib/stream-utils";
 import {
   PSYCHOLOGY_SYSTEM_PROMPT,
   buildPsychologyPrompt,
@@ -29,9 +30,20 @@ export async function POST(request: NextRequest) {
       conversationHistory || undefined
     );
 
+    const llmMessages = [{ role: "user" as const, content: userPrompt }];
+    const isStream = request.nextUrl.searchParams.get("stream") === "true";
+
+    if (isStream) {
+      return createStreamingResponse({
+        system: PSYCHOLOGY_SYSTEM_PROMPT,
+        messages: llmMessages,
+        maxTokens: 4000,
+      });
+    }
+
     const raw = await callLLM({
       system: PSYCHOLOGY_SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userPrompt }],
+      messages: llmMessages,
       maxTokens: 4000,
     });
 

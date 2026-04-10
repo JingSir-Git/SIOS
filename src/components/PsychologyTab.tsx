@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Send,
   Loader2,
@@ -45,7 +45,7 @@ interface PsyAnalysis {
 }
 
 export default function PsychologyTab() {
-  const { profiles, preSelectedProfileId, clearPreSelection } = useAppStore();
+  const { profiles, preSelectedProfileId, clearPreSelection, addToast } = useAppStore();
   const [messages, setMessages] = useState<PsyMessage[]>([]);
   const [input, setInput] = useState("");
   const [selfDescription, setSelfDescription] = useState("");
@@ -111,6 +111,13 @@ export default function PsychologyTab() {
       .join("\n");
   };
 
+  const abortRef = useRef<AbortController | null>(null);
+
+  const abortStreaming = useCallback(() => {
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+    setLoading(false);
+  }, []);
+
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
 
@@ -119,46 +126,100 @@ export default function PsychologyTab() {
       role: "user",
       content: input.trim(),
     };
+    const currentInput = input.trim();
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
 
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const counselorMsgId = (Date.now() + 1).toString();
+    setMessages((prev) => [...prev, { id: counselorMsgId, role: "counselor", content: "" }]);
+
     try {
-      const res = await fetch("/api/psychology", {
+      const res = await fetch("/api/psychology?stream=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: input.trim(),
+          message: currentInput,
           profilesSummary: buildProfilesSummary() || undefined,
           selfDescription: selfDescription.trim() || undefined,
           conversationHistory: buildConversationHistory() || undefined,
         }),
+        signal: controller.signal,
       });
 
       if (!res.ok) throw new Error("请求失败");
 
-      const data = await res.json();
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("无法读取响应流");
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let streamedText = "";
 
-      const counselorMsg: PsyMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "counselor",
-        content: data.empathyResponse || "...",
-        analysis: data,
-      };
-      setMessages((prev) => [...prev, counselorMsg]);
-      setExpandedId(counselorMsg.id);
-    } catch (err) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6).trim());
+            if (event.type === "progress" && event.text) {
+              streamedText += event.text;
+              setMessages((prev) =>
+                prev.map((m) => m.id === counselorMsgId ? { ...m, content: streamedText } : m)
+              );
+            } else if (event.type === "result" && event.data) {
+              const data = event.data as PsyAnalysis & { empathyResponse?: string };
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === counselorMsgId
+                    ? { ...m, content: data.empathyResponse || streamedText || "...", analysis: data }
+                    : m
+                )
+              );
+              setExpandedId(counselorMsgId);
+            } else if (event.type === "error") {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === counselorMsgId
+                    ? { ...m, content: streamedText || `（分析出错：${event.text || "未知错误"}，请重试）` }
+                    : m
+                )
+              );
+            }
+          } catch { /* skip malformed SSE line */ }
+        }
+      }
+      // Notify if user switched away
+      const currentTab = useAppStore.getState().activeTab;
+      if (currentTab !== "psychology") {
+        addToast({
+          type: "success",
+          title: "心理顾问已回复",
+          message: "心理顾问已回复您的咨询",
+          duration: 8000,
+          action: { label: "查看回复", tab: "psychology" },
+        });
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
       console.error(err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: "counselor",
-          content: "（系统暂时无法响应，请稍后再试）",
-        },
-      ]);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === counselorMsgId
+            ? { ...m, content: "（系统暂时无法响应，请稍后再试）" }
+            : m
+        )
+      );
     } finally {
       setLoading(false);
+      abortRef.current = null;
     }
   };
 

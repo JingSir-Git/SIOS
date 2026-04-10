@@ -170,6 +170,7 @@ export interface ChatMessage {
   senderName: string;
   content: string;
   timestamp?: string;
+  participantId?: string; // unique participant identifier for multi-party chats
 }
 
 export interface ConversationSession {
@@ -523,4 +524,51 @@ export interface EQReviewRequest {
 
 export interface EQReviewResponse {
   report: EQReport;
+}
+
+// ============================================================
+// §9  AI Memory System — Structured Profile Memories
+// ============================================================
+
+/** Category of a memory entry. */
+export type MemoryCategory =
+  | "key_event"          // 重要事件: major events, turning points
+  | "pattern_change"     // 模式变化: communication pattern shifts
+  | "commitment"         // 承诺追踪: promises made, deadlines, follow-ups
+  | "preference"         // 偏好记录: likes, dislikes, habits
+  | "relationship_shift" // 关系转折: trust level changes, conflicts, reconciliations
+  | "insight"            // 深层洞察: hidden motives, recurring themes
+  | "user_note";         // 用户备注: manually added by the user
+
+// ============================================================
+// §10  Playbook History — Versioned Communication Manuals
+// ============================================================
+
+/** A saved playbook version for diff comparison across time. */
+export interface PlaybookVersion {
+  id: string;
+  profileId: string;
+  profileName: string;
+  createdAt: string;
+  /** The full playbook JSON result */
+  result: Record<string, unknown>;
+  /** Summary for display in version list */
+  summary: string;
+  /** Number of conversations used when generating */
+  conversationCount: number;
+}
+
+/** A single structured memory entry linked to a profile. */
+export interface ProfileMemoryEntry {
+  id: string;
+  profileId: string;
+  category: MemoryCategory;
+  content: string;           // the memory itself (natural language)
+  source: string;            // e.g. "对话分析 2024-01-15", "用户手动添加"
+  conversationId?: string;   // linked conversation if applicable
+  importance: number;        // 1-5, higher = more important
+  createdAt: string;
+  updatedAt: string;
+  verified: boolean;         // user has confirmed this memory is correct
+  archived: boolean;         // soft-deleted / outdated
 }

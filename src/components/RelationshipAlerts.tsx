@@ -17,13 +17,17 @@ interface Alert {
   id: string;
   profileId: string;
   profileName: string;
-  type: "contact_overdue" | "unresolved_issue" | "relationship_cooling" | "follow_up" | "smart_followup";
+  type: "contact_overdue" | "unresolved_issue" | "relationship_cooling" | "follow_up" | "smart_followup" | "emotion_decline" | "pattern_shift";
   severity: "low" | "medium" | "high";
   title: string;
   description: string;
   action: string;
   topicSuggestions?: string[];
   timingSuggestion?: string;
+  /** For quick-action navigation */
+  actionTab?: string;
+  actionProfileId?: string;
+  actionContext?: { context: string; goal: string };
 }
 
 /** Analyze conversation timestamps + profile patterns to suggest best communication timing */
@@ -115,6 +119,14 @@ const ALERT_CONFIG: Record<
     icon: Lightbulb,
     color: "border-emerald-500/30 bg-emerald-500/5 text-emerald-300",
   },
+  emotion_decline: {
+    icon: Heart,
+    color: "border-orange-500/30 bg-orange-500/5 text-orange-300",
+  },
+  pattern_shift: {
+    icon: AlertTriangle,
+    color: "border-cyan-500/30 bg-cyan-500/5 text-cyan-300",
+  },
 };
 
 /** Extract topic-based follow-up suggestions from conversation analysis data */
@@ -154,7 +166,7 @@ const SEVERITY_INDICATOR: Record<Alert["severity"], string> = {
 };
 
 export default function RelationshipAlerts() {
-  const { profiles, relationships, conversations } = useAppStore();
+  const { profiles, relationships, conversations, navigateToTab } = useAppStore();
 
   const alerts = useMemo(() => {
     const result: Alert[] = [];
@@ -299,6 +311,81 @@ export default function RelationshipAlerts() {
         });
       }
 
+      // Alert: Emotion trend deterioration
+      if (profileConversations.length >= 3) {
+        const recentWithEmotions = profileConversations
+          .filter((c) => c.analysis?.emotionCurve && c.analysis.emotionCurve.length > 0)
+          .slice(0, 6);
+        if (recentWithEmotions.length >= 3) {
+          const avgEmotions = recentWithEmotions.map((c) => {
+            const curve = c.analysis!.emotionCurve;
+            return curve.reduce((s: number, p: { selfEmotion: number; otherEmotion: number }) => s + p.otherEmotion, 0) / curve.length;
+          });
+          // Check if last 2 are lower than first 2
+          const earlyAvg = avgEmotions.slice(-2).reduce((a, b) => a + b, 0) / 2;
+          const recentAvg = avgEmotions.slice(0, 2).reduce((a, b) => a + b, 0) / 2;
+          const delta = recentAvg - earlyAvg;
+          if (delta < -0.3) {
+            result.push({
+              id: `emotion-decline-${profile.id}`,
+              profileId: profile.id,
+              profileName: profile.name,
+              type: "emotion_decline",
+              severity: delta < -0.5 ? "high" : "medium",
+              title: `${profile.name}的情绪在最近对话中明显下降`,
+              description: `对方情绪均值从 ${earlyAvg.toFixed(2)} 降至 ${recentAvg.toFixed(2)}，需要关注`,
+              action: `建议在下次对话中更加关注对方感受，使用更多共情和积极回应`,
+              actionTab: "coach",
+              actionProfileId: profile.id,
+              actionContext: {
+                context: `${profile.name}在最近的对话中情绪有明显下降趋势`,
+                goal: "帮助我改善与对方的情绪互动，提升对话质量",
+              },
+            });
+          }
+        }
+      }
+
+      // Alert: Pattern shift from version history (dimension drift detection)
+      if (profile.versionHistory && profile.versionHistory.length >= 2) {
+        const latest = profile.versionHistory[profile.versionHistory.length - 1];
+        const previous = profile.versionHistory[profile.versionHistory.length - 2];
+        // Compare dimension means — detect significant drift
+        let totalDrift = 0;
+        let driftCount = 0;
+        const driftDetails: string[] = [];
+        const dimLabels: Record<string, string> = {
+          openness: "开放性", conscientiousness: "尽责性", extraversion: "外向性",
+          agreeableness: "宜人性", neuroticism: "神经质", analyticalThinking: "分析思维",
+          emotionalExpression: "情感表达", directness: "直接程度",
+        };
+        for (const key of Object.keys(latest.dimensions)) {
+          const lv = latest.dimensions[key as keyof typeof latest.dimensions];
+          const pv = previous.dimensions[key as keyof typeof previous.dimensions];
+          if (lv && pv) {
+            const drift = Math.abs(lv.value - pv.value) / 100;
+            if (drift > 0.15) {
+              totalDrift += drift;
+              driftCount++;
+              const dir = lv.value > pv.value ? "↑" : "↓";
+              driftDetails.push(`${dimLabels[key] || key}${dir}`);
+            }
+          }
+        }
+        if (driftCount >= 2 && totalDrift > 0.4) {
+          result.push({
+            id: `pattern-shift-${profile.id}`,
+            profileId: profile.id,
+            profileName: profile.name,
+            type: "pattern_shift",
+            severity: totalDrift > 0.8 ? "medium" : "low",
+            title: `${profile.name}的性格维度出现显著变化`,
+            description: `${driftDetails.slice(0, 4).join("、")}等${driftCount}个维度偏移`,
+            action: `维度变化可能反映对方近期状态变化，建议关注并适当调整互动方式`,
+          });
+        }
+      }
+
       // Alert: Scheduled follow-up
       if (relationship?.nextFollowUp) {
         const followUpDate = new Date(relationship.nextFollowUp).getTime();
@@ -382,6 +469,14 @@ export default function RelationshipAlerts() {
                     <ChevronRight className="h-2.5 w-2.5" />
                     <span>{alert.action}</span>
                   </div>
+                  {alert.actionTab && (
+                    <button
+                      onClick={() => navigateToTab(alert.actionTab!, alert.actionProfileId, alert.actionContext)}
+                      className="mt-1.5 text-[9px] px-2 py-0.5 rounded border border-violet-500/30 text-violet-300 hover:bg-violet-500/10 transition-colors"
+                    >
+                      立即处理 →
+                    </button>
+                  )}
                   {alert.timingSuggestion && (
                     <div className="flex items-center gap-1 mt-1.5 text-[9px] opacity-50">
                       <Clock className="h-2 w-2 shrink-0 text-cyan-400" />

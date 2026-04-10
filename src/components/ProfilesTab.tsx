@@ -19,6 +19,7 @@ import {
   FileText,
   Clock,
   GitMerge,
+  GitCompareArrows,
   Swords,
   Compass,
   MessageCircle,
@@ -26,6 +27,12 @@ import {
   GraduationCap,
   UserCircle,
   Share2,
+  BookOpen,
+  Flame,
+  BarChart3,
+  Brain,
+  Sparkles,
+  FileDown,
 } from "lucide-react";
 import { cn, getConfidenceLabel, getConfidenceColor, formatDate } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
@@ -37,6 +44,20 @@ import SubjectiveImpressionEditor from "./SubjectiveImpressionEditor";
 import SelfProfileTab from "./SelfProfileTab";
 import ProfileEvolutionChart from "./ProfileEvolutionChart";
 import ProfileShareFusion from "./ProfileShareFusion";
+import ProfileMemoryPanel from "./ProfileMemoryPanel";
+import RelationshipGraph from "./RelationshipGraph";
+import PlaybookGenerator from "./PlaybookGenerator";
+import EmotionHeatmap from "./EmotionHeatmap";
+import GlobalEmotionDashboard from "./GlobalEmotionDashboard";
+import ScenarioTrainer from "./ScenarioTrainer";
+import MemoryNetworkGraph from "./MemoryNetworkGraph";
+import ConversationPatternLearner from "./ConversationPatternLearner";
+import EmotionForecast from "./EmotionForecast";
+import ConversationTimeline from "./ConversationTimeline";
+import RelationshipEvolutionSummary from "./RelationshipEvolutionSummary";
+import ProfileCompare from "./ProfileCompare";
+import MemorySummary from "./MemorySummary";
+import { exportProfileReport } from "@/lib/export-report";
 import { TEMPLATE_CATEGORIES, type ProfileTemplate } from "@/lib/profile-templates";
 import type { PersonProfile, ConversationSession } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
@@ -60,6 +81,12 @@ export default function ProfilesTab() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showMerge, setShowMerge] = useState(false);
   const [showSelfProfile, setShowSelfProfile] = useState(false);
+  const [showGraph, setShowGraph] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [showTrainer, setShowTrainer] = useState(false);
+  const [showMemoryGraph, setShowMemoryGraph] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
+  const [showMemorySummary, setShowMemorySummary] = useState(false);
 
   const selectedProfile = profiles.find((p) => p.id === selectedId);
 
@@ -160,14 +187,14 @@ export default function ProfilesTab() {
   return (
     <div className="flex flex-col h-full">
       <div className="border-b border-zinc-800 px-6 py-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
             <h1 className="text-lg font-semibold text-zinc-100">人物画像库</h1>
-            <p className="text-xs text-zinc-500 mt-1">
+            <p className="text-xs text-zinc-500 mt-1 hidden md:block">
               基于真实对话数据构建的动态心理画像，越用越精准
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setShowSelfProfile(!showSelfProfile)}
               className={cn(
@@ -180,6 +207,80 @@ export default function ProfilesTab() {
               <UserCircle className="h-3.5 w-3.5" />
               自我画像
             </button>
+            {profiles.length >= 1 && (
+              <button
+                onClick={() => setShowDashboard(!showDashboard)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors border",
+                  showDashboard
+                    ? "bg-violet-500/15 text-violet-300 border-violet-500/30"
+                    : "text-zinc-500 border-zinc-700 hover:text-zinc-300 hover:border-zinc-600"
+                )}
+              >
+                <BarChart3 className="h-3.5 w-3.5" />
+                情绪仪表盘
+              </button>
+            )}
+            {profiles.length >= 1 && (
+              <button
+                onClick={() => setShowTrainer(!showTrainer)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors border",
+                  showTrainer
+                    ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                    : "text-zinc-500 border-zinc-700 hover:text-zinc-300 hover:border-zinc-600"
+                )}
+              >
+                <Swords className="h-3.5 w-3.5" />
+                场景训练
+              </button>
+            )}
+            {profiles.length >= 1 && (
+              <button
+                onClick={() => setShowMemoryGraph(!showMemoryGraph)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors border",
+                  showMemoryGraph
+                    ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/30"
+                    : "text-zinc-500 border-zinc-700 hover:text-zinc-300 hover:border-zinc-600"
+                )}
+              >
+                <Brain className="h-3.5 w-3.5" />
+                记忆网络
+              </button>
+            )}
+            {profiles.length >= 1 && (
+              <button
+                onClick={() => setShowMemorySummary(true)}
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors border text-zinc-500 border-zinc-700 hover:text-cyan-300 hover:border-cyan-500/30"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                记忆摘要
+              </button>
+            )}
+            {profiles.length >= 1 && (
+              <button
+                onClick={() => setShowGraph(!showGraph)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors border",
+                  showGraph
+                    ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                    : "text-zinc-500 border-zinc-700 hover:text-zinc-300 hover:border-zinc-600"
+                )}
+              >
+                <Share2 className="h-3.5 w-3.5" />
+                关系图谱
+              </button>
+            )}
+            {profiles.length >= 2 && (
+              <button
+                onClick={() => setShowCompare(true)}
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors border text-zinc-500 border-zinc-700 hover:text-pink-300 hover:border-pink-500/30"
+              >
+                <GitCompareArrows className="h-3.5 w-3.5" />
+                画像对比
+              </button>
+            )}
             {profiles.length >= 2 && (
               <button
                 onClick={() => setShowMerge(!showMerge)}
@@ -213,10 +314,54 @@ export default function ProfilesTab() {
           </div>
         )}
 
+        {/* Global Emotion Dashboard */}
+        <GlobalEmotionDashboard
+          isOpen={showDashboard}
+          onClose={() => setShowDashboard(false)}
+          onSelectProfile={(id) => {
+            setShowDashboard(false);
+            setSelectedId(id);
+          }}
+        />
+
+        {/* Relationship Graph */}
+        <RelationshipGraph
+          isOpen={showGraph}
+          onClose={() => setShowGraph(false)}
+          onSelectProfile={(id) => {
+            setShowGraph(false);
+            setSelectedId(id);
+          }}
+        />
+
         {/* Profile Merge Panel */}
         {showMerge && (
           <ProfileMerge onClose={() => setShowMerge(false)} />
         )}
+
+        {/* Profile Compare */}
+        <ProfileCompare
+          isOpen={showCompare}
+          onClose={() => setShowCompare(false)}
+        />
+
+        {/* Memory Summary */}
+        <MemorySummary
+          isOpen={showMemorySummary}
+          onClose={() => setShowMemorySummary(false)}
+        />
+
+        {/* Memory Network Graph */}
+        <MemoryNetworkGraph
+          isOpen={showMemoryGraph}
+          onClose={() => setShowMemoryGraph(false)}
+        />
+
+        {/* Scenario Trainer */}
+        <ScenarioTrainer
+          isOpen={showTrainer}
+          onClose={() => setShowTrainer(false)}
+        />
 
         {/* Relationship Temperature Trends */}
         <RelationshipTrends />
@@ -546,6 +691,9 @@ function ProfileDetail({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showConversations, setShowConversations] = useState(false);
   const [showShareFusion, setShowShareFusion] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
+  const [showPlaybook, setShowPlaybook] = useState(false);
+  const [showHeatmap, setShowHeatmap] = useState(false);
 
   return (
     <div className="flex flex-col h-full">
@@ -643,6 +791,52 @@ function ProfileDetail({
               <Share2 className="h-3.5 w-3.5" />
               画像共享与融合
             </button>
+            <button
+              onClick={() => setShowMemory(!showMemory)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs transition-colors",
+                showMemory
+                  ? "border-violet-500/40 bg-violet-500/10 text-violet-300"
+                  : "border-violet-500/20 bg-violet-500/5 text-violet-300 hover:bg-violet-500/10"
+              )}
+            >
+              <Heart className="h-3.5 w-3.5" />
+              AI记忆系统
+            </button>
+            <button
+              onClick={() => setShowPlaybook(!showPlaybook)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs transition-colors",
+                showPlaybook
+                  ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
+                  : "border-amber-500/20 bg-amber-500/5 text-amber-300 hover:bg-amber-500/10"
+              )}
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              沟通手册
+            </button>
+            <button
+              onClick={() => setShowHeatmap(!showHeatmap)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs transition-colors",
+                showHeatmap
+                  ? "border-orange-500/40 bg-orange-500/10 text-orange-300"
+                  : "border-orange-500/20 bg-orange-500/5 text-orange-300 hover:bg-orange-500/10"
+              )}
+            >
+              <Flame className="h-3.5 w-3.5" />
+              情绪热力图
+            </button>
+            <button
+              onClick={() => {
+                const { profileMemories } = useAppStore.getState();
+                exportProfileReport(profile, linkedConversations, profileMemories);
+              }}
+              className="flex items-center gap-1.5 rounded-lg border border-zinc-500/20 bg-zinc-500/5 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-500/10 transition-colors"
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              导出报告
+            </button>
           </div>
 
           {/* Share & Fusion Panel */}
@@ -652,6 +846,36 @@ function ProfileDetail({
               onClose={() => setShowShareFusion(false)}
             />
           )}
+
+          {/* Emotion Heatmap */}
+          <EmotionHeatmap
+            profileId={profile.id}
+            profileName={profile.name}
+            isOpen={showHeatmap}
+            onClose={() => setShowHeatmap(false)}
+          />
+
+          {/* AI Playbook Generator */}
+          <PlaybookGenerator
+            profile={profile}
+            linkedConversations={linkedConversations}
+            isOpen={showPlaybook}
+            onClose={() => setShowPlaybook(false)}
+          />
+
+          {/* AI Memory Panel */}
+          <ProfileMemoryPanel
+            profileId={profile.id}
+            profileName={profile.name}
+            isOpen={showMemory}
+            onClose={() => setShowMemory(false)}
+          />
+
+          {/* Emotion Forecast */}
+          <EmotionForecast
+            profile={profile}
+            conversations={linkedConversations}
+          />
 
           {/* Radar Chart */}
           <div className="rounded-lg border border-zinc-800 p-5">
@@ -663,6 +887,30 @@ function ProfileDetail({
 
           {/* Profile Evolution Timeline */}
           <ProfileEvolutionChart profile={profile} />
+
+          {/* Relationship Evolution Summary */}
+          {linkedConversations.filter((c) => c.analysis).length >= 3 && (
+            <RelationshipEvolutionSummary
+              profile={profile}
+              conversations={linkedConversations}
+            />
+          )}
+
+          {/* Conversation Pattern Learner */}
+          {linkedConversations.filter((c) => c.analysis).length >= 2 && (
+            <ConversationPatternLearner
+              profile={profile}
+              conversations={linkedConversations}
+            />
+          )}
+
+          {/* Conversation Timeline */}
+          {linkedConversations.filter((c) => c.analysis).length >= 1 && (
+            <ConversationTimeline
+              conversations={linkedConversations}
+              profileName={profile.name}
+            />
+          )}
 
           {/* Dimension Details */}
           <div className="rounded-lg border border-zinc-800 p-5">

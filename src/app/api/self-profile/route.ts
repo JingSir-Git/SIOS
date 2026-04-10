@@ -5,6 +5,7 @@
 import { NextRequest } from "next/server";
 import { callLLM } from "@/lib/api-client";
 import { extractJSON } from "@/lib/extract-json";
+import { createStreamingResponse } from "@/lib/stream-utils";
 import {
   SELF_PROFILE_SYSTEM_PROMPT,
   buildSelfProfilePrompt,
@@ -32,9 +33,21 @@ export async function POST(request: NextRequest) {
       existingSelfProfile || undefined
     );
 
+    const llmMessages = [{ role: "user" as const, content: userPrompt }];
+    const isStream = request.nextUrl.searchParams.get("stream") === "true";
+
+    if (isStream) {
+      return createStreamingResponse({
+        system: SELF_PROFILE_SYSTEM_PROMPT,
+        messages: llmMessages,
+        maxTokens: 8000,
+        postProcess: (parsed) => ({ profile: parsed }),
+      });
+    }
+
     const raw = await callLLM({
       system: SELF_PROFILE_SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userPrompt }],
+      messages: llmMessages,
       maxTokens: 8000,
     });
 

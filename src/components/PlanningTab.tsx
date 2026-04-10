@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   CalendarClock,
   Loader2,
@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { PLANNING_EXAMPLE_CATEGORIES, type PlanningExample } from "@/lib/planning-examples";
 import ModuleHistoryPanel from "./ModuleHistoryPanel";
+import StreamingIndicator from "./StreamingIndicator";
 import { v4 as uuidv4 } from "uuid";
 
 interface PlanMilestone {
@@ -94,7 +95,7 @@ const PRIORITY_LABELS: Record<string, string> = {
 };
 
 export default function PlanningTab() {
-  const { addModuleHistory } = useAppStore();
+  const { addModuleHistory, addToast } = useAppStore();
   const [objective, setObjective] = useState("");
   const [context, setContext] = useState("");
   const [constraints, setConstraints] = useState("");
@@ -104,6 +105,8 @@ export default function PlanningTab() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PlanResult | null>(null);
   const [error, setError] = useState("");
+  const [streamingText, setStreamingText] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
   const [expandedPhase, setExpandedPhase] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [showExamples, setShowExamples] = useState(false);
@@ -123,14 +126,24 @@ export default function PlanningTab() {
     setError("");
   };
 
+  const abortStreaming = useCallback(() => {
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+    setLoading(false);
+  }, []);
+
   const generatePlan = async () => {
     if (!objective.trim()) return;
     setLoading(true);
     setError("");
     setResult(null);
+    setStreamingText("");
+
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
-      const res = await fetch("/api/planning", {
+      const res = await fetch("/api/planning?stream=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -141,32 +154,76 @@ export default function PlanningTab() {
           constraints: constraints.trim() || undefined,
           preferences: preferences.trim() || undefined,
         }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || "规划生成失败");
+        let errMsg = `规划生成失败 (${res.status})`;
+        try { const d = await res.json(); if (d.error) errMsg = d.error; } catch { /* use default */ }
+        throw new Error(errMsg);
       }
 
-      const data = await res.json();
-      setResult(data);
-      setExpandedPhase(0);
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("无法读取响应流");
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let gotResult = false;
+      let streamError = "";
 
-      // Auto-save to module history
-      if (data) {
-        addModuleHistory("planning", {
-          id: uuidv4(),
-          title: data.title || `规划: ${objective.trim().slice(0, 30)}`,
-          createdAt: new Date().toISOString(),
-          module: "planning",
-          data: { result: data, objective: objective.trim(), context: context.trim(), domain, timeScale },
-          summary: `${data.phases?.length || 0}个阶段·${data.milestones?.length || 0}个里程碑`,
-        });
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6).trim());
+            if (event.type === "progress" && event.text) {
+              setStreamingText((prev) => prev + event.text);
+            } else if (event.type === "result" && event.data) {
+              gotResult = true;
+              const data = event.data as PlanResult;
+              setResult(data);
+              setExpandedPhase(0);
+              if (data) {
+                addModuleHistory("planning", {
+                  id: uuidv4(),
+                  title: data.title || `规划: ${objective.trim().slice(0, 30)}`,
+                  createdAt: new Date().toISOString(),
+                  module: "planning",
+                  data: { result: data, objective: objective.trim(), context: context.trim(), domain, timeScale },
+                  summary: `${data.phases?.length || 0}个阶段·${data.phases?.reduce((n: number, p: PlanPhase) => n + (p.milestones?.length || 0), 0) || 0}个里程碑`,
+                });
+              }
+            } else if (event.type === "error") {
+              streamError = event.text || "规划生成出错";
+            }
+          } catch { /* skip malformed SSE line */ }
+        }
       }
-    } catch (err) {
+      if (!gotResult) {
+        setError(streamError || "规划生成未返回结果，请重试");
+      } else {
+        // Notify if user switched away
+        const currentTab = useAppStore.getState().activeTab;
+        if (currentTab !== "planning") {
+          addToast({
+            type: "success",
+            title: "规划已生成",
+            message: `"${objective.trim().slice(0, 30)}" 的规划已就绪`,
+            duration: 8000,
+            action: { label: "查看规划", tab: "planning" },
+          });
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "未知错误");
     } finally {
       setLoading(false);
+      abortRef.current = null;
     }
   };
 
@@ -438,6 +495,15 @@ ${result.reviewSchedule}`;
               )}
             </button>
           </div>
+
+          {/* Streaming indicator */}
+          {loading && !result && (
+            <StreamingIndicator
+              text={streamingText}
+              label="AI规划师正在制定方案"
+              onAbort={abortStreaming}
+            />
+          )}
 
           {/* Error */}
           {error && (

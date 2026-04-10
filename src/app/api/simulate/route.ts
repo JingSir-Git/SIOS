@@ -5,6 +5,7 @@
 import { NextRequest } from "next/server";
 import { callLLM } from "@/lib/api-client";
 import { extractJSON } from "@/lib/extract-json";
+import { createStreamingResponse } from "@/lib/stream-utils";
 import {
   SIMULATION_SYSTEM_PROMPT,
   buildSimulationPrompt,
@@ -52,6 +53,16 @@ export async function POST(request: NextRequest) {
     }
 
     messages.push({ role: "user", content: userMessage });
+
+    const isStream = request.nextUrl.searchParams.get("stream") === "true";
+
+    if (isStream) {
+      return createStreamingResponse({
+        system: systemPrompt,
+        messages,
+        maxTokens: 4000,
+      });
+    }
 
     const raw = await callLLM({
       system: systemPrompt,

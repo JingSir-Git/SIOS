@@ -364,6 +364,110 @@ export const COACH_EXAMPLE_CATEGORIES: CoachExampleCategory[] = [
       },
     ],
   },
+  // ============================================================
+  // 7. 日常生活 — 常见生活谈判与沟通
+  // ============================================================
+  {
+    id: "daily-life",
+    label: "日常生活",
+    icon: "🏠",
+    examples: [
+      {
+        id: "coach-return-product",
+        label: "退换商品遭拒",
+        description: "买的电子产品有瑕疵，店家不认要求退货",
+        goal: "成功退货或换新，至少获得维修/补偿方案",
+        messages: [
+          { role: "self", content: "你好，我上周在你们这买的耳机，右耳有杂音，想退货。" },
+          { role: "other", content: "先生，电子产品过了7天就不能退了，只能送修。" },
+          { role: "self", content: "可是我买了才5天就出问题了，当时就应该退的，只是这几天出差没来。" },
+          { role: "other", content: "但我们的退货期限是按购买日期算的，这个是规定。" },
+          { role: "self", content: "你们卖的产品有质量问题，难道不应该承担责任吗？我可以出示购买凭证。" },
+          { role: "other", content: "这样吧，我帮您申请一下售后，但退货确实不太好办。" },
+        ],
+      },
+      {
+        id: "coach-rental-negotiate",
+        label: "续租谈涨租",
+        description: "房东要涨20%房租，你想争取合理涨幅",
+        goal: "控制涨幅在10%以内，最好争取不涨",
+        messages: [
+          { role: "other", content: "小李，合同下个月到期了，新合同的房租要调整一下，涨到4200。" },
+          { role: "self", content: "张姐，现在是3500吧，一下涨700有点多了。附近同户型的也就3800左右。" },
+          { role: "other", content: "那是老房子，我这个装修才两年，家电都是新的。而且物业费涨了，我也有成本。" },
+          { role: "self", content: "我在这住了两年了，一直爱惜房子，从没拖过租金。换一个租客您还要空置期和中介费。" },
+          { role: "other", content: "那倒是。你说多少合适？" },
+          { role: "self", content: "3700怎么样？涨了200我可以接受，而且我可以一次付半年。" },
+        ],
+      },
+      {
+        id: "coach-car-repair-dispute",
+        label: "4S店维修扯皮",
+        description: "车刚过保修期就出大问题，4S店不愿免费修",
+        goal: "争取到免费或大幅优惠的维修方案",
+        messages: [
+          { role: "self", content: "我的车变速箱异响，买了才两年半，应该不会这么快坏吧？" },
+          { role: "other", content: "检测结果是变速箱阀体需要更换，费用大概1.2万。您的车过保了，只能自费。" },
+          { role: "self", content: "过保才一个月！两年多的车变速箱就坏了，这是质量问题吧？" },
+          { role: "other", content: "保修期是按合同来的，过了就是过了。我们也是按规定办事。" },
+          { role: "self", content: "你们这款车的变速箱投诉在车质网上排前三，这是已知的通病了。我看到其他4S店对这个问题做了延保处理。" },
+          { role: "other", content: "这个我要向厂家申请一下，不确定能不能批。" },
+        ],
+      },
+    ],
+  },
+
+  // ============================================================
+  // 8. 教育沟通 — 校园场景教练
+  // ============================================================
+  {
+    id: "education",
+    label: "教育场景",
+    icon: "🎓",
+    examples: [
+      {
+        id: "coach-exam-appeal",
+        label: "对考试成绩申诉",
+        description: "认为阅卷有误，需要向教务处申请复核",
+        goal: "成功启动成绩复核流程，争取改分",
+        messages: [
+          { role: "self", content: "老师您好，我想申请一下上周期末考试的成绩复核。" },
+          { role: "other", content: "复核需要有具体理由的，你觉得哪道题有问题？" },
+          { role: "self", content: "论述题第三题，我写了满满两页，但只给了3分（满分15分）。我对照了标准答案，要点都覆盖了。" },
+          { role: "other", content: "论述题的评分有一定主观性，不同老师可能有不同标准。" },
+          { role: "self", content: "我理解。但其他同学写了类似的要点拿了11分，差距太大了。我这里有我和同学的答题照片做对比。" },
+          { role: "other", content: "嗯，你把材料整理好交上来，我转给教研室主任看看。" },
+        ],
+      },
+      {
+        id: "coach-intern-conflict",
+        label: "实习期与带教老师冲突",
+        description: "实习期间被带教老师布置超量工作还不给好评",
+        goal: "改善与带教老师的关系，保住实习评价",
+        messages: [
+          { role: "other", content: "小周，这几份报告你今天做完，另外明天的PPT你也顺便做了。" },
+          { role: "self", content: "李姐，今天手上已经有三份报告了，再加这些可能做不完。" },
+          { role: "other", content: "实习就是学东西的，多做一点怎么了？我当年实习比你忙十倍。" },
+          { role: "self", content: "我很愿意学习，也一直在认真完成每项任务。只是想确认一下优先级，哪个最急？" },
+          { role: "other", content: "都急。做不完就加班嘛，年轻人别这么计较。" },
+        ],
+      },
+      {
+        id: "coach-scholarship-appeal",
+        label: "奖学金评定申诉",
+        description: "综合测评排名第一但奖学金给了别人，需要向辅导员申诉",
+        goal: "争取到应得的奖学金名额，或至少获得合理解释",
+        messages: [
+          { role: "self", content: "李老师，我想问一下今年国奖名额的事。我综测排名年级第一，但名单上没有我。" },
+          { role: "other", content: "这个是评审委员会的决定，综测成绩只是参考因素之一。" },
+          { role: "self", content: "那请问还参考了哪些因素？评审标准能公开吗？" },
+          { role: "other", content: "主要还看科研成果、社会实践这些。你的论文发表数量不如排第二的同学。" },
+          { role: "self", content: "可是评审细则里并没有论文数量这一项。而且我有两个省级竞赛获奖，这个应该也算科研成果吧？" },
+          { role: "other", content: "嗯...你把你的材料重新整理一份给我，我帮你反映一下。" },
+        ],
+      },
+    ],
+  },
 ];
 
 export function getAllCoachExamples(): CoachExample[] {

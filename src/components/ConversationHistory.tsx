@@ -12,9 +12,11 @@ import {
   AlertTriangle,
   RotateCcw,
   Eye,
+  Play,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
+import ConversationReplay from "./ConversationReplay";
 
 interface ConversationHistoryProps {
   onClose: () => void;
@@ -30,6 +32,9 @@ export default function ConversationHistory({
   const { conversations, deleteConversation } = useAppStore();
   const [search, setSearch] = useState("");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [replayConvoId, setReplayConvoId] = useState<string | null>(null);
+
+  const replayConvo = replayConvoId ? conversations.find((c) => c.id === replayConvoId) : null;
 
   const filtered = search.trim()
     ? conversations.filter(
@@ -123,9 +128,12 @@ export default function ConversationHistory({
                     </button>
                   </div>
                 ) : (
-                  <button
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => onLoadConversation(convo.id)}
-                    className="flex items-center gap-3 w-full text-left px-3 py-2.5"
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onLoadConversation(convo.id); }}
+                    className="flex items-center gap-3 w-full text-left px-3 py-2.5 cursor-pointer"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -146,6 +154,18 @@ export default function ConversationHistory({
                       </div>
                     </div>
                     <div className="flex items-center gap-0.5 shrink-0">
+                      {convo.rawText && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setReplayConvoId(convo.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded text-zinc-600 hover:text-emerald-400 transition-all"
+                          title="回放对话"
+                        >
+                          <Play className="h-3 w-3" />
+                        </button>
+                      )}
                       {convo.rawText && onReAnalyze && (
                         <button
                           onClick={(e) => {
@@ -169,13 +189,23 @@ export default function ConversationHistory({
                       </button>
                     </div>
                     <ChevronRight className="h-3.5 w-3.5 text-zinc-600 shrink-0" />
-                  </button>
+                  </div>
                 )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Conversation Replay Overlay */}
+      {replayConvo && (
+        <div className="mt-3">
+          <ConversationReplay
+            conversation={replayConvo}
+            onClose={() => setReplayConvoId(null)}
+          />
+        </div>
+      )}
     </div>
   );
 }

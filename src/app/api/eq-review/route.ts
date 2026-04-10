@@ -5,6 +5,7 @@
 import { NextRequest } from "next/server";
 import { callLLM } from "@/lib/api-client";
 import { extractJSON } from "@/lib/extract-json";
+import { createStreamingResponse } from "@/lib/stream-utils";
 import {
   EQ_REVIEW_SYSTEM_PROMPT,
   buildEQReviewPrompt,
@@ -27,10 +28,22 @@ export async function POST(request: NextRequest) {
       targetProfile ? JSON.stringify(targetProfile) : undefined
     );
 
+    const llmMessages = [{ role: "user" as const, content: userPrompt }];
+    const isStream = request.nextUrl.searchParams.get("stream") === "true";
+
+    if (isStream) {
+      return createStreamingResponse({
+        system: EQ_REVIEW_SYSTEM_PROMPT,
+        messages: llmMessages,
+        maxTokens: 8000,
+        postProcess: (parsed) => ({ report: parsed }),
+      });
+    }
+
     const raw = await callLLM({
       system: EQ_REVIEW_SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userPrompt }],
-      maxTokens: 6000,
+      messages: llmMessages,
+      maxTokens: 8000,
     });
 
     const { data: review, error: parseError } = extractJSON(raw);

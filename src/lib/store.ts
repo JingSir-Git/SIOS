@@ -17,10 +17,22 @@ import type {
   ProfileSnapshot,
   MBTITestResult,
   EQScoreEntry,
+  ProfileMemoryEntry,
+  PlaybookVersion,
 } from "./types";
 
 // ---- Theme & Preferences Types ----
 export type ThemeKey = "dark" | "violet-dark" | "green-eye" | "sepia" | "blue-night";
+
+export interface ToastItem {
+  id: string;
+  type: "success" | "error" | "info" | "warning";
+  title: string;
+  message?: string;
+  createdAt: number;
+  duration?: number; // ms, default 5000
+  action?: { label: string; tab?: string };
+}
 
 export interface ModuleHistoryEntry {
   id: string;
@@ -43,6 +55,11 @@ export interface DataExport {
   conversations: ConversationSession[];
   relationships: RelationshipEdge[];
   mbtiResults?: MBTITestResult[];
+  eqScores?: EQScoreEntry[];
+  moduleHistory?: Record<string, ModuleHistoryEntry[]>;
+  coachingTips?: CoachingTip[];
+  playbookVersions?: PlaybookVersion[];
+  profileMemories?: ProfileMemoryEntry[];
 }
 
 interface AppState {
@@ -100,6 +117,8 @@ interface AppState {
   toggleSidebar: () => void;
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  mobileDrawerOpen: boolean;
+  setMobileDrawerOpen: (open: boolean) => void;
 
   // ---- User Preferences ----
   fontSize: number; // 12-20, default 14
@@ -115,8 +134,30 @@ interface AppState {
 
   // ---- Cross-Tab Navigation ----
   preSelectedProfileId: string | null;
-  navigateToTab: (tab: string, profileId?: string) => void;
+  scenarioContext: string | null;
+  scenarioGoal: string | null;
+  navigateToTab: (tab: string, profileId?: string, scenario?: { context: string; goal: string }) => void;
   clearPreSelection: () => void;
+
+  // ---- Playbook History ----
+  playbookVersions: PlaybookVersion[];
+  addPlaybookVersion: (version: PlaybookVersion) => void;
+  getPlaybookVersions: (profileId: string) => PlaybookVersion[];
+  deletePlaybookVersion: (id: string) => void;
+
+  // ---- AI Memory System ----
+  profileMemories: ProfileMemoryEntry[];
+  addMemory: (entry: ProfileMemoryEntry) => void;
+  updateMemory: (id: string, updates: Partial<ProfileMemoryEntry>) => void;
+  deleteMemory: (id: string) => void;
+  getMemoriesForProfile: (profileId: string) => ProfileMemoryEntry[];
+  getActiveMemoriesForProfile: (profileId: string) => ProfileMemoryEntry[];
+  addMemoriesBatch: (entries: ProfileMemoryEntry[]) => void;
+
+  // ---- Toast Notifications ----
+  toasts: ToastItem[];
+  addToast: (toast: Omit<ToastItem, "id" | "createdAt">) => void;
+  removeToast: (id: string) => void;
 }
 
 // ============================================================
@@ -332,13 +373,17 @@ export const useAppStore = create<AppState>()(
       exportAllData: () => {
         const state = get();
         return {
-          version: 4,
+          version: 5,
           exportedAt: new Date().toISOString(),
           profiles: state.profiles,
           conversations: state.conversations,
           relationships: state.relationships,
           mbtiResults: state.mbtiResults,
           eqScores: state.eqScores,
+          moduleHistory: state.moduleHistory,
+          coachingTips: state.coachingTips,
+          playbookVersions: state.playbookVersions,
+          profileMemories: state.profileMemories,
         };
       },
 
@@ -357,7 +402,11 @@ export const useAppStore = create<AppState>()(
             conversations: data.conversations,
             relationships: data.relationships,
             mbtiResults: data.mbtiResults || [],
-            eqScores: (data as unknown as Record<string, unknown>).eqScores as EQScoreEntry[] || [],
+            eqScores: data.eqScores || [],
+            moduleHistory: data.moduleHistory || {},
+            coachingTips: data.coachingTips || [],
+            playbookVersions: data.playbookVersions || [],
+            profileMemories: data.profileMemories || [],
           });
         } else {
           // Merge mode: add items that don't already exist (by id)
@@ -379,8 +428,24 @@ export const useAppStore = create<AppState>()(
 
           // Merge EQ scores
           const existingEqIds = new Set(state.eqScores.map((e) => e.id));
-          const importedEq = ((data as unknown as Record<string, unknown>).eqScores as EQScoreEntry[] || []);
-          const newEq = importedEq.filter((e) => !existingEqIds.has(e.id));
+          const newEq = (data.eqScores || []).filter((e) => !existingEqIds.has(e.id));
+
+          // Merge playbook versions
+          const existingPbIds = new Set(state.playbookVersions.map((p) => p.id));
+          const newPb = (data.playbookVersions || []).filter((p) => !existingPbIds.has(p.id));
+
+          // Merge profile memories
+          const existingMemIds = new Set(state.profileMemories.map((m) => m.id));
+          const newMem = (data.profileMemories || []).filter((m) => !existingMemIds.has(m.id));
+
+          // Merge module history (combine per-module arrays)
+          const mergedModuleHistory = { ...state.moduleHistory };
+          for (const [mod, entries] of Object.entries(data.moduleHistory || {})) {
+            const existing = mergedModuleHistory[mod] || [];
+            const existIds = new Set(existing.map((e) => e.id));
+            const newEntries = entries.filter((e) => !existIds.has(e.id));
+            mergedModuleHistory[mod] = [...existing, ...newEntries].slice(0, 50);
+          }
 
           set({
             profiles: [...state.profiles, ...newProfiles],
@@ -388,6 +453,9 @@ export const useAppStore = create<AppState>()(
             relationships: [...state.relationships, ...newRels],
             mbtiResults: [...state.mbtiResults, ...newMbti],
             eqScores: [...state.eqScores, ...newEq],
+            playbookVersions: [...state.playbookVersions, ...newPb],
+            profileMemories: [...state.profileMemories, ...newMem],
+            moduleHistory: mergedModuleHistory,
           });
         }
 
@@ -403,6 +471,13 @@ export const useAppStore = create<AppState>()(
           liveChatMessages: [],
           mbtiResults: [],
           eqScores: [],
+          profileMemories: [],
+          playbookVersions: [],
+          moduleHistory: {},
+          toasts: [],
+          preSelectedProfileId: null,
+          scenarioContext: null,
+          scenarioGoal: null,
         }),
 
       // ---- UI ----
@@ -411,10 +486,18 @@ export const useAppStore = create<AppState>()(
         set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       activeTab: "analyze",
       setActiveTab: (tab) => set({ activeTab: tab }),
+      mobileDrawerOpen: false,
+      setMobileDrawerOpen: (open) => set({ mobileDrawerOpen: open }),
 
       // ---- User Preferences ----
       fontSize: 14,
-      setFontSize: (size) => set({ fontSize: Math.min(20, Math.max(12, size)) }),
+      setFontSize: (size) => {
+        const validSizes = [12, 13, 14, 16, 18];
+        const closest = validSizes.reduce((prev, curr) =>
+          Math.abs(curr - size) < Math.abs(prev - size) ? curr : prev
+        );
+        set({ fontSize: closest });
+      },
       theme: "dark" as ThemeKey,
       setTheme: (theme) => set({ theme }),
 
@@ -436,9 +519,86 @@ export const useAppStore = create<AppState>()(
 
       // ---- Cross-Tab Navigation ----
       preSelectedProfileId: null,
-      navigateToTab: (tab, profileId) =>
-        set({ activeTab: tab, preSelectedProfileId: profileId || null }),
-      clearPreSelection: () => set({ preSelectedProfileId: null }),
+      scenarioContext: null,
+      scenarioGoal: null,
+      navigateToTab: (tab, profileId, scenario) =>
+        set({
+          activeTab: tab,
+          preSelectedProfileId: profileId || null,
+          scenarioContext: scenario?.context || null,
+          scenarioGoal: scenario?.goal || null,
+        }),
+      clearPreSelection: () => set({ preSelectedProfileId: null, scenarioContext: null, scenarioGoal: null }),
+
+      // ---- Playbook History ----
+      playbookVersions: [],
+
+      addPlaybookVersion: (version) =>
+        set((state) => ({
+          playbookVersions: [version, ...state.playbookVersions].slice(0, 50),
+        })),
+
+      getPlaybookVersions: (profileId) =>
+        get().playbookVersions
+          .filter((v) => v.profileId === profileId)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+
+      deletePlaybookVersion: (id) =>
+        set((state) => ({
+          playbookVersions: state.playbookVersions.filter((v) => v.id !== id),
+        })),
+
+      // ---- AI Memory System ----
+      profileMemories: [],
+
+      addMemory: (entry) =>
+        set((state) => ({ profileMemories: [...state.profileMemories, entry] })),
+
+      updateMemory: (id, updates) =>
+        set((state) => ({
+          profileMemories: state.profileMemories.map((m) =>
+            m.id === id ? { ...m, ...updates, updatedAt: new Date().toISOString() } : m
+          ),
+        })),
+
+      deleteMemory: (id) =>
+        set((state) => ({
+          profileMemories: state.profileMemories.filter((m) => m.id !== id),
+        })),
+
+      getMemoriesForProfile: (profileId) =>
+        get().profileMemories.filter((m) => m.profileId === profileId),
+
+      getActiveMemoriesForProfile: (profileId) =>
+        get().profileMemories
+          .filter((m) => m.profileId === profileId && !m.archived)
+          .sort((a, b) => b.importance - a.importance || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+
+      addMemoriesBatch: (entries) =>
+        set((state) => {
+          // Deduplicate by content+profileId to avoid duplicate memories
+          const existing = new Set(
+            state.profileMemories.map((m) => `${m.profileId}::${m.content}`)
+          );
+          const newEntries = entries.filter(
+            (e) => !existing.has(`${e.profileId}::${e.content}`)
+          );
+          return { profileMemories: [...state.profileMemories, ...newEntries] };
+        }),
+
+      // ---- Toast Notifications ----
+      toasts: [],
+      addToast: (toast) =>
+        set((state) => ({
+          toasts: [
+            ...state.toasts,
+            { ...toast, id: crypto.randomUUID(), createdAt: Date.now() },
+          ],
+        })),
+      removeToast: (id) =>
+        set((state) => ({
+          toasts: state.toasts.filter((t) => t.id !== id),
+        })),
     }),
     {
       name: "social-intelligence-os",
@@ -461,6 +621,8 @@ export const useAppStore = create<AppState>()(
         fontSize: state.fontSize,
         theme: state.theme,
         moduleHistory: state.moduleHistory,
+        profileMemories: state.profileMemories,
+        playbookVersions: state.playbookVersions,
       }),
     }
   )

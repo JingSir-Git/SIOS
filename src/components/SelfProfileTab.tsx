@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   UserCircle,
   Loader2,
@@ -17,8 +17,16 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
+import StreamingIndicator from "./StreamingIndicator";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+/** Safely coerce an LLM-returned value to a string array (handles string, array, or undefined). */
+function asArray(val: unknown): string[] {
+  if (Array.isArray(val)) return val.map(String);
+  if (typeof val === "string" && val.trim()) return [val];
+  return [];
+}
 
 interface SelfProfileResult {
   communicatorType: {
@@ -69,6 +77,8 @@ export default function SelfProfileTab() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SelfProfileResult | null>(null);
   const [error, setError] = useState("");
+  const [streamingText, setStreamingText] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
 
   const latestMBTI = mbtiResults[0];
 
@@ -76,20 +86,29 @@ export default function SelfProfileTab() {
   const analyzableConversations = conversations.filter((c) => c.rawText);
   const hasEnoughData = analyzableConversations.length >= 2;
 
+  const abortStreaming = useCallback(() => {
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+    setLoading(false);
+  }, []);
+
   const handleAnalyze = async () => {
     if (!hasEnoughData) return;
     setLoading(true);
     setError("");
     setResult(null);
+    setStreamingText("");
+
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
-      // Take up to 8 most recent conversations with rawText
       const texts = analyzableConversations
         .slice(0, 8)
         .map((c) => c.rawText!)
         .filter(Boolean);
 
-      const res = await fetch("/api/self-profile", {
+      const res = await fetch("/api/self-profile?stream=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -99,19 +118,53 @@ export default function SelfProfileTab() {
             ? JSON.stringify(result)
             : undefined,
         }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || "请求失败");
+        let errMsg = `请求失败 (${res.status})`;
+        try { const d = await res.json(); if (d.error) errMsg = d.error; } catch { /* use default */ }
+        throw new Error(errMsg);
       }
 
-      const data = await res.json();
-      setResult(data.profile);
-    } catch (err) {
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("无法读取响应流");
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let gotResult = false;
+      let streamError = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6).trim());
+            if (event.type === "progress" && event.text) {
+              setStreamingText((prev) => prev + event.text);
+            } else if (event.type === "result" && event.data) {
+              gotResult = true;
+              const data = event.data as { profile: SelfProfileResult };
+              setResult(data.profile);
+            } else if (event.type === "error") {
+              streamError = event.text || "自我画像分析出错";
+            }
+          } catch { /* skip malformed SSE line */ }
+        }
+      }
+      if (!gotResult) {
+        setError(streamError || "自我画像分析未返回结果，请重试");
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "未知错误");
     } finally {
       setLoading(false);
+      abortRef.current = null;
     }
   };
 
@@ -189,6 +242,15 @@ export default function SelfProfileTab() {
             </button>
           </div>
 
+          {/* Streaming indicator */}
+          {loading && !result && (
+            <StreamingIndicator
+              text={streamingText}
+              label="AI正在分析你的沟通模式"
+              onAbort={abortStreaming}
+            />
+          )}
+
           {/* Error */}
           {error && (
             <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
@@ -246,11 +308,11 @@ export default function SelfProfileTab() {
                     <span className="text-[10px] text-zinc-500">语气特征</span>
                     <p className="text-xs text-zinc-300">{result.linguisticFingerprint.toneSignature}</p>
                   </div>
-                  {result.linguisticFingerprint.frequentPatterns?.length > 0 && (
+                  {asArray(result.linguisticFingerprint.frequentPatterns).length > 0 && (
                     <div>
                       <span className="text-[10px] text-zinc-500">常见表达模式</span>
                       <div className="flex flex-wrap gap-1.5 mt-1">
-                        {result.linguisticFingerprint.frequentPatterns.map((p: string, i: number) => (
+                        {asArray(result.linguisticFingerprint.frequentPatterns).map((p: string, i: number) => (
                           <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-300">
                             {p}
                           </span>
@@ -272,10 +334,10 @@ export default function SelfProfileTab() {
                   <div className="space-y-2">
                     <p className="text-[11px] text-zinc-400">{result.emotionalPatterns.expressionStyle}</p>
                     <p className="text-[11px] text-zinc-400">{result.emotionalPatterns.regulationAbility}</p>
-                    {result.emotionalPatterns.triggerPoints?.length > 0 && (
+                    {asArray(result.emotionalPatterns.triggerPoints).length > 0 && (
                       <div>
                         <span className="text-[9px] text-zinc-600">触发点：</span>
-                        {result.emotionalPatterns.triggerPoints.map((t: string, i: number) => (
+                        {asArray(result.emotionalPatterns.triggerPoints).map((t: string, i: number) => (
                           <span key={i} className="text-[10px] text-pink-300 block">• {t}</span>
                         ))}
                       </div>
@@ -335,10 +397,10 @@ export default function SelfProfileTab() {
                       <span className="text-[9px] text-zinc-600">/100</span>
                     </div>
                     <p className="text-[11px] text-zinc-400">{result.listeningQuality.strengths}</p>
-                    {result.listeningQuality.missedSignals?.length > 0 && (
+                    {asArray(result.listeningQuality.missedSignals).length > 0 && (
                       <div>
                         <span className="text-[9px] text-zinc-600">可能忽视的信号：</span>
-                        {result.listeningQuality.missedSignals.map((s: string, i: number) => (
+                        {asArray(result.listeningQuality.missedSignals).map((s: string, i: number) => (
                           <span key={i} className="text-[10px] text-amber-300 block">⚠ {s}</span>
                         ))}
                       </div>
@@ -355,7 +417,7 @@ export default function SelfProfileTab() {
                     <h4 className="text-xs font-medium text-emerald-300">沟通优势</h4>
                   </div>
                   <div className="space-y-1">
-                    {result.strengths?.map((s: string, i: number) => (
+                    {asArray(result.strengths).map((s: string, i: number) => (
                       <p key={i} className="text-[11px] text-zinc-400">✓ {s}</p>
                     ))}
                   </div>
@@ -366,7 +428,7 @@ export default function SelfProfileTab() {
                     <h4 className="text-xs font-medium text-red-300">沟通盲点</h4>
                   </div>
                   <div className="space-y-1">
-                    {result.blindSpots?.map((s: string, i: number) => (
+                    {asArray(result.blindSpots).map((s: string, i: number) => (
                       <p key={i} className="text-[11px] text-zinc-400">⚠ {s}</p>
                     ))}
                   </div>
@@ -374,7 +436,7 @@ export default function SelfProfileTab() {
               </div>
 
               {/* Growth Areas */}
-              {result.growthAreas?.length > 0 && (
+              {Array.isArray(result.growthAreas) && result.growthAreas.length > 0 && (
                 <div className="rounded-lg border border-zinc-800 p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <Sparkles className="h-4 w-4 text-violet-400" />

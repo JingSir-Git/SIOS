@@ -18,8 +18,12 @@ import {
   Lightbulb,
   Users,
   Star,
+  Briefcase,
+  Eye,
+  Flame,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { MBTITestResult } from "@/lib/types";
 import { useAppStore } from "@/lib/store";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -56,6 +60,8 @@ export default function MBTITab() {
   const [currentQ, setCurrentQ] = useState(0);
   const [result, setResult] = useState<MBTIResult | null>(null);
   const [showResult, setShowResult] = useState(false);
+  const [viewingFromHistory, setViewingFromHistory] = useState(false);
+  const [historyRecord, setHistoryRecord] = useState<MBTITestResult | null>(null);
 
   const questions: MBTIQuestion[] = mode ? getQuestionsForMode(mode) : [];
   const totalQuestions = questions.length;
@@ -95,6 +101,30 @@ export default function MBTITab() {
     setResult(null);
     setShowResult(false);
     setMode(null);
+    setViewingFromHistory(false);
+    setHistoryRecord(null);
+  };
+
+  const handleViewHistoryResult = (rec: MBTITestResult) => {
+    const s = rec.scores;
+    const mkPct = (a: number, b: number, la: string, lb: string) => ({
+      label: a >= b ? la : lb,
+      value: Math.round((Math.max(a, b) / (a + b || 1)) * 100),
+    });
+    setResult({
+      type: rec.type,
+      scores: s,
+      percentages: {
+        EI: mkPct(s.E, s.I, "E", "I"),
+        SN: mkPct(s.S, s.N, "S", "N"),
+        TF: mkPct(s.T, s.F, "T", "F"),
+        JP: mkPct(s.J, s.P, "J", "P"),
+      },
+    });
+    setMode(rec.mode);
+    setShowResult(true);
+    setViewingFromHistory(true);
+    setHistoryRecord(rec);
   };
 
   const canFinish = answeredCount >= totalQuestions;
@@ -169,15 +199,16 @@ export default function MBTITab() {
                     const modeInfo = MBTI_TEST_MODES.find((m) => m.id === r.mode);
                     const typeDesc = MBTI_TYPE_DESCRIPTIONS[r.type];
                     return (
-                      <div
+                      <button
                         key={r.id}
-                        className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 flex items-center justify-between"
+                        onClick={() => handleViewHistoryResult(r)}
+                        className="w-full rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 flex items-center justify-between hover:border-violet-500/30 hover:bg-zinc-800/50 transition-all cursor-pointer group/hist"
                       >
                         <div className="flex items-center gap-3">
                           <span className="text-lg font-bold bg-gradient-to-r from-violet-400 to-pink-400 bg-clip-text text-transparent">
                             {r.type}
                           </span>
-                          <div>
+                          <div className="text-left">
                             <span className="text-xs text-zinc-300">
                               {typeDesc?.nickname || r.type}
                             </span>
@@ -186,17 +217,20 @@ export default function MBTITab() {
                             </div>
                           </div>
                         </div>
-                        <div className="flex gap-1">
-                          {r.type.split("").map((letter, i) => (
-                            <span
-                              key={i}
-                              className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono"
-                            >
-                              {letter}
-                            </span>
-                          ))}
+                        <div className="flex items-center gap-2">
+                          <div className="flex gap-1">
+                            {r.type.split("").map((letter, i) => (
+                              <span
+                                key={i}
+                                className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono"
+                              >
+                                {letter}
+                              </span>
+                            ))}
+                          </div>
+                          <ChevronRight className="h-3.5 w-3.5 text-zinc-600 group-hover/hist:text-violet-400 transition-colors" />
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -218,13 +252,29 @@ export default function MBTITab() {
     const typeInfo = MBTI_TYPE_DESCRIPTIONS[result.type];
     const report = MBTI_DETAILED_REPORTS[result.type];
     const modeLabel = MBTI_TEST_MODES.find((m) => m.id === mode)?.label || "";
+    const displayQCount = viewingFromHistory && historyRecord ? historyRecord.questionCount : totalQuestions;
     return (
       <div className="flex flex-col h-full">
-        <div className="border-b border-zinc-800 px-6 py-4">
-          <h1 className="text-lg font-semibold text-zinc-100">MBTI 人格检测 · 结果报告</h1>
-          <p className="text-xs text-zinc-500 mt-1">
-            基于{modeLabel}（{totalQuestions}题）的个性化人格分析
-          </p>
+        <div className="border-b border-zinc-800 px-6 py-4 flex items-center gap-3">
+          {viewingFromHistory && (
+            <button
+              onClick={handleReset}
+              className="shrink-0 h-8 w-8 rounded-lg border border-zinc-700 flex items-center justify-center hover:border-violet-500/30 hover:bg-zinc-800/50 transition-all"
+            >
+              <ChevronLeft className="h-4 w-4 text-zinc-400" />
+            </button>
+          )}
+          <div>
+            <h1 className="text-lg font-semibold text-zinc-100">MBTI 人格检测 · 结果报告</h1>
+            <p className="text-xs text-zinc-500 mt-1">
+              基于{modeLabel}（{displayQCount}题）的个性化人格分析
+              {viewingFromHistory && historyRecord && (
+                <span className="ml-2 text-zinc-600">
+                  · {new Date(historyRecord.completedAt).toLocaleDateString("zh-CN")}
+                </span>
+              )}
+            </p>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -387,6 +437,111 @@ export default function MBTITab() {
                       <p key={i} className="text-[11px] text-zinc-400 flex items-start gap-2">
                         <span className="text-pink-400 font-medium shrink-0">{i + 1}.</span> {a}
                       </p>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ===== 深度人格洞察 ===== */}
+
+                {/* Hidden Depth */}
+                <div className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-500/5 via-pink-500/5 to-violet-500/5 p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Eye className="h-4 w-4 text-purple-400" />
+                    <h3 className="text-sm font-semibold text-purple-300">隐藏的深度</h3>
+                  </div>
+                  <p className="text-[11px] text-zinc-300 leading-relaxed italic">{report.hiddenDepth}</p>
+                </div>
+
+                {/* Motivation & Blind Spot */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Flame className="h-4 w-4 text-amber-400" />
+                      <h4 className="text-xs font-medium text-amber-300">核心驱动力</h4>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">{report.motivationDriver}</p>
+                  </div>
+                  <div className="rounded-lg border border-rose-500/20 bg-rose-500/5 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-rose-400" />
+                      <h4 className="text-xs font-medium text-rose-300">盲点警告</h4>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">{report.blindSpotWarning}</p>
+                  </div>
+                </div>
+
+                {/* Love Language & Decision Style */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border border-pink-500/20 bg-pink-500/5 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Heart className="h-4 w-4 text-pink-400" />
+                      <h4 className="text-xs font-medium text-pink-300">爱的语言</h4>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">{report.loveLanguage}</p>
+                  </div>
+                  <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="h-4 w-4 text-indigo-400" />
+                      <h4 className="text-xs font-medium text-indigo-300">决策风格</h4>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">{report.decisionMakingStyle}</p>
+                  </div>
+                </div>
+
+                {/* Social Intelligence */}
+                <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Users className="h-4 w-4 text-sky-400" />
+                    <h4 className="text-xs font-medium text-sky-300">社交智慧</h4>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">{report.socialIntelligence}</p>
+                </div>
+
+                {/* Compatible & Challenging Types */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Heart className="h-4 w-4 text-emerald-400" />
+                      <h4 className="text-xs font-medium text-emerald-300">最佳拍档</h4>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {report.compatibleTypes.map((t, i) => {
+                        const desc = MBTI_TYPE_DESCRIPTIONS[t];
+                        return (
+                          <span key={i} className="text-[10px] px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                            {t} {desc?.nickname}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Swords className="h-4 w-4 text-orange-400" />
+                      <h4 className="text-xs font-medium text-orange-300">挑战组合</h4>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {report.challengingTypes.map((t, i) => {
+                        const desc = MBTI_TYPE_DESCRIPTIONS[t];
+                        return (
+                          <span key={i} className="text-[10px] px-2 py-1 rounded-md bg-orange-500/10 text-orange-300 border border-orange-500/20">
+                            {t} {desc?.nickname}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Career Suggestions */}
+                <div className="rounded-lg border border-teal-500/20 bg-teal-500/5 p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Briefcase className="h-4 w-4 text-teal-400" />
+                    <h3 className="text-sm font-semibold text-teal-300">推荐职业方向</h3>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {report.careerSuggestions.map((c, i) => (
+                      <span key={i} className="text-[10px] px-2.5 py-1 rounded-full bg-teal-500/10 text-teal-300 border border-teal-500/20">{c}</span>
                     ))}
                   </div>
                 </div>

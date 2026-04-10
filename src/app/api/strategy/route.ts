@@ -5,6 +5,7 @@
 import { NextRequest } from "next/server";
 import { callLLM } from "@/lib/api-client";
 import { extractJSON } from "@/lib/extract-json";
+import { createStreamingResponse } from "@/lib/stream-utils";
 
 const STRATEGY_SYSTEM_PROMPT = `你是 Social Intelligence OS 的策略规划引擎——一个顶级的谈判策略顾问。你为用户即将到来的重要对话制定完整的策略方案。
 
@@ -78,9 +79,20 @@ ${objective}`;
   ]
 }`;
 
+    const llmMessages = [{ role: "user" as const, content: userPrompt }];
+    const isStream = request.nextUrl.searchParams.get("stream") === "true";
+
+    if (isStream) {
+      return createStreamingResponse({
+        system: STRATEGY_SYSTEM_PROMPT,
+        messages: llmMessages,
+        maxTokens: 6000,
+      });
+    }
+
     const raw = await callLLM({
       system: STRATEGY_SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userPrompt }],
+      messages: llmMessages,
       maxTokens: 6000,
     });
 

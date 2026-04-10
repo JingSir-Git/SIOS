@@ -5,75 +5,78 @@ import { THEME_LABELS } from "./ThemeProvider";
 import {
   Type,
   Palette,
-  Minus,
-  Plus,
   RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const THEME_KEYS: ThemeKey[] = ["dark", "violet-dark", "green-eye", "sepia", "blue-night"];
 
+const FONT_SIZE_LEVELS = [
+  { value: 12, label: "紧凑", scale: 0.85 },
+  { value: 13, label: "较小", scale: 0.92 },
+  { value: 14, label: "标准", scale: 1.0 },
+  { value: 16, label: "较大", scale: 1.1 },
+  { value: 18, label: "超大", scale: 1.2 },
+];
+
 export default function UserPreferences() {
   const { fontSize, setFontSize, theme, setTheme } = useAppStore();
+  const currentLevel = FONT_SIZE_LEVELS.find((l) => l.value === fontSize) || FONT_SIZE_LEVELS[2];
 
   return (
     <div className="space-y-6">
       {/* Font Size */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Type className="h-4 w-4 text-violet-400" />
-          <h3 className="text-sm font-medium text-zinc-200">字体大小</h3>
-        </div>
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setFontSize(fontSize - 1)}
-            disabled={fontSize <= 12}
-            className={cn(
-              "rounded-lg p-2 border transition-colors",
-              fontSize <= 12
-                ? "border-zinc-800 text-zinc-600 cursor-not-allowed"
-                : "border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white"
-            )}
-          >
-            <Minus className="h-4 w-4" />
-          </button>
-          <div className="flex-1">
-            <input
-              type="range"
-              min={12}
-              max={20}
-              value={fontSize}
-              onChange={(e) => setFontSize(Number(e.target.value))}
-              className="w-full accent-violet-500 h-1.5 rounded-full bg-zinc-700 appearance-none cursor-pointer"
-            />
-            <div className="flex justify-between mt-1">
-              <span className="text-[10px] text-zinc-600">12px</span>
-              <span className="text-xs font-mono text-violet-400 font-medium">{fontSize}px</span>
-              <span className="text-[10px] text-zinc-600">20px</span>
-            </div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Type className="h-4 w-4 text-violet-400" />
+            <h3 className="text-sm font-medium text-zinc-200">界面缩放</h3>
           </div>
-          <button
-            onClick={() => setFontSize(fontSize + 1)}
-            disabled={fontSize >= 20}
-            className={cn(
-              "rounded-lg p-2 border transition-colors",
-              fontSize >= 20
-                ? "border-zinc-800 text-zinc-600 cursor-not-allowed"
-                : "border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white"
-            )}
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setFontSize(14)}
-            className="rounded-lg p-2 border border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors"
-            title="重置为默认"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-          </button>
+          {fontSize !== 14 && (
+            <button
+              onClick={() => setFontSize(14)}
+              className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-violet-400 transition-colors"
+            >
+              <RotateCcw className="h-3 w-3" />
+              重置
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-5 gap-2">
+          {FONT_SIZE_LEVELS.map((level) => {
+            const isActive = fontSize === level.value;
+            return (
+              <button
+                key={level.value}
+                onClick={() => setFontSize(level.value)}
+                className={cn(
+                  "flex flex-col items-center gap-1.5 rounded-xl p-3 border-2 transition-all",
+                  isActive
+                    ? "border-violet-500 bg-violet-500/10 shadow-lg shadow-violet-500/10"
+                    : "border-zinc-700 hover:border-zinc-500 bg-zinc-800/30"
+                )}
+              >
+                <span className={cn(
+                  "font-medium",
+                  isActive ? "text-violet-300" : "text-zinc-400"
+                )} style={{ fontSize: `${Math.round(14 * level.scale)}px` }}>
+                  Aa
+                </span>
+                <span className={cn(
+                  "text-[10px] font-medium",
+                  isActive ? "text-violet-300" : "text-zinc-500"
+                )}>
+                  {level.label}
+                </span>
+                <span className="text-[8px] text-zinc-600">
+                  {Math.round(level.scale * 100)}%
+                </span>
+              </button>
+            );
+          })}
         </div>
         <p className="text-[10px] text-zinc-600 mt-3">
-          调整全局字体大小。预览效果实时生效，默认为 14px。
+          调整全局界面缩放等级，所有文字和元素会等比缩放。当前：{currentLevel.label}（{Math.round(currentLevel.scale * 100)}%）
         </p>
       </div>
 

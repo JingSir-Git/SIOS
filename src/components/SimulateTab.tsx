@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Send,
   Loader2,
@@ -26,7 +26,7 @@ interface SimMessage {
 }
 
 export default function SimulateTab() {
-  const { profiles, preSelectedProfileId, clearPreSelection } = useAppStore();
+  const { profiles, preSelectedProfileId, scenarioContext, scenarioGoal, clearPreSelection, addToast } = useAppStore();
   const [selectedProfileId, setSelectedProfileId] = useState("");
   const [scenario, setScenario] = useState("");
   const [userGoal, setUserGoal] = useState("");
@@ -40,13 +40,21 @@ export default function SimulateTab() {
   const [activeExampleCategory, setActiveExampleCategory] = useState(SIMULATE_EXAMPLE_CATEGORIES[0].id);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Pick up cross-tab pre-selection
+  // Pick up cross-tab pre-selection + scenario prefill
   useEffect(() => {
     if (preSelectedProfileId && profiles.find((p) => p.id === preSelectedProfileId)) {
       setSelectedProfileId(preSelectedProfileId);
+    }
+    if (scenarioContext) {
+      setScenario(scenarioContext);
+    }
+    if (scenarioGoal) {
+      setUserGoal(scenarioGoal);
+    }
+    if (preSelectedProfileId || scenarioContext || scenarioGoal) {
       clearPreSelection();
     }
-  }, [preSelectedProfileId, profiles, clearPreSelection]);
+  }, [preSelectedProfileId, scenarioContext, scenarioGoal, profiles, clearPreSelection]);
 
   const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
 
@@ -82,6 +90,13 @@ export default function SimulateTab() {
     setInput("");
   };
 
+  const abortRef = useRef<AbortController | null>(null);
+
+  const abortStreaming = useCallback(() => {
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+    setLoading(false);
+  }, []);
+
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
     const userMsg: SimMessage = {
@@ -89,9 +104,18 @@ export default function SimulateTab() {
       role: "user",
       content: input.trim(),
     };
+    const currentInput = input.trim();
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
+
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    // Add a placeholder simulated message that will be updated during streaming
+    const simMsgId = (Date.now() + 1).toString();
+    setMessages((prev) => [...prev, { id: simMsgId, role: "simulated", content: "" }]);
 
     try {
       let profileDescription = "一个典型的商务人士";
@@ -111,7 +135,7 @@ export default function SimulateTab() {
 情绪触发点: ${selectedProfile.communicationStyle?.triggerPoints?.join("、") || "未知"}`;
       }
 
-      const res = await fetch("/api/simulate", {
+      const res = await fetch("/api/simulate?stream=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -122,33 +146,80 @@ export default function SimulateTab() {
             role: m.role,
             content: m.content,
           })),
-          userMessage: input.trim(),
+          userMessage: currentInput,
         }),
+        signal: controller.signal,
       });
 
       if (!res.ok) throw new Error("请求失败");
 
-      const data = await res.json();
-      const simMsg: SimMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "simulated",
-        content: data.reply || data.text || "...",
-        coaching: data.coaching,
-        emotionalState: data.emotionalState,
-      };
-      setMessages((prev) => [...prev, simMsg]);
-    } catch (err) {
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("无法读取响应流");
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let streamedText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6).trim());
+            if (event.type === "progress" && event.text) {
+              streamedText += event.text;
+              // Update the placeholder message with streamed text progressively
+              setMessages((prev) =>
+                prev.map((m) => m.id === simMsgId ? { ...m, content: streamedText } : m)
+              );
+            } else if (event.type === "result" && event.data) {
+              const data = event.data as { reply?: string; text?: string; coaching?: string; emotionalState?: string };
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === simMsgId
+                    ? { ...m, content: data.reply || data.text || streamedText || "...", coaching: data.coaching, emotionalState: data.emotionalState }
+                    : m
+                )
+              );
+            } else if (event.type === "error") {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === simMsgId
+                    ? { ...m, content: streamedText || `（模拟出错：${event.text || "未知错误"}，请重试）` }
+                    : m
+                )
+              );
+            }
+          } catch { /* skip malformed SSE line */ }
+        }
+      }
+      // Notify if user switched away
+      const currentTab = useAppStore.getState().activeTab;
+      if (currentTab !== "simulate") {
+        addToast({
+          type: "info",
+          title: "模拟对练已回复",
+          message: "对方已回复，可以继续对话",
+          duration: 6000,
+          action: { label: "继续对练", tab: "simulate" },
+        });
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
       console.error(err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: "simulated",
-          content: "（系统错误，请重试）",
-        },
-      ]);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === simMsgId
+            ? { ...m, content: "（系统错误，请重试）" }
+            : m
+        )
+      );
     } finally {
       setLoading(false);
+      abortRef.current = null;
     }
   };
 

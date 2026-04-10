@@ -5,6 +5,7 @@
 import { NextRequest } from "next/server";
 import { callLLM } from "@/lib/api-client";
 import { extractJSON } from "@/lib/extract-json";
+import { createStreamingResponse } from "@/lib/stream-utils";
 
 const PLANNING_SYSTEM_PROMPT = `你是 Social Intelligence OS 的规划制定引擎——一个顶级的战略规划顾问。你帮助用户制定从日常事务到长期战略的各类计划。
 
@@ -128,9 +129,20 @@ ${timeScaleLabels[timeScale] || timeScale || "根据目标自动判断"}`;
 - 里程碑的 dependencies 引用其他里程碑的 id
 - priority 只能是 "critical"、"high"、"medium"、"low" 之一`;
 
+    const llmMessages = [{ role: "user" as const, content: userPrompt }];
+    const isStream = request.nextUrl.searchParams.get("stream") === "true";
+
+    if (isStream) {
+      return createStreamingResponse({
+        system: PLANNING_SYSTEM_PROMPT,
+        messages: llmMessages,
+        maxTokens: 10000,
+      });
+    }
+
     const raw = await callLLM({
       system: PLANNING_SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userPrompt }],
+      messages: llmMessages,
       maxTokens: 10000,
     });
 

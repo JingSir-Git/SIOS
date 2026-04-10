@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   GraduationCap,
   Send,
@@ -24,8 +24,10 @@ import { parseConversation, formatMessagesForLLM } from "@/lib/parse-conversatio
 import MessageAttributionEditor from "./MessageAttributionEditor";
 import ModuleHistoryPanel from "./ModuleHistoryPanel";
 import { EQRadarChart, EQGrowthCurve } from "./EQScoreCharts";
+import CoachEvolution from "./CoachEvolution";
 import type { ChatMessage } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
+import StreamingIndicator from "./StreamingIndicator";
 
 interface EQItem {
   messageIndex: number;
@@ -64,13 +66,15 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: React.ElementType; 
 type EQStage = "input" | "attribution" | "results";
 
 export default function EQTrainingTab() {
-  const { profiles, conversations, preSelectedProfileId, clearPreSelection, addModuleHistory, addEQScore } = useAppStore();
+  const { profiles, conversations, preSelectedProfileId, clearPreSelection, addModuleHistory, addEQScore, addToast } = useAppStore();
   const [stage, setStage] = useState<EQStage>("input");
   const [conversation, setConversation] = useState("");
   const [selectedProfileId, setSelectedProfileId] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<EQResult | null>(null);
   const [error, setError] = useState("");
+  const [streamingText, setStreamingText] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
   const [showExamples, setShowExamples] = useState(false);
   const [showConversations, setShowConversations] = useState(false);
   const [activeExampleCategory, setActiveExampleCategory] = useState(EQ_EXAMPLE_CATEGORIES[0].id);
@@ -134,15 +138,25 @@ export default function EQTrainingTab() {
     runReview(formatted);
   };
 
-  // ---- Core review call ----
+  const abortStreaming = useCallback(() => {
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+    setLoading(false);
+  }, []);
+
+  // ---- Core review call (SSE streaming) ----
   const runReview = async (convoText: string) => {
     setLoading(true);
     setError("");
     setResult(null);
+    setStreamingText("");
     setStage("results");
 
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
-      const res = await fetch("/api/eq-review", {
+      const res = await fetch("/api/eq-review?stream=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -159,43 +173,92 @@ export default function EQTrainingTab() {
               }
             : undefined,
         }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || "请求失败");
+        let errMsg = `请求失败 (${res.status})`;
+        try {
+          const errData = await res.json();
+          if (errData.error) errMsg = errData.error;
+        } catch { /* use default */ }
+        throw new Error(errMsg);
       }
 
-      const data = await res.json();
-      setResult(data.report);
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("无法读取响应流");
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let gotResult = false;
+      let streamError = "";
 
-      // Auto-save to module history + EQ score tracking
-      if (data.report) {
-        const entryId = uuidv4();
-        addModuleHistory("eq-training", {
-          id: entryId,
-          title: `EQ复盘 — ${data.report.overallScore}分`,
-          createdAt: new Date().toISOString(),
-          module: "eq-training",
-          data: { result: data.report, conversation: convoText },
-          summary: `得分${data.report.overallScore}，${data.report.items?.length || 0}条建议`,
-        });
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6).trim());
+            if (event.type === "progress" && event.text) {
+              setStreamingText((prev) => prev + event.text);
+            } else if (event.type === "result" && event.data) {
+              gotResult = true;
+              const data = event.data as { report: EQResult };
+              setResult(data.report);
+              if (data.report) {
+                const entryId = uuidv4();
+                addModuleHistory("eq-training", {
+                  id: entryId,
+                  title: `EQ复盘 — ${data.report.overallScore}分`,
+                  createdAt: new Date().toISOString(),
+                  module: "eq-training",
+                  data: { result: data.report, conversation: convoText },
+                  summary: `得分${data.report.overallScore}，${data.report.items?.length || 0}条建议`,
+                });
+                if (data.report.dimensionScores) {
+                  addEQScore({
+                    id: entryId,
+                    overallScore: data.report.overallScore,
+                    dimensionScores: data.report.dimensionScores,
+                    createdAt: new Date().toISOString(),
+                    profileName: selectedProfile?.name,
+                  });
+                }
+              }
+            } else if (event.type === "error") {
+              streamError = event.text || "分析过程出错";
+            }
+          } catch {
+            // Malformed SSE line — skip
+          }
+        }
+      }
 
-        // Persist EQ score for growth tracking
-        if (data.report.dimensionScores) {
-          addEQScore({
-            id: entryId,
-            overallScore: data.report.overallScore,
-            dimensionScores: data.report.dimensionScores,
-            createdAt: new Date().toISOString(),
-            profileName: selectedProfile?.name,
+      // If stream completed but no result was received, surface the error
+      if (!gotResult) {
+        setError(streamError || "分析未返回结果，可能是AI输出格式异常，请重试");
+      } else {
+        // Notify if user switched away
+        const currentTab = useAppStore.getState().activeTab;
+        if (currentTab !== "eq-training") {
+          addToast({
+            type: "success",
+            title: "情商评估完成",
+            message: "情商训练评估已完成，可以查看结果",
+            duration: 8000,
+            action: { label: "查看结果", tab: "eq-training" },
           });
         }
       }
-    } catch (err) {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "未知错误");
     } finally {
       setLoading(false);
+      abortRef.current = null;
     }
   };
 
@@ -432,6 +495,15 @@ export default function EQTrainingTab() {
             </button>
           </div>}
 
+          {/* Streaming indicator */}
+          {loading && !result && stage === "results" && (
+            <StreamingIndicator
+              text={streamingText}
+              label="AI教练正在复盘中"
+              onAbort={abortStreaming}
+            />
+          )}
+
           {/* Error */}
           {error && (
             <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
@@ -615,6 +687,9 @@ export default function EQTrainingTab() {
 
               {/* EQ Growth Curve */}
               <EQGrowthCurve />
+
+              {/* Coach Evolution Tracker */}
+              <CoachEvolution />
             </div>
           )}
         </div>

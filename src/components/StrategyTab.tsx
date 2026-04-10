@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Map,
   Loader2,
@@ -18,6 +18,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { STRATEGY_EXAMPLE_CATEGORIES, type StrategyExample } from "@/lib/strategy-examples";
+import StreamingIndicator from "./StreamingIndicator";
+import { formatMemoriesForPrompt } from "@/lib/memory-utils";
 import ModuleHistoryPanel from "./ModuleHistoryPanel";
 import { v4 as uuidv4 } from "uuid";
 
@@ -48,21 +50,31 @@ interface StrategyResult {
 }
 
 export default function StrategyTab() {
-  const { profiles, preSelectedProfileId, clearPreSelection, addModuleHistory } = useAppStore();
+  const { profiles, preSelectedProfileId, scenarioContext, scenarioGoal, clearPreSelection, addModuleHistory, getActiveMemoriesForProfile, addToast } = useAppStore();
   const [selectedProfileId, setSelectedProfileId] = useState("");
 
-  // Pick up cross-tab pre-selection
+  // Pick up cross-tab pre-selection + scenario prefill
   useEffect(() => {
     if (preSelectedProfileId && profiles.find((p) => p.id === preSelectedProfileId)) {
       setSelectedProfileId(preSelectedProfileId);
+    }
+    if (scenarioGoal) {
+      setObjective(scenarioGoal);
+    }
+    if (scenarioContext) {
+      setContext(scenarioContext);
+    }
+    if (preSelectedProfileId || scenarioContext || scenarioGoal) {
       clearPreSelection();
     }
-  }, [preSelectedProfileId, profiles, clearPreSelection]);
+  }, [preSelectedProfileId, scenarioContext, scenarioGoal, profiles, clearPreSelection]);
   const [objective, setObjective] = useState("");
   const [context, setContext] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<StrategyResult | null>(null);
   const [error, setError] = useState("");
+  const [streamingText, setStreamingText] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
   const [expandedPoint, setExpandedPoint] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [copiedScript, setCopiedScript] = useState<number | null>(null);
@@ -79,14 +91,24 @@ export default function StrategyTab() {
 
   const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
 
+  const abortStreaming = useCallback(() => {
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+    setLoading(false);
+  }, []);
+
   const generateStrategy = async () => {
     if (!objective.trim()) return;
     setLoading(true);
     setError("");
     setResult(null);
+    setStreamingText("");
+
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
-      const profileInfo = selectedProfile
+      let profileInfo = selectedProfile
         ? `对方: ${selectedProfile.name}
 沟通风格: ${selectedProfile.communicationStyle?.overallType || "未知"}
 强势程度: ${selectedProfile.dimensions.assertiveness?.value ?? "未知"}/100
@@ -97,7 +119,15 @@ export default function StrategyTab() {
 有效说服策略: ${selectedProfile.patterns?.persuasionVulnerability?.join("、") || "未知"}`
         : "";
 
-      const res = await fetch("/api/strategy", {
+      // Inject AI memory context
+      if (selectedProfile) {
+        const memories = getActiveMemoriesForProfile(selectedProfile.id);
+        if (memories.length > 0) {
+          profileInfo += `\n\n${formatMemoriesForPrompt(memories, selectedProfile)}`;
+        }
+      }
+
+      const res = await fetch("/api/strategy?stream=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -105,31 +135,75 @@ export default function StrategyTab() {
           context: context.trim() || undefined,
           profileInfo: profileInfo || undefined,
         }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || "策略生成失败");
+        let errMsg = `策略生成失败 (${res.status})`;
+        try { const d = await res.json(); if (d.error) errMsg = d.error; } catch { /* use default */ }
+        throw new Error(errMsg);
       }
 
-      const data = await res.json();
-      setResult(data);
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("无法读取响应流");
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let gotResult = false;
+      let streamError = "";
 
-      // Auto-save to module history
-      if (data) {
-        addModuleHistory("strategy", {
-          id: uuidv4(),
-          title: `策略: ${objective.trim().slice(0, 30)}`,
-          createdAt: new Date().toISOString(),
-          module: "strategy",
-          data: { result: data, objective: objective.trim(), context: context.trim() },
-          summary: data.objective?.slice(0, 50) || "策略方案",
-        });
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6).trim());
+            if (event.type === "progress" && event.text) {
+              setStreamingText((prev) => prev + event.text);
+            } else if (event.type === "result" && event.data) {
+              gotResult = true;
+              const data = event.data as StrategyResult;
+              setResult(data);
+              if (data) {
+                addModuleHistory("strategy", {
+                  id: uuidv4(),
+                  title: `策略: ${objective.trim().slice(0, 30)}`,
+                  createdAt: new Date().toISOString(),
+                  module: "strategy",
+                  data: { result: data, objective: objective.trim(), context: context.trim() },
+                  summary: data.objective?.slice(0, 50) || "策略方案",
+                });
+              }
+            } else if (event.type === "error") {
+              streamError = event.text || "策略生成出错";
+            }
+          } catch { /* skip malformed SSE line */ }
+        }
       }
-    } catch (err) {
+      if (!gotResult) {
+        setError(streamError || "策略生成未返回结果，请重试");
+      } else {
+        // Notify if user switched away
+        const currentTab = useAppStore.getState().activeTab;
+        if (currentTab !== "strategy") {
+          addToast({
+            type: "success",
+            title: "策略方案已生成",
+            message: `"${objective.trim().slice(0, 30)}" 的策略已就绪`,
+            duration: 8000,
+            action: { label: "查看方案", tab: "strategy" },
+          });
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "未知错误");
     } finally {
       setLoading(false);
+      abortRef.current = null;
     }
   };
 
@@ -311,6 +385,15 @@ ${result.redLines.map((r) => `- ${r}`).join("\n")}`;
               )}
             </button>
           </div>
+
+          {/* Streaming indicator */}
+          {loading && !result && (
+            <StreamingIndicator
+              text={streamingText}
+              label="AI策略师正在制定方案"
+              onAbort={abortStreaming}
+            />
+          )}
 
           {/* Error */}
           {error && (

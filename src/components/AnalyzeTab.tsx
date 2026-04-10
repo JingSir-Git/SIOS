@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   Send,
   Loader2,
@@ -17,6 +17,7 @@ import {
   X,
   Fingerprint,
   History,
+  Clock,
 } from "lucide-react";
 import { cn, getTipTypeIcon } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
@@ -25,11 +26,14 @@ import ConversationHistory from "./ConversationHistory";
 import MessageAttributionEditor from "./MessageAttributionEditor";
 import ModuleHistoryPanel from "./ModuleHistoryPanel";
 import ScenarioShortcuts from "./ScenarioShortcuts";
+import ConversationQualityScore from "./ConversationQualityScore";
 import { parseConversation, formatMessagesForLLM } from "@/lib/parse-conversation";
 import { EXAMPLE_CATEGORIES, type ExampleConversation } from "@/lib/example-conversations";
 import { ALL_MBTI_TYPES } from "@/lib/mbti-questions";
 import type { EmotionPoint, ChatMessage } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
+import StreamingIndicator from "./StreamingIndicator";
+import { extractMemoriesFromAnalysis, formatMemoriesForPrompt } from "@/lib/memory-utils";
 
 // ---- Types ----
 
@@ -124,11 +128,14 @@ export default function AnalyzeTab() {
 
   // Attribution stage state
   const [parsedMessages, setParsedMessages] = useState<ChatMessage[]>([]);
+  const [detectedPlatform, setDetectedPlatform] = useState<string | null>(null);
 
   // Results stage state
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState("");
+  const [streamingText, setStreamingText] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     surfaceFeatures: true,
     discourseStructure: true,
@@ -142,6 +149,8 @@ export default function AnalyzeTab() {
   const [formattedConversation, setFormattedConversation] = useState("");
   // Original raw text before attribution (preserved for re-analysis)
   const [originalRawText, setOriginalRawText] = useState("");
+  // User-specified conversation date (for timeline accuracy)
+  const [conversationDate, setConversationDate] = useState("");
 
   // Example selector
   const [showExamples, setShowExamples] = useState(false);
@@ -150,7 +159,7 @@ export default function AnalyzeTab() {
   // History panel
   const [showHistory, setShowHistory] = useState(false);
 
-  const { addConversation, addProfile, updateProfile, snapshotProfile, profiles, conversations, mbtiResults, addModuleHistory, navigateToTab } = useAppStore();
+  const { addConversation, addProfile, updateProfile, snapshotProfile, profiles, conversations, mbtiResults, addModuleHistory, navigateToTab, getActiveMemoriesForProfile, addMemoriesBatch, addToast, activeTab } = useAppStore();
 
   // Auto-populate selfMBTI from stored test results
   const latestMBTI = mbtiResults[0];
@@ -221,12 +230,20 @@ export default function AnalyzeTab() {
 
     const parseResult = parseConversation(conversation.trim());
 
+    // Show detected platform badge
+    if (parseResult.platformLabel && parseResult.timestampCount && parseResult.timestampCount > 0) {
+      setDetectedPlatform(parseResult.platformLabel);
+    } else {
+      setDetectedPlatform(null);
+    }
+
     if (parseResult.needsAttribution) {
       // Unstructured chat — show attribution editor
       setParsedMessages(parseResult.messages);
       setStage("attribution");
     } else {
-      // Structured chat — go directly to analysis
+      // Structured chat with clear "我" speaker — go directly to analysis
+      setParsedMessages(parseResult.messages);
       const formatted = formatMessagesForLLM(parseResult.messages);
       setFormattedConversation(formatted);
 
@@ -246,6 +263,9 @@ export default function AnalyzeTab() {
     messages: ChatMessage[],
     speakers: { id: string; name: string; role: string }[]
   ) => {
+    // Store the user-confirmed messages for saving later
+    setParsedMessages(messages);
+
     const formatted = formatMessagesForLLM(messages);
     setFormattedConversation(formatted);
 
@@ -265,60 +285,149 @@ export default function AnalyzeTab() {
     runAnalysis(formatted, resolvedTargetName);
   };
 
-  // ---- Core analysis call ----
+  const abortStreaming = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    setLoading(false);
+  }, []);
+
+  // ---- Core analysis call (SSE streaming) ----
   const runAnalysis = async (convoText: string, overrideTargetName?: string) => {
     setLoading(true);
     setError("");
     setResult(null);
+    setStreamingText("");
     setStage("results");
 
     const finalTargetName = overrideTargetName || targetName.trim() || undefined;
 
+    // Abort any previous stream
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    // Inject AI memory context if an existing profile exists for this target
+    let memoryContext: string | undefined;
+    if (finalTargetName) {
+      const existingProfile = profiles.find((p) => p.name === finalTargetName);
+      if (existingProfile) {
+        const memories = getActiveMemoriesForProfile(existingProfile.id);
+        if (memories.length > 0) {
+          memoryContext = formatMemoriesForPrompt(memories, existingProfile);
+        }
+      }
+    }
+
     try {
-      const res = await fetch("/api/analyze", {
+      const res = await fetch("/api/analyze?stream=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversation: convoText,
           targetName: finalTargetName,
-          context: context.trim() || undefined,
+          context: (context.trim() || "") + (memoryContext ? `\n\n${memoryContext}` : "") || undefined,
           mbtiInfo: (effectiveSelfMBTI || otherMBTI || showMBTI) ? {
             selfMBTI: effectiveSelfMBTI || undefined,
             otherMBTI: otherMBTI || undefined,
           } : undefined,
         }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || "分析请求失败");
+        let errMsg = `分析请求失败 (${res.status})`;
+        try {
+          const errData = await res.json();
+          if (errData.error) errMsg = errData.error;
+        } catch { /* use default */ }
+        throw new Error(errMsg);
       }
 
-      const data = await res.json();
-      setResult(data.analysis);
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("无法读取响应流");
 
-      // Auto-save to module history
-      if (data.analysis) {
-        const name = overrideTargetName || targetName.trim() || "对方";
-        addModuleHistory("analyze", {
-          id: uuidv4(),
-          title: `与${name}的对话分析`,
-          createdAt: new Date().toISOString(),
-          module: "analyze",
-          data: { result: data.analysis, conversation: convoText, targetName: name, context: context.trim() },
-          summary: data.analysis.summary?.slice(0, 60) || "对话分析完成",
-        });
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let gotResult = false;
+      let streamError = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr) continue;
+          try {
+            const event = JSON.parse(jsonStr);
+            if (event.type === "progress" && event.text) {
+              setStreamingText((prev) => prev + event.text);
+            } else if (event.type === "result" && event.data) {
+              const data = event.data as { analysis: AnalysisResult; targetName: string };
+              const a = data.analysis;
+
+              // Validate critical fields — reject incomplete results
+              const requiredSections = ["surfaceFeatures", "discourseStructure", "interactionPatterns", "semanticContent"];
+              const missingSections = requiredSections.filter(
+                (key) => !a || !a[key as keyof AnalysisResult] || typeof a[key as keyof AnalysisResult] !== "object"
+              );
+              if (missingSections.length > 0 || !a?.summary) {
+                streamError = `解析失败：AI返回的分析结果不完整，缺少 ${missingSections.length > 0 ? missingSections.join("、") : "summary"} 等关键字段。请重试。`;
+              } else {
+                gotResult = true;
+                setResult(a);
+                // Auto-save to module history
+                const name = overrideTargetName || targetName.trim() || "对方";
+                addModuleHistory("analyze", {
+                  id: uuidv4(),
+                  title: `与${name}的对话分析`,
+                  createdAt: new Date().toISOString(),
+                  module: "analyze",
+                  data: { result: a, conversation: convoText, targetName: name, context: context.trim() },
+                  summary: a.summary?.slice(0, 60) || "对话分析完成",
+                });
+              }
+            } else if (event.type === "error") {
+              streamError = event.text || "分析过程出错";
+            }
+          } catch { /* skip malformed SSE line */ }
+        }
       }
-    } catch (err) {
+
+      if (!gotResult) {
+        setError(streamError || "分析未返回结果，可能是AI输出格式异常，请重试");
+      } else {
+        // Notify user via toast if they're on a different tab
+        const currentTab = useAppStore.getState().activeTab;
+        if (currentTab !== "analyze") {
+          addToast({
+            type: "success",
+            title: "对话分析完成",
+            message: `与${overrideTargetName || targetName.trim() || "对方"}的对话已分析完毕`,
+            duration: 8000,
+            action: { label: "查看结果", tab: "analyze" },
+          });
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "未知错误");
     } finally {
       setLoading(false);
+      abortRef.current = null;
     }
   };
 
   const handleSave = () => {
     if (!result) return;
 
+    try {
     const name = targetName.trim() || "对方";
     const convoId = uuidv4();
 
@@ -331,8 +440,8 @@ export default function AnalyzeTab() {
       id: convoId,
       title: `与${name}的对话分析`,
       participants: ["我", name],
-      messages: [],
-      createdAt: new Date().toISOString(),
+      messages: parsedMessages.length > 0 ? parsedMessages : [],
+      createdAt: conversationDate || new Date().toISOString(),
       rawText: originalRawText || conversation,
       targetName: name,
       context: context || undefined,
@@ -347,7 +456,7 @@ export default function AnalyzeTab() {
 
     if (result.profileUpdate) {
       const pu = result.profileUpdate;
-      const newDims = pu.dimensions || {};
+      const newDims = (pu.dimensions && typeof pu.dimensions === 'object') ? pu.dimensions : {};
 
       if (existingProfile) {
         // ---- Dynamic merge into existing profile ----
@@ -366,10 +475,10 @@ export default function AnalyzeTab() {
         for (const key of Object.keys(dimLabels)) {
           const existing = mergedDimensions[key as keyof typeof mergedDimensions];
           const incoming = newDims[key];
-          if (!incoming) continue;
+          if (!incoming || typeof incoming !== 'object') continue;
 
-          const oldConf = existing?.confidence ?? 10;
-          const newConf = incoming.confidence ?? 10;
+          const oldConf = Math.max(1, existing?.confidence ?? 10);
+          const newConf = Math.max(1, typeof incoming.confidence === 'number' ? incoming.confidence : 10);
           const totalConf = oldConf + newConf;
 
           // Weighted average: higher confidence data has more influence
@@ -400,21 +509,21 @@ export default function AnalyzeTab() {
 
         // 3. Merge communication style: prefer newer non-empty values
         const mergedCommStyle = { ...existingProfile.communicationStyle };
-        if (pu.communicationStyle) {
+        if (pu.communicationStyle && typeof pu.communicationStyle === 'object') {
           if (pu.communicationStyle.overallType) mergedCommStyle.overallType = pu.communicationStyle.overallType;
-          if (pu.communicationStyle.strengths?.length) {
-            const set = new Set([...mergedCommStyle.strengths, ...pu.communicationStyle.strengths]);
+          if (Array.isArray(pu.communicationStyle.strengths) && pu.communicationStyle.strengths.length) {
+            const set = new Set([...(mergedCommStyle.strengths || []), ...pu.communicationStyle.strengths]);
             mergedCommStyle.strengths = [...set].slice(0, 8);
           }
-          if (pu.communicationStyle.weaknesses?.length) {
-            const set = new Set([...mergedCommStyle.weaknesses, ...pu.communicationStyle.weaknesses]);
+          if (Array.isArray(pu.communicationStyle.weaknesses) && pu.communicationStyle.weaknesses.length) {
+            const set = new Set([...(mergedCommStyle.weaknesses || []), ...pu.communicationStyle.weaknesses]);
             mergedCommStyle.weaknesses = [...set].slice(0, 8);
           }
-          if (pu.communicationStyle.triggerPoints?.length) {
+          if (Array.isArray(pu.communicationStyle.triggerPoints) && pu.communicationStyle.triggerPoints.length) {
             const set = new Set([...(mergedCommStyle.triggerPoints || []), ...pu.communicationStyle.triggerPoints]);
             mergedCommStyle.triggerPoints = [...set].slice(0, 8);
           }
-          if (pu.communicationStyle.preferredTopics?.length) {
+          if (Array.isArray(pu.communicationStyle.preferredTopics) && pu.communicationStyle.preferredTopics.length) {
             const set = new Set([...(mergedCommStyle.preferredTopics || []), ...pu.communicationStyle.preferredTopics]);
             mergedCommStyle.preferredTopics = [...set].slice(0, 8);
           }
@@ -422,11 +531,11 @@ export default function AnalyzeTab() {
 
         // 4. Update patterns: prefer newer non-empty values
         const mergedPatterns = { ...existingProfile.patterns };
-        if (pu.patterns) {
+        if (pu.patterns && typeof pu.patterns === 'object') {
           if (pu.patterns.responseSpeed) mergedPatterns.responseSpeed = pu.patterns.responseSpeed as string;
           if (pu.patterns.conflictStyle) mergedPatterns.conflictStyle = pu.patterns.conflictStyle as string;
           if (pu.patterns.decisionStyle) mergedPatterns.decisionStyle = pu.patterns.decisionStyle as string;
-          if (pu.patterns.persuasionVulnerability?.length) {
+          if (Array.isArray(pu.patterns.persuasionVulnerability) && pu.patterns.persuasionVulnerability.length) {
             const set = new Set([...(mergedPatterns.persuasionVulnerability || []), ...(pu.patterns.persuasionVulnerability as string[])]);
             mergedPatterns.persuasionVulnerability = [...set].slice(0, 8);
           }
@@ -437,7 +546,7 @@ export default function AnalyzeTab() {
           dimensions: mergedDimensions,
           communicationStyle: mergedCommStyle,
           patterns: mergedPatterns,
-          conversationCount: existingProfile.conversationCount + 1,
+          conversationCount: (existingProfile.conversationCount || 0) + 1,
           lastInteraction: new Date().toISOString(),
         });
       } else {
@@ -488,7 +597,24 @@ export default function AnalyzeTab() {
       }
     }
 
+    // ---- Extract and persist AI memories ----
+    if (profileId) {
+      const memories = extractMemoriesFromAnalysis(
+        profileId,
+        name,
+        result,
+        convoId,
+      );
+      if (memories.length > 0) {
+        addMemoriesBatch(memories);
+      }
+    }
+
     setSaved(true);
+    } catch (err) {
+      console.error("Save error:", err);
+      addToast({ type: "error", title: "保存失败", message: err instanceof Error ? err.message : "保存过程中发生错误，请重试" });
+    }
   };
 
   const resetToInput = () => {
@@ -497,6 +623,7 @@ export default function AnalyzeTab() {
     setError("");
     setSaved(false);
     setFormattedConversation("");
+    setConversationDate("");
   };
 
   const renderSection = (key: string, data: Record<string, unknown>) => {
@@ -614,6 +741,24 @@ export default function AnalyzeTab() {
                   <Fingerprint className="h-3 w-3" />
                   {showMBTI ? "隐藏MBTI" : "+ MBTI"}
                 </button>
+              </div>
+
+              {/* Conversation date picker */}
+              <div className="flex items-center gap-2">
+                <Clock className="h-3.5 w-3.5 text-zinc-600" />
+                <span className="text-[10px] text-zinc-500">对话发生时间</span>
+                <input
+                  type="datetime-local"
+                  value={conversationDate ? conversationDate.slice(0, 16) : ""}
+                  onChange={(e) => setConversationDate(e.target.value ? new Date(e.target.value).toISOString() : "")}
+                  className="rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1 text-[11px] text-zinc-400 focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/20"
+                />
+                {!conversationDate && (
+                  <span className="text-[9px] text-zinc-600">留空则默认当前时间</span>
+                )}
+                {conversationDate && (
+                  <button onClick={() => setConversationDate("")} className="text-[9px] text-zinc-600 hover:text-zinc-400">清除</button>
+                )}
               </div>
 
               {/* MBTI Selector */}
@@ -797,19 +942,26 @@ export default function AnalyzeTab() {
               )}
 
               {!loading && !result && (
-                <button
-                  onClick={handlePreprocess}
-                  disabled={!conversation.trim()}
-                  className={cn(
-                    "flex items-center justify-center gap-2 rounded-lg px-6 py-2.5 text-sm font-medium transition-all w-full",
-                    !conversation.trim()
-                      ? "bg-zinc-800 text-zinc-600 cursor-not-allowed"
-                      : "bg-violet-600 text-white hover:bg-violet-500 shadow-lg shadow-violet-500/20"
+                <div className="space-y-2">
+                  <button
+                    onClick={handlePreprocess}
+                    disabled={!conversation.trim()}
+                    className={cn(
+                      "flex items-center justify-center gap-2 rounded-lg px-6 py-2.5 text-sm font-medium transition-all w-full",
+                      !conversation.trim()
+                        ? "bg-zinc-800 text-zinc-600 cursor-not-allowed"
+                        : "bg-violet-600 text-white hover:bg-violet-500 shadow-lg shadow-violet-500/20"
+                    )}
+                  >
+                    <FileText className="h-4 w-4" />
+                    解析对话 & 开始分析
+                  </button>
+                  {detectedPlatform && (
+                    <p className="text-[10px] text-center text-cyan-400">
+                      ✓ 检测到{detectedPlatform}格式的时间戳，已自动解析
+                    </p>
                   )}
-                >
-                  <FileText className="h-4 w-4" />
-                  解析对话 & 开始分析
-                </button>
+                </div>
               )}
             </div>
           )}
@@ -823,15 +975,13 @@ export default function AnalyzeTab() {
             />
           )}
 
-          {/* ===== Loading indicator ===== */}
+          {/* ===== Loading indicator (streaming) ===== */}
           {loading && (
-            <div className="flex flex-col items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-violet-400 mb-4" />
-              <p className="text-sm text-zinc-400">AI 正在深度分析中...</p>
-              <p className="text-[10px] text-zinc-600 mt-1">
-                五层信号提取 + 贝叶斯画像构建，预计需要 10-30 秒
-              </p>
-            </div>
+            <StreamingIndicator
+              text={streamingText}
+              label="AI 正在深度分析中"
+              onAbort={abortStreaming}
+            />
           )}
 
           {/* Error */}
@@ -859,6 +1009,19 @@ export default function AnalyzeTab() {
                   {result.summary}
                 </p>
               </div>
+
+              {/* Quality Score */}
+              <ConversationQualityScore
+                analysis={result as unknown as import("@/lib/types").ConversationAnalysis}
+                previousAnalyses={(() => {
+                  const matchedProfile = profiles.find((p) => p.name === targetName);
+                  if (!matchedProfile) return [];
+                  return conversations
+                    .filter((c) => c.analysis && c.linkedProfileId === matchedProfile.id)
+                    .slice(1, 6)
+                    .map((c) => c.analysis!);
+                })()}
+              />
 
               {/* Emotion Curve */}
               {result.emotionCurve && result.emotionCurve.length > 0 && (

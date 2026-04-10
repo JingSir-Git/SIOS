@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#09090b"/>
+  <circle cx="256" cy="210" r="72" fill="none" stroke="#8b5cf6" stroke-width="10"/>
+  <path d="M180 345 C180 290 332 290 332 345" fill="none" stroke="#8b5cf6" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="256" cy="210" r="22" fill="#8b5cf6" opacity="0.3"/>
+  <path d="M224 190 Q256 158 288 190" fill="none" stroke="#a78bfa" stroke-width="6" stroke-linecap="round"/>
+  <text x="256" y="440" text-anchor="middle" font-family="system-ui,sans-serif" font-size="56" font-weight="700" fill="#f4f4f5">SIOS</text>
+</svg>

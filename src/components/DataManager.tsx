@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   Download,
   Upload,
@@ -10,6 +10,8 @@ import {
   HardDrive,
   FileJson,
   Shield,
+  Brain,
+  Copy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore, type DataExport } from "@/lib/store";
@@ -19,6 +21,10 @@ export default function DataManager() {
     profiles,
     conversations,
     relationships,
+    profileMemories,
+    mbtiResults,
+    eqScores,
+    playbookVersions,
     exportAllData,
     importData,
     clearAllData,
@@ -28,7 +34,37 @@ export default function DataManager() {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [importMode, setImportMode] = useState<"merge" | "replace">("merge");
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const getStorageSize = useCallback(() => {
+    try {
+      const data = localStorage.getItem("social-intelligence-os");
+      if (!data) return 0;
+      return new Blob([data]).size;
+    } catch {
+      return 0;
+    }
+  }, []);
+
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+  };
+
+  const handleCopyJSON = useCallback(() => {
+    try {
+      const data = exportAllData();
+      navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("\u590D\u5236\u5931\u8D25");
+    }
+  }, [exportAllData]);
 
   const handleExport = () => {
     try {
@@ -91,7 +127,8 @@ export default function DataManager() {
     setTimeout(() => setImportResult(null), 3000);
   };
 
-  const totalItems = profiles.length + conversations.length + relationships.length;
+  const totalItems = profiles.length + conversations.length + relationships.length + mbtiResults.length + eqScores.length + playbookVersions.length + profileMemories.length;
+  const storageSize = getStorageSize();
 
   return (
     <div className="space-y-6">
@@ -101,7 +138,7 @@ export default function DataManager() {
           <HardDrive className="h-4 w-4 text-violet-400" />
           <h3 className="text-sm font-medium text-zinc-200">数据概览</h3>
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-3">
           <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 p-3 text-center">
             <p className="text-2xl font-semibold text-violet-400">{profiles.length}</p>
             <p className="text-[10px] text-zinc-500 mt-1">人物画像</p>
@@ -113,6 +150,26 @@ export default function DataManager() {
           <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 p-3 text-center">
             <p className="text-2xl font-semibold text-cyan-400">{relationships.length}</p>
             <p className="text-[10px] text-zinc-500 mt-1">关系图谱</p>
+          </div>
+          <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 p-3 text-center">
+            <p className="text-2xl font-semibold text-pink-400">{mbtiResults.length}</p>
+            <p className="text-[10px] text-zinc-500 mt-1">MBTI记录</p>
+          </div>
+          <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 p-3 text-center">
+            <p className="text-2xl font-semibold text-amber-400">{profileMemories.length}</p>
+            <p className="text-[10px] text-zinc-500 mt-1">AI记忆</p>
+          </div>
+          <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 p-3 text-center">
+            <p className="text-2xl font-semibold text-teal-400">{playbookVersions.length}</p>
+            <p className="text-[10px] text-zinc-500 mt-1">策略版本</p>
+          </div>
+          <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 p-3 text-center">
+            <p className="text-2xl font-semibold text-orange-400">{eqScores.length}</p>
+            <p className="text-[10px] text-zinc-500 mt-1">EQ评分</p>
+          </div>
+          <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 p-3 text-center">
+            <p className="text-2xl font-semibold text-emerald-400">{formatBytes(storageSize)}</p>
+            <p className="text-[10px] text-zinc-500 mt-1">存储占用</p>
           </div>
         </div>
         <div className="mt-3 flex items-center gap-1.5">
@@ -132,19 +189,34 @@ export default function DataManager() {
         <p className="text-[11px] text-zinc-500 mb-4">
           将所有画像、对话记录和关系图谱导出为 JSON 文件。可用于备份或迁移到其他设备。
         </p>
-        <button
-          onClick={handleExport}
-          disabled={totalItems === 0}
-          className={cn(
-            "flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all w-full",
-            totalItems === 0
-              ? "bg-zinc-800 text-zinc-600 cursor-not-allowed"
-              : "bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 hover:border-emerald-500/50"
-          )}
-        >
-          <FileJson className="h-4 w-4" />
-          导出全部数据（{totalItems} 条记录）
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExport}
+            disabled={totalItems === 0}
+            className={cn(
+              "flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all flex-1",
+              totalItems === 0
+                ? "bg-zinc-800 text-zinc-600 cursor-not-allowed"
+                : "bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 hover:border-emerald-500/50"
+            )}
+          >
+            <FileJson className="h-4 w-4" />
+            导出全部数据（{totalItems} 条记录）
+          </button>
+          <button
+            onClick={handleCopyJSON}
+            disabled={totalItems === 0}
+            className={cn(
+              "flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
+              totalItems === 0
+                ? "bg-zinc-800 text-zinc-600 cursor-not-allowed"
+                : "bg-zinc-800 text-zinc-400 border border-zinc-700 hover:text-zinc-200 hover:border-zinc-600"
+            )}
+          >
+            {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+            {copied ? "已复制" : "复制"}
+          </button>
+        </div>
       </div>
 
       {/* Import */}
@@ -228,7 +300,7 @@ export default function DataManager() {
             <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2">
               <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
               <p className="text-[11px] text-red-300">
-                确定要删除所有 {totalItems} 条记录吗？此操作无法撤销！
+                确定要删除所有数据吗？包括 {profiles.length} 个画像、{conversations.length} 条对话、{profileMemories.length} 条AI记忆、{mbtiResults.length} 条MBTI记录等共 {totalItems} 项。此操作无法撤销！
               </p>
             </div>
             <div className="flex gap-2">

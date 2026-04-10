@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Send,
   Loader2,
@@ -18,6 +18,8 @@ import { cn, getTipTypeColor, getTipTypeIcon } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import type { CoachingTip } from "@/lib/types";
 import { COACH_EXAMPLE_CATEGORIES, type CoachExample } from "@/lib/coach-examples";
+import StreamingIndicator from "./StreamingIndicator";
+import { formatMemoriesForPrompt } from "@/lib/memory-utils";
 
 interface Message {
   id: string;
@@ -26,7 +28,7 @@ interface Message {
 }
 
 export default function CoachTab() {
-  const { profiles, preSelectedProfileId, clearPreSelection } = useAppStore();
+  const { profiles, preSelectedProfileId, scenarioContext, scenarioGoal, clearPreSelection, getActiveMemoriesForProfile, addToast } = useAppStore();
   const [messages, setMessages] = useState<Message[]>([]);
   const [selfInput, setSelfInput] = useState("");
   const [otherInput, setOtherInput] = useState("");
@@ -37,14 +39,24 @@ export default function CoachTab() {
   useEffect(() => {
     if (preSelectedProfileId && profiles.find((p) => p.id === preSelectedProfileId)) {
       setSelectedProfileId(preSelectedProfileId);
+    }
+    if (scenarioContext) {
+      setOtherInput(scenarioContext);
+    }
+    if (scenarioGoal) {
+      setUserGoal(scenarioGoal);
+    }
+    if (preSelectedProfileId || scenarioContext || scenarioGoal) {
       clearPreSelection();
     }
-  }, [preSelectedProfileId, profiles, clearPreSelection]);
+  }, [preSelectedProfileId, scenarioContext, scenarioGoal, profiles, clearPreSelection]);
   const [tips, setTips] = useState<CoachingTip[]>([]);
   const [suggestedReply, setSuggestedReply] = useState("");
   const [currentDynamic, setCurrentDynamic] = useState("");
   const [scriptTemplates, setScriptTemplates] = useState<{scenario: string; script: string; rationale: string}[]>([]);
   const [loading, setLoading] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
   const [copied, setCopied] = useState(false);
   const [copiedScript, setCopiedScript] = useState<number | null>(null);
   const [showExamples, setShowExamples] = useState(false);
@@ -84,36 +96,105 @@ export default function CoachTab() {
     else setOtherInput("");
   };
 
+  const abortStreaming = useCallback(() => {
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+    setLoading(false);
+  }, []);
+
   const requestCoaching = async () => {
     if (messages.length === 0) return;
     setLoading(true);
+    setStreamingText("");
+
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
       const formatted = messages
         .map((m) => `${m.role === "self" ? "我" : "对方"}：${m.content}`)
         .join("\n");
 
-      const res = await fetch("/api/coach", {
+      // Inject AI memory context if an existing profile is selected
+      let memoryContext: string | undefined;
+      if (selectedProfile) {
+        const memories = getActiveMemoriesForProfile(selectedProfile.id);
+        if (memories.length > 0) {
+          memoryContext = formatMemoriesForPrompt(memories, selectedProfile);
+        }
+      }
+
+      const res = await fetch("/api/coach?stream=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: formatted,
           targetProfile: selectedProfile || undefined,
-          userGoal: userGoal.trim() || undefined,
+          userGoal: (userGoal.trim() || "") + (memoryContext ? `\n\n${memoryContext}` : "") || undefined,
         }),
+        signal: controller.signal,
       });
 
-      if (!res.ok) throw new Error("请求失败");
+      if (!res.ok) {
+        let errMsg = `请求失败 (${res.status})`;
+        try { const d = await res.json(); if (d.error) errMsg = d.error; } catch { /* use default */ }
+        throw new Error(errMsg);
+      }
 
-      const data = await res.json();
-      if (data.tips) setTips(data.tips);
-      if (data.suggestedReply) setSuggestedReply(data.suggestedReply);
-      if (data.currentDynamic) setCurrentDynamic(data.currentDynamic);
-      if (data.scriptTemplates) setScriptTemplates(data.scriptTemplates);
-    } catch (err) {
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("无法读取响应流");
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let gotResult = false;
+      let streamError = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6).trim());
+            if (event.type === "progress" && event.text) {
+              setStreamingText((prev) => prev + event.text);
+            } else if (event.type === "result" && event.data) {
+              gotResult = true;
+              const data = event.data as Record<string, unknown>;
+              if (data.tips) setTips(data.tips as CoachingTip[]);
+              if (data.suggestedReply) setSuggestedReply(data.suggestedReply as string);
+              if (data.currentDynamic) setCurrentDynamic(data.currentDynamic as string);
+              if (data.scriptTemplates) setScriptTemplates(data.scriptTemplates as {scenario: string; script: string; rationale: string}[]);
+            } else if (event.type === "error") {
+              streamError = event.text || "教练分析出错";
+            }
+          } catch { /* skip malformed SSE line */ }
+        }
+      }
+      if (!gotResult && streamError) {
+        console.error("[CoachTab] Stream error:", streamError);
+      }
+      // Notify if user switched away
+      if (gotResult) {
+        const currentTab = useAppStore.getState().activeTab;
+        if (currentTab !== "coach") {
+          addToast({
+            type: "success",
+            title: "教练建议已生成",
+            message: "实时教练已完成分析，可以查看建议",
+            duration: 8000,
+            action: { label: "查看建议", tab: "coach" },
+          });
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
       console.error(err);
     } finally {
       setLoading(false);
+      abortRef.current = null;
     }
   };
 
@@ -374,6 +455,15 @@ export default function CoachTab() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Streaming indicator */}
+          {loading && (
+            <StreamingIndicator
+              text={streamingText}
+              label="AI教练正在分析"
+              onAbort={abortStreaming}
+            />
+          )}
+
           {/* Current Dynamic */}
           {currentDynamic && (
             <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">

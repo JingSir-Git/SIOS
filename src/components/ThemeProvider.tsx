@@ -110,8 +110,23 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     const root = document.documentElement;
 
-    // Apply font size
-    root.style.fontSize = `${fontSize}px`;
+    // Apply global zoom scaling based on discrete font size levels
+    // This scales ALL elements (including hardcoded px values) uniformly
+    const SCALE_MAP: Record<number, number> = {
+      12: 0.85,
+      13: 0.92,
+      14: 1.0,
+      16: 1.1,
+      18: 1.2,
+    };
+    const scale = SCALE_MAP[fontSize] ?? 1.0;
+    root.style.fontSize = `${Math.round(16 * scale)}px`;
+
+    // Apply zoom for pixel-based elements (text-[10px], etc.)
+    const mainEl = document.getElementById("app-main");
+    if (mainEl) {
+      mainEl.style.zoom = `${scale}`;
+    }
 
     // Apply theme variables
     const vars = THEMES[theme] || THEMES.dark;

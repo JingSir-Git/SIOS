@@ -6,6 +6,7 @@
 
 import type { ChatMessage } from "./types";
 import { v4 as uuidv4 } from "uuid";
+import { extractTimestamp, detectPlatform, stripTimestamp, inferMessageIntervals, type ChatPlatform, getPlatformLabel } from "./timestamp-parser";
 
 /** The result of parsing, plus a flag indicating whether attribution is needed. */
 export interface ParseResult {
@@ -13,6 +14,12 @@ export interface ParseResult {
   participants: string[];
   format: "structured" | "unstructured";
   needsAttribution: boolean;
+  /** Detected chat platform based on timestamp format analysis */
+  detectedPlatform?: ChatPlatform;
+  /** Human-readable platform label */
+  platformLabel?: string;
+  /** Number of timestamps successfully extracted */
+  timestampCount?: number;
 }
 
 /**
@@ -49,10 +56,21 @@ export function parseConversation(raw: string): ParseResult {
   // If ≥40% of lines look structured, treat as structured format
   const isStructured = structuredCount / lines.length >= 0.4;
 
+  // Detect platform from raw text
+  const platformInfo = detectPlatform(raw);
+
   if (isStructured) {
-    return parseStructured(lines, colonPattern, timestampPattern);
+    const result = parseStructured(lines, colonPattern, timestampPattern);
+    result.detectedPlatform = platformInfo.platform;
+    result.platformLabel = getPlatformLabel(platformInfo.platform);
+    result.timestampCount = platformInfo.sampleCount;
+    return result;
   } else {
-    return parseUnstructured(lines);
+    const result = parseUnstructured(lines);
+    result.detectedPlatform = platformInfo.platform;
+    result.platformLabel = getPlatformLabel(platformInfo.platform);
+    result.timestampCount = platformInfo.sampleCount;
+    return result;
   }
 }
 
@@ -75,10 +93,19 @@ function parseStructured(
 
     let timestamp: string | undefined;
     let cleanLine = trimmed;
-    const tsMatch = trimmed.match(timestampPattern);
-    if (tsMatch) {
-      timestamp = tsMatch[1];
-      cleanLine = trimmed.slice(tsMatch[0].length);
+
+    // Try universal timestamp parser first (supports WeChat, QQ, Telegram, etc.)
+    const universalTs = extractTimestamp(trimmed);
+    if (universalTs) {
+      timestamp = universalTs.iso;
+      cleanLine = trimmed.replace(universalTs.raw, "").trim();
+    } else {
+      // Fallback to original bracketed pattern
+      const tsMatch = trimmed.match(timestampPattern);
+      if (tsMatch) {
+        timestamp = tsMatch[1];
+        cleanLine = trimmed.slice(tsMatch[0].length);
+      }
     }
 
     const colonMatch = cleanLine.match(colonPattern);
@@ -120,21 +147,36 @@ function parseStructured(
 
   const participants = Array.from(participantSet);
 
+  // Assign participantId based on senderName
+  const participantIdMap = new Map<string, string>();
+  for (const p of participants) {
+    participantIdMap.set(p, uuidv4());
+  }
+  for (const msg of messages) {
+    msg.participantId = participantIdMap.get(msg.senderName) || uuidv4();
+  }
+
   // Determine self vs other
-  const selfNames = ["我", "自己", "me", "Me", "ME"];
+  const selfNames = ["\u6211", "\u81ea\u5df1", "me", "Me", "ME"];
   let selfName = participants.find((p) => selfNames.includes(p));
+  const selfExplicit = !!selfName; // did we find a clear "我" speaker?
   if (!selfName && participants.length > 0) {
-    selfName = participants[0];
+    selfName = participants[0]; // fallback: assume first speaker is self
   }
   for (const msg of messages) {
     msg.role = msg.senderName === selfName ? "self" : "other";
   }
 
+  // Show attribution editor when:
+  // 1. Multi-party (>2 speakers) — always needs confirmation
+  // 2. Two speakers but no explicit "我" — user should confirm who is self
+  const needsAttribution = participants.length > 2 || (!selfExplicit && participants.length >= 2);
+
   return {
     messages,
     participants,
     format: "structured",
-    needsAttribution: false,
+    needsAttribution,
   };
 }
 
@@ -146,12 +188,31 @@ function parseUnstructured(lines: string[]): ParseResult {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
+    // Try to extract timestamp from unstructured lines too
+    const { cleaned, timestamp } = stripTimestamp(trimmed);
+    if (!cleaned) continue;
+
     messages.push({
       id: uuidv4(),
       role: "other",
       senderName: "未归属",
-      content: trimmed,
+      content: cleaned,
+      timestamp: timestamp?.iso,
     });
+  }
+
+  // If no timestamps were found, infer approximate intervals
+  if (!messages.some((m) => m.timestamp) && messages.length >= 2) {
+    const intervals = inferMessageIntervals(messages);
+    // Assign synthetic timestamps starting from a base time
+    const baseTime = new Date();
+    baseTime.setHours(baseTime.getHours() - 1); // assume conversation started 1 hour ago
+    let cumulative = 0;
+    for (let i = 0; i < messages.length; i++) {
+      const ts = new Date(baseTime.getTime() + cumulative * 1000);
+      messages[i].timestamp = ts.toISOString();
+      if (i < intervals.length) cumulative += intervals[i];
+    }
   }
 
   // Run smart auto-attribution to guess speaker turns

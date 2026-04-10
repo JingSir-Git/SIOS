@@ -80,16 +80,25 @@ export async function callLLMStreaming({
   });
 
   let result = "";
-  for await (const event of stream) {
-    if (
-      event.type === "content_block_delta" &&
-      event.delta &&
-      "text" in event.delta
-    ) {
-      const text = (event.delta as { type: string; text: string }).text;
-      result += text;
-      onChunk(text);
+  try {
+    for await (const event of stream) {
+      if (
+        event.type === "content_block_delta" &&
+        event.delta &&
+        "text" in event.delta
+      ) {
+        const text = (event.delta as { type: string; text: string }).text;
+        result += text;
+        onChunk(text);
+      }
     }
+  } catch (streamErr: unknown) {
+    // If we got partial content, return it so extractJSON can attempt repair
+    if (result.length > 0) {
+      console.warn("[callLLMStreaming] Stream interrupted with partial content, attempting recovery.", streamErr);
+      return result;
+    }
+    throw streamErr;
   }
   return result;
 }

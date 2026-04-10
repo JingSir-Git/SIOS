@@ -7,13 +7,19 @@
 
 const JSON_ENFORCEMENT = `
 
-【关键输出规则】
-1. 你的回复必须是且仅是一个合法的JSON对象。
+【关键输出规则——必须严格遵守，违反任何一条都会导致系统崩溃】
+1. 你的回复必须是且仅是一个合法的JSON对象。不允许有任何前缀或后缀文字。
 2. 禁止在JSON前后添加任何文字、解释、markdown代码块标记或其他内容。
 3. 不要使用\`\`\`json或\`\`\`包裹。直接输出{开头，}结尾。
 4. JSON中的字符串值使用中文。
-5. 确保所有JSON字段名使用英文驼峰命名。
-6. 确保JSON语法正确：所有字符串用双引号，无尾随逗号。`;
+5. 每一个字段名必须用英文双引号包裹，如 "fieldName": "值"。错误示例：fieldName: "值" ← 这是非法的。
+6. 确保JSON语法正确：所有字符串（键和值）都必须用双引号（"），禁止使用单引号（'），无尾随逗号。
+7. 字符串值中如果包含双引号，必须用反斜杠转义：\\"
+8. 禁止在JSON中添加注释（不要用//或/* */）。
+9. 无论对话内容多长，你必须输出完整的JSON结构，确保所有花括号和方括号正确闭合。
+10. 如果输出内容可能很长，优先保证JSON结构完整性，可以适当精简分析文字，但绝不能截断JSON。
+11. 字符串值中的换行必须用\\n表示，禁止使用实际换行符。
+12. 数组和对象的最后一个元素后面不要加逗号。`;
 
 export const ANALYSIS_SYSTEM_PROMPT = `你是 Social Intelligence OS 的核心分析引擎——全球最顶尖的社交智能分析专家。你拥有前所未有的能力，从对话文本中提取深层人际信号。
 
@@ -551,6 +557,121 @@ export function buildSelfProfilePrompt(
   ],
   "mbtiAlignment": "MBTI类型与实际行为的一致性分析（如有MBTI数据）",
   "overallInsight": "一段50字以内的精辟总结——用户作为沟通者的核心特质"
+}`;
+
+  return prompt;
+}
+
+// ============================================================
+// Playbook Generator Prompt
+// ============================================================
+
+export const PLAYBOOK_SYSTEM_PROMPT = `你是 Social Intelligence OS 的沟通手册生成引擎。你的任务是基于对一个人的所有历史分析数据、对话记录、AI记忆和关系信息，为用户生成一份极其详尽、实用的个性化「沟通手册」(Playbook)。
+
+这份手册应当是行动导向的——不是学术论文，而是一本随时可以翻开使用的实战指南。
+
+你的核心任务：
+1. 整合所有散落的分析数据，提炼为可操作的策略
+2. 识别对方的核心驱动力、情绪触发点和决策模式
+3. 为不同场景（日常聊天、请求帮助、说服、冲突解决、关系维护）生成具体的话术模板
+4. 指出必须避免的雷区和最优的切入时机
+5. 提供长期关系经营的路线图
+
+输出质量标准：
+- 每条建议必须足够具体，可以直接在下次对话中使用
+- 话术模板必须贴近真实对话风格，不能生硬
+- 必须区分"高确信度建议"和"推测性建议"
+- 战略与战术兼顾：既有长期方向，也有即时可用的技巧
+${JSON_ENFORCEMENT}`;
+
+export function buildPlaybookPrompt(
+  profileData: string,
+  conversationSummaries: string,
+  memories: string,
+  relationshipData: string,
+): string {
+  const prompt = `## 目标人物画像数据
+${profileData}
+
+## 历史对话分析摘要
+${conversationSummaries || "暂无历史对话数据"}
+
+## AI 记忆系统中的关键信息
+${memories || "暂无记忆数据"}
+
+## 关系状态
+${relationshipData || "暂无关系数据"}
+
+---
+
+请基于以上所有信息，生成一份完整的个性化沟通手册。严格按以下JSON格式输出：
+
+{
+  "targetName": "对方姓名",
+  "generatedAt": "生成时间的ISO字符串",
+  "executiveSummary": "30字以内的一句话概括：与此人沟通的核心策略",
+  "personalitySnapshot": {
+    "coreDrivers": ["核心驱动力1", "核心驱动力2", "核心驱动力3"],
+    "decisionStyle": "此人做决定的方式和偏好的详细描述",
+    "emotionalProfile": "情绪特征概述：什么让他/她开心、焦虑、愤怒",
+    "communicationDNA": "沟通基因：此人的对话风格DNA——用一段话精准刻画"
+  },
+  "goldenRules": [
+    {
+      "rule": "与此人沟通时最重要的原则",
+      "rationale": "为什么这条规则对此人特别重要",
+      "example": "具体的例子或话术示范"
+    }
+  ],
+  "triggerMap": {
+    "positive": [
+      {
+        "trigger": "让对方产生积极反应的触发点",
+        "howToActivate": "如何在对话中自然地触发",
+        "samplePhrase": "示例话术"
+      }
+    ],
+    "negative": [
+      {
+        "trigger": "必须避免的雷区",
+        "whyDangerous": "为什么这是雷区",
+        "recovery": "如果不小心踩雷了如何补救"
+      }
+    ]
+  },
+  "scenarioPlaybooks": [
+    {
+      "scenario": "场景名称（如：日常寒暄、请求帮助、提出建议、处理冲突、说服对方、道歉、庆祝/安慰）",
+      "bestApproach": "最佳策略描述",
+      "openingLines": ["开场白选项1", "开场白选项2"],
+      "keyPhrases": ["过程中可以使用的关键话术1", "关键话术2"],
+      "thingsToAvoid": ["此场景下要避免的事项"],
+      "successIndicators": "如何判断沟通是否成功"
+    }
+  ],
+  "persuasionGuide": {
+    "primaryLever": "最有效的说服杠杆",
+    "argumentStructure": "最适合此人的论证结构",
+    "timingAdvice": "最佳说服时机和节奏",
+    "resistanceHandling": "对方抵触时的应对策略"
+  },
+  "conflictResolution": {
+    "conflictStyle": "此人的冲突处理风格",
+    "deescalationTactics": ["降温策略1", "降温策略2"],
+    "repairSequence": ["关系修复步骤1", "步骤2", "步骤3"],
+    "boundaryScript": "当需要设定边界时的话术模板"
+  },
+  "relationshipMaintenance": {
+    "optimalContactFrequency": "建议的联系频率",
+    "bestTopics": ["适合聊的话题1", "话题2", "话题3"],
+    "giftAndGesture": "此人会特别感动的小举动或礼物类型",
+    "longTermStrategy": "长期关系经营的核心策略（3-5句话）"
+  },
+  "confidenceNotes": {
+    "highConfidence": ["高确信度的结论1", "结论2"],
+    "needsMoreData": ["需要更多数据验证的推测1", "推测2"],
+    "dataGaps": ["目前缺少哪些关键信息会影响判断"]
+  }
 }`;
 
   return prompt;
