@@ -205,21 +205,73 @@ export function CoinTossRitual({
 // 2. Tarot Card Draw Ritual
 // ============================================================
 
-const MAJOR_ARCANA = [
-  "愚者", "魔术师", "女祭司", "女皇", "皇帝", "教皇",
-  "恋人", "战车", "力量", "隐者", "命运之轮", "正义",
-  "倒吊人", "死神", "节制", "恶魔", "塔", "星星",
-  "月亮", "太阳", "审判", "世界",
+// Major Arcana with roman numerals and symbolic glyphs
+const MAJOR_ARCANA: { name: string; num: string; glyph: string }[] = [
+  { name: "愚者",     num: "0",    glyph: "🃏" },
+  { name: "魔术师",   num: "I",    glyph: "✧" },
+  { name: "女祭司",   num: "II",   glyph: "☽" },
+  { name: "女皇",     num: "III",  glyph: "♀" },
+  { name: "皇帝",     num: "IV",   glyph: "♔" },
+  { name: "教皇",     num: "V",    glyph: "☩" },
+  { name: "恋人",     num: "VI",   glyph: "♡" },
+  { name: "战车",     num: "VII",  glyph: "⚔" },
+  { name: "力量",     num: "VIII", glyph: "∞" },
+  { name: "隐者",     num: "IX",   glyph: "☆" },
+  { name: "命运之轮", num: "X",    glyph: "☸" },
+  { name: "正义",     num: "XI",   glyph: "⚖" },
+  { name: "倒吊人",   num: "XII",  glyph: "⚓" },
+  { name: "死神",     num: "XIII", glyph: "☠" },
+  { name: "节制",     num: "XIV",  glyph: "⚗" },
+  { name: "恶魔",     num: "XV",   glyph: "⛧" },
+  { name: "塔",       num: "XVI",  glyph: "⚡" },
+  { name: "星星",     num: "XVII", glyph: "✦" },
+  { name: "月亮",     num: "XVIII",glyph: "☾" },
+  { name: "太阳",     num: "XIX",  glyph: "☀" },
+  { name: "审判",     num: "XX",   glyph: "♆" },
+  { name: "世界",     num: "XXI",  glyph: "⊕" },
 ];
+
+const SUIT_GLYPHS: Record<string, string> = {
+  "权杖": "♣",
+  "圣杯": "♥",
+  "宝剑": "♠",
+  "星币": "♦",
+};
+const SUIT_COLORS: Record<string, string> = {
+  "权杖": "text-orange-400",
+  "圣杯": "text-blue-400",
+  "宝剑": "text-slate-300",
+  "星币": "text-yellow-400",
+};
 
 const MINOR_SUITS = ["权杖", "圣杯", "宝剑", "星币"];
 const MINOR_NUMBERS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "侍从", "骑士", "王后", "国王"];
 
-function getAllCards(): string[] {
-  const cards: string[] = [...MAJOR_ARCANA.map(c => `大阿卡纳·${c}`)];
+interface CardInfo {
+  displayName: string;
+  glyph: string;
+  numLabel: string;
+  colorClass: string;
+  isMajor: boolean;
+}
+
+function getAllCards(): CardInfo[] {
+  const cards: CardInfo[] = MAJOR_ARCANA.map(c => ({
+    displayName: c.name,
+    glyph: c.glyph,
+    numLabel: c.num,
+    colorClass: "text-purple-300",
+    isMajor: true,
+  }));
   for (const suit of MINOR_SUITS) {
     for (const num of MINOR_NUMBERS) {
-      cards.push(`${suit}${num}`);
+      cards.push({
+        displayName: `${suit}${num}`,
+        glyph: SUIT_GLYPHS[suit],
+        numLabel: num,
+        colorClass: SUIT_COLORS[suit],
+        isMajor: false,
+      });
     }
   }
   return cards;
@@ -229,6 +281,10 @@ interface TarotCard {
   name: string;
   reversed: boolean;
   position: string;
+  glyph: string;
+  numLabel: string;
+  colorClass: string;
+  isMajor: boolean;
 }
 
 const SPREAD_POSITIONS: Record<string, string[]> = {
@@ -272,11 +328,19 @@ export function TarotDrawRitual({
 
     setTimeout(() => {
       const usedNames = new Set(drawnCards.map(c => c.name));
-      const available = deck.filter(c => !usedNames.has(c));
-      const card = available[Math.floor(Math.random() * available.length)];
+      const available = deck.filter(c => !usedNames.has(c.displayName));
+      const cardInfo = available[Math.floor(Math.random() * available.length)];
       const reversed = Math.random() < 0.35;
       const position = positions[drawnCards.length];
-      const newCard: TarotCard = { name: card, reversed, position };
+      const newCard: TarotCard = {
+        name: cardInfo.displayName,
+        reversed,
+        position,
+        glyph: cardInfo.glyph,
+        numLabel: cardInfo.numLabel,
+        colorClass: cardInfo.colorClass,
+        isMajor: cardInfo.isMajor,
+      };
       setDrawnCards((prev) => [...prev, newCard]);
       setDrawing(false);
     }, 1800);
@@ -304,101 +368,51 @@ export function TarotDrawRitual({
 
       {!shuffled ? (
         <div className="text-center py-4">
-          <div className={cn(
-            "inline-flex gap-1 mb-3",
-            shuffling && "animate-pulse"
-          )}>
-            {[...Array(5)].map((_, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "w-8 h-12 rounded border-2 bg-gradient-to-b transition-all duration-300",
-                  shuffling
-                    ? "border-pink-500/60 from-pink-500/20 to-purple-500/20"
-                    : "border-zinc-700 from-zinc-800 to-zinc-900",
-                  shuffling && (i % 2 === 0 ? "translate-y-1" : "-translate-y-1")
-                )}
-                style={shuffling ? { transform: `rotate(${(i - 2) * 8}deg) translateY(${i % 2 === 0 ? 4 : -4}px)`, transition: `all ${0.3 + i * 0.05}s ease` } : {}}
-              />
+          <div className={cn("inline-flex gap-1.5 mb-4", shuffling && "animate-pulse")}>
+            {[...Array(7)].map((_, i) => (
+              <div key={i} className={cn("w-5 h-8 rounded-sm border bg-gradient-to-b transition-all", shuffling ? "border-pink-500/50 from-purple-900/60 to-pink-900/60" : "border-zinc-700 from-zinc-800 to-zinc-900")} style={shuffling ? { transform: `rotate(${(i-3)*12}deg) translateY(${Math.sin(i*1.2)*6}px)`, transition: `all ${0.4+i*0.06}s ease` } : {}}>
+                {!shuffling && <div className="w-full h-full flex items-center justify-center text-[7px] text-zinc-600">✦</div>}
+              </div>
             ))}
           </div>
-          <p className="text-[10px] text-zinc-500 mb-3">
-            {shuffling ? "牌正在洗牌中，请静心冥想你的问题..." : "请先洗牌，心中默念你想问的问题"}
-          </p>
-          <button
-            onClick={handleShuffle}
-            disabled={shuffling}
-            className={cn(
-              "rounded-lg px-6 py-2 text-xs font-medium transition-all",
-              shuffling
-                ? "bg-pink-500/10 text-pink-400 animate-pulse cursor-wait"
-                : "bg-pink-500/20 text-pink-300 hover:bg-pink-500/30 border border-pink-500/30"
-            )}
-          >
-            {shuffling ? "洗牌中..." : "开始洗牌"}
-          </button>
+          <p className="text-[10px] text-zinc-500 mb-3">{shuffling ? "牌正在洗牌中，请静心冥想你的问题..." : "请先洗牌，心中默念你想问的问题"}</p>
+          <button onClick={handleShuffle} disabled={shuffling} className={cn("rounded-lg px-6 py-2 text-xs font-medium transition-all", shuffling ? "bg-pink-500/10 text-pink-400 animate-pulse cursor-wait" : "bg-pink-500/20 text-pink-300 hover:bg-pink-500/30 border border-pink-500/30")}>{shuffling ? "洗牌中..." : "开始洗牌"}</button>
         </div>
       ) : (
         <>
-          {/* Card display */}
-          <div className={cn(
-            "grid gap-2 mb-3",
-            totalCards <= 3 ? "grid-cols-3" : totalCards <= 6 ? "grid-cols-3 sm:grid-cols-6" : "grid-cols-5"
-          )}>
+          <div className="flex flex-wrap justify-center gap-2.5 mb-3">
             {positions.map((pos, idx) => {
               const card = drawnCards[idx];
               const isNext = idx === drawnCards.length && !drawing;
+              const isDrawing = drawing && idx === drawnCards.length;
+              const cw = totalCards <= 3 ? 72 : totalCards <= 6 ? 58 : 50;
               return (
-                <div key={idx} className="flex flex-col items-center gap-1">
-                  <div
-                    className={cn(
-                      "w-full aspect-[2/3] rounded-lg border-2 flex items-center justify-center transition-all duration-300",
-                      card
-                        ? card.reversed
-                          ? "border-red-500/50 bg-gradient-to-b from-red-500/10 to-purple-500/10 rotate-180"
-                          : "border-pink-500/50 bg-gradient-to-b from-pink-500/10 to-violet-500/10"
-                        : isNext
-                          ? "border-pink-500/40 bg-zinc-800/50 cursor-pointer hover:bg-pink-500/10"
-                          : drawing && idx === drawnCards.length
-                            ? "border-pink-500/60 bg-pink-500/10 animate-pulse"
-                            : "border-zinc-800 bg-zinc-900/50"
-                    )}
-                  >
+                <div key={idx} className="flex flex-col items-center gap-1" style={{ width: cw }}>
+                  <div className={cn("w-full rounded-md border overflow-hidden transition-all duration-500 relative", card ? (card.reversed ? "border-red-500/40 bg-gradient-to-b from-red-950/80 to-purple-950/80" : "border-pink-500/40 bg-gradient-to-b from-purple-950/80 to-indigo-950/80") : isNext ? "border-pink-500/30 bg-zinc-800/60 cursor-pointer hover:border-pink-500/50" : isDrawing ? "border-pink-500/50 bg-pink-500/5 animate-pulse" : "border-zinc-800 bg-zinc-900/40")} style={{ aspectRatio: "5/8" }}>
                     {card ? (
-                      <div className={cn("text-center px-1", card.reversed && "rotate-180")}>
-                        <p className="text-[9px] font-medium text-pink-200 leading-tight">{card.name}</p>
-                        <p className={cn("text-[8px] mt-0.5", card.reversed ? "text-red-400" : "text-emerald-400")}>
-                          {card.reversed ? "逆位" : "正位"}
-                        </p>
+                      <div className={cn("w-full h-full flex flex-col items-center justify-between py-1.5 px-1", card.reversed && "rotate-180")}>
+                        <span className={cn("text-[7px] font-mono self-start pl-0.5 opacity-60", card.colorClass)}>{card.numLabel}</span>
+                        <span className={cn("text-lg leading-none", card.colorClass)}>{card.glyph}</span>
+                        <div className="text-center">
+                          <p className={cn("text-[7px] font-medium leading-tight", card.isMajor ? "text-purple-200" : card.colorClass)}>{card.name}</p>
+                          <p className={cn("text-[6px] mt-px font-medium", card.reversed ? "text-red-400" : "text-emerald-400/70")}>{card.reversed ? "逆位 ↓" : "正位 ↑"}</p>
+                        </div>
                       </div>
-                    ) : drawing && idx === drawnCards.length ? (
-                      <span className="text-[10px] text-pink-400">✦</span>
+                    ) : isDrawing ? (
+                      <div className="w-full h-full flex items-center justify-center"><span className="text-sm text-pink-400 animate-spin">✦</span></div>
                     ) : (
-                      <span className="text-[10px] text-zinc-700">{idx + 1}</span>
+                      <div className="w-full h-full flex flex-col items-center justify-center gap-0.5"><span className="text-[9px] text-zinc-700">{idx+1}</span><div className="w-2.5 h-2.5 rounded-full border border-dashed border-zinc-700" /></div>
                     )}
+                    {card && <><div className="absolute top-0.5 right-0.5 text-[5px] opacity-25 text-pink-300">✦</div><div className="absolute bottom-0.5 left-0.5 text-[5px] opacity-25 text-pink-300 rotate-180">✦</div></>}
                   </div>
-                  <span className="text-[9px] text-zinc-500 text-center leading-tight">{pos}</span>
+                  <span className="text-[7px] text-zinc-500 text-center leading-tight">{pos}</span>
                 </div>
               );
             })}
           </div>
-
-          {/* Action */}
           {drawnCards.length < totalCards && (
-            <button
-              onClick={drawOneCard}
-              disabled={drawing}
-              className={cn(
-                "w-full rounded-lg py-2.5 text-xs font-medium transition-all",
-                drawing
-                  ? "bg-pink-500/10 text-pink-400 animate-pulse cursor-wait"
-                  : "bg-pink-500/20 text-pink-300 hover:bg-pink-500/30 border border-pink-500/30"
-              )}
-            >
-              {drawing ? "翻牌中..." : `抽第${drawnCards.length + 1}张牌 — ${positions[drawnCards.length]}`}
-            </button>
+            <button onClick={drawOneCard} disabled={drawing} className={cn("w-full rounded-lg py-2.5 text-xs font-medium transition-all", drawing ? "bg-pink-500/10 text-pink-400 animate-pulse cursor-wait" : "bg-pink-500/20 text-pink-300 hover:bg-pink-500/30 border border-pink-500/30")}>{drawing ? "翻牌中..." : `抽第${drawnCards.length+1}张牌 — ${positions[drawnCards.length]}`}</button>
           )}
-
           {drawnCards.length === totalCards && (
             <div className="text-center">
               <p className="text-[10px] text-emerald-400 font-medium">✓ 牌阵已成，{totalCards}张牌全部揭示</p>

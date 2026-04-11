@@ -647,12 +647,13 @@ export default function DivinationTab() {
               if (parsed.text) {
                 fullText += parsed.text;
                 setStreamingText(fullText);
+                messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
               }
             } catch {
-              // Might be plain text streaming
               if (data.trim()) {
                 fullText += data;
                 setStreamingText(fullText);
+                messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
               }
             }
           }
@@ -831,38 +832,39 @@ export default function DivinationTab() {
               </div>
             )}
 
-            {/* Step 1: Question Domain (all categories) */}
-            <InteractiveSection title="求测领域" step={1}>
-              <div className="flex flex-wrap gap-1.5">
-                {QUESTION_DOMAINS.map((d) => (
-                  <OptionChip
-                    key={d.id}
-                    label={`${d.emoji} ${d.label}`}
-                    active={questionDomain === d.id}
-                    onClick={() => setQuestionDomain(questionDomain === d.id ? "" : d.id)}
-                  />
-                ))}
-              </div>
-            </InteractiveSection>
-
-            {/* Yijing: trigram selection */}
+            {/* Yijing: proper Bagua octagonal layout */}
             {selectedCategory === "yijing" && (
-              <InteractiveSection title="心选卦象（凭直觉选一个）" step={2}>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {TRIGRAMS.map((t) => (
+              <InteractiveSection title="心选卦象（凭直觉选一个）" step={1}>
+                <div className="relative w-48 h-48 mx-auto">
+                  {/* Center Taiji symbol */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full border border-zinc-700/50 bg-zinc-800/30 flex items-center justify-center text-sm text-zinc-500">☯</div>
+                  </div>
+                  {/* 后天八卦 positions: S top, N bottom */}
+                  {[
+                    { ...TRIGRAMS[5], x: 50, y: 2 },   /* 离-南 top */
+                    { ...TRIGRAMS[3], x: 85, y: 15 },   /* 巽-东南 */
+                    { ...TRIGRAMS[2], x: 98, y: 50 },   /* 震-东 right */
+                    { ...TRIGRAMS[6], x: 85, y: 85 },   /* 艮-东北 */
+                    { ...TRIGRAMS[4], x: 50, y: 98 },   /* 坎-北 bottom */
+                    { ...TRIGRAMS[0], x: 15, y: 85 },   /* 乾-西北 */
+                    { ...TRIGRAMS[7], x: 2, y: 50 },    /* 兑-西 left */
+                    { ...TRIGRAMS[1], x: 15, y: 15 },   /* 坤-西南 */
+                  ].map((t) => (
                     <button
                       key={t.id}
                       onClick={() => setSelectedTrigram(selectedTrigram === t.id ? "" : t.id)}
                       className={cn(
-                        "flex flex-col items-center rounded-lg border px-2 py-2 text-[10px] transition-all",
+                        "absolute flex flex-col items-center rounded-lg border px-1 py-1 transition-all -translate-x-1/2 -translate-y-1/2",
                         selectedTrigram === t.id
-                          ? "border-amber-500/50 bg-amber-500/15 text-amber-200"
-                          : "border-zinc-700/50 bg-zinc-800/30 text-zinc-400 hover:border-zinc-600"
+                          ? "border-amber-500/50 bg-amber-500/15 text-amber-200 shadow-lg shadow-amber-500/10 z-10"
+                          : "border-zinc-700/50 bg-zinc-900/80 text-zinc-400 hover:border-amber-500/30 hover:bg-zinc-800/80"
                       )}
+                      style={{ left: `${t.x}%`, top: `${t.y}%`, width: 44 }}
                     >
-                      <span className="text-base leading-none">{t.label.split(" ")[1]}</span>
-                      <span className="mt-0.5 font-medium">{t.label.split(" ")[0]}</span>
-                      <span className="text-[9px] text-zinc-500">{t.nature}·{t.attr}</span>
+                      <span className="text-sm leading-none">{t.label.split(" ")[1]}</span>
+                      <span className="text-[9px] font-medium">{t.label.split(" ")[0]}</span>
+                      <span className="text-[7px] text-zinc-500">{t.nature}</span>
                     </button>
                   ))}
                 </div>
@@ -871,7 +873,7 @@ export default function DivinationTab() {
 
             {/* Bazi/Ziwei: five elements */}
             {(selectedCategory === "bazi" || selectedCategory === "ziwei") && (
-              <InteractiveSection title="你认为自己偏向哪种五行？（可选）" step={2}>
+              <InteractiveSection title="你认为自己偏向哪种五行？（可选）" step={1}>
                 <div className="flex flex-wrap gap-2">
                   {FIVE_ELEMENTS.map((e) => (
                     <button
@@ -895,7 +897,7 @@ export default function DivinationTab() {
             {/* Fengshui: house type, floor, facing direction */}
             {selectedCategory === "fengshui" && (
               <>
-                <InteractiveSection title="房屋类型" step={2}>
+                <InteractiveSection title="房屋类型" step={1}>
                   <div className="flex flex-wrap gap-1.5">
                     {HOUSE_TYPES.map((h) => (
                       <OptionChip
@@ -907,7 +909,7 @@ export default function DivinationTab() {
                     ))}
                   </div>
                 </InteractiveSection>
-                <InteractiveSection title="楼层" step={3}>
+                <InteractiveSection title="楼层" step={2}>
                   <div className="flex flex-wrap gap-1.5">
                     {FLOOR_RANGES.map((f) => (
                       <OptionChip
@@ -919,7 +921,7 @@ export default function DivinationTab() {
                     ))}
                   </div>
                 </InteractiveSection>
-                <InteractiveSection title="大门/主窗朝向" step={4}>
+                <InteractiveSection title="大门/主窗朝向" step={3}>
                   <div className="grid grid-cols-4 gap-1.5">
                     {DIRECTIONS.map((d) => (
                       <OptionChip
@@ -936,7 +938,7 @@ export default function DivinationTab() {
 
             {/* Tarot: spread selection */}
             {selectedCategory === "tarot" && (
-              <InteractiveSection title="选择牌阵" step={2}>
+              <InteractiveSection title="选择牌阵" step={1}>
                 <div className="space-y-1.5">
                   {TAROT_SPREADS.map((s) => (
                     <button
@@ -962,7 +964,7 @@ export default function DivinationTab() {
 
             {/* Qimen: direction selection */}
             {selectedCategory === "qimen" && (
-              <InteractiveSection title="关注方位" step={2}>
+              <InteractiveSection title="关注方位（可选）" step={1}>
                 <div className="grid grid-cols-4 gap-1.5">
                   {DIRECTIONS.map((d) => (
                     <OptionChip
@@ -978,7 +980,7 @@ export default function DivinationTab() {
 
             {/* Liuyao: question type selection */}
             {selectedCategory === "liuyao" && (
-              <InteractiveSection title="占断事项" step={2}>
+              <InteractiveSection title="占断事项" step={1}>
                 <div className="grid grid-cols-3 gap-1.5">
                   {[
                     { id: "career", label: "求财" },
@@ -1004,7 +1006,7 @@ export default function DivinationTab() {
 
             {/* Name: analysis type */}
             {selectedCategory === "name" && (
-              <InteractiveSection title="分析类型" step={2}>
+              <InteractiveSection title="分析类型" step={1}>
                 <div className="grid grid-cols-2 gap-1.5">
                   {[
                     { id: "analyze", label: "姓名详细分析" },
