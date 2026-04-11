@@ -20,6 +20,8 @@ import {
   Info,
   ArrowRight,
   FileDown,
+  Compass,
+  Layers,
 } from "lucide-react";
 import {
   AreaChart,
@@ -80,7 +82,7 @@ function StatCard({
 // ---- Main Component ----
 
 export default function DashboardTab() {
-  const { profiles, conversations, mbtiResults, eqScores, relationships, profileMemories, addToast, setActiveTab } = useAppStore();
+  const { profiles, conversations, mbtiResults, eqScores, relationships, profileMemories, divinationRecords, moduleHistory, addToast, setActiveTab } = useAppStore();
   const toastPushedRef = useRef(false);
 
   // Trend alerts
@@ -113,31 +115,64 @@ export default function DashboardTab() {
     // Latest MBTI
     const latestMBTI = mbtiResults.length > 0 ? mbtiResults[0] : null;
 
-    // Conversation trend (last 4 weeks)
+    // Adaptive activity trend — use actual data range instead of fixed 4 weeks
     const now = Date.now();
-    const weekMs = 7 * 24 * 60 * 60 * 1000;
-    const weeklyData: { week: string; count: number; analyzed: number }[] = [];
-    for (let w = 3; w >= 0; w--) {
-      const start = now - (w + 1) * weekMs;
-      const end = now - w * weekMs;
-      const weekConvos = conversations.filter((c) => {
-        const t = new Date(c.createdAt).getTime();
-        return t >= start && t < end;
-      });
-      const weekLabel = w === 0 ? "本周" : w === 1 ? "上周" : `${w + 1}周前`;
-      weeklyData.push({
-        week: weekLabel,
-        count: weekConvos.length,
-        analyzed: weekConvos.filter((c) => c.analysis).length,
-      });
+    const dayMs = 24 * 60 * 60 * 1000;
+    const allTimestamps = [
+      ...conversations.map((c) => new Date(c.createdAt).getTime()),
+      ...divinationRecords.map((r) => new Date(r.createdAt).getTime()),
+    ].filter(Boolean);
+    const earliest = allTimestamps.length > 0 ? Math.min(...allTimestamps) : now;
+    const daysSpan = Math.max(1, Math.ceil((now - earliest) / dayMs));
+
+    let weeklyData: { week: string; count: number; analyzed: number }[] = [];
+    if (daysSpan <= 7) {
+      // Show daily for first week
+      for (let d = Math.min(daysSpan, 7) - 1; d >= 0; d--) {
+        const start = now - (d + 1) * dayMs;
+        const end = now - d * dayMs;
+        const dayConvos = conversations.filter((c) => { const t = new Date(c.createdAt).getTime(); return t >= start && t < end; });
+        const dayLabel = d === 0 ? "今天" : d === 1 ? "昨天" : `${d}天前`;
+        weeklyData.push({ week: dayLabel, count: dayConvos.length, analyzed: dayConvos.filter((c) => c.analysis).length });
+      }
+    } else {
+      // Show weekly
+      const weeks = Math.min(Math.ceil(daysSpan / 7), 8);
+      const weekMs = 7 * dayMs;
+      for (let w = weeks - 1; w >= 0; w--) {
+        const start = now - (w + 1) * weekMs;
+        const end = now - w * weekMs;
+        const weekConvos = conversations.filter((c) => { const t = new Date(c.createdAt).getTime(); return t >= start && t < end; });
+        const weekLabel = w === 0 ? "本周" : w === 1 ? "上周" : `${w + 1}周前`;
+        weeklyData.push({ week: weekLabel, count: weekConvos.length, analyzed: weekConvos.filter((c) => c.analysis).length });
+      }
     }
 
-    // EQ trend
+    // EQ trend from conversation analysis (eqScores entries, or derive from analysis)
     const eqTrend = eqScores.slice(-8).map((e, i) => ({
       index: i + 1,
       score: e.overallScore,
       label: new Date(e.createdAt).toLocaleDateString("zh-CN", { month: "short", day: "numeric" }),
     }));
+
+    // Divination stats
+    const divinationCount = divinationRecords.length;
+    const divinationByCategory: { name: string; count: number }[] = [];
+    const catMap = new Map<string, number>();
+    for (const r of divinationRecords) {
+      catMap.set(r.categoryLabel, (catMap.get(r.categoryLabel) || 0) + 1);
+    }
+    catMap.forEach((count, name) => divinationByCategory.push({ name, count }));
+    divinationByCategory.sort((a, b) => b.count - a.count);
+
+    // Module usage breakdown
+    const moduleUsage: { name: string; count: number; color: string }[] = [
+      { name: "对话分析", count: conversations.length, color: "#60a5fa" },
+      { name: "人物画像", count: profiles.length, color: "#a78bfa" },
+      { name: "风水玄学", count: divinationCount, color: "#34d399" },
+      { name: "AI记忆", count: profileMemories.length, color: "#f472b6" },
+      { name: "EQ训练", count: eqScores.length, color: "#facc15" },
+    ].filter((m) => m.count > 0);
 
     // Profile dimension averages (across all profiles)
     const dimAverages: { key: DimensionKey; label: string; avg: number }[] = DIMENSION_KEYS.map((key) => {
@@ -186,10 +221,14 @@ export default function DashboardTab() {
       sentimentData,
       memoriesCount: profileMemories.length,
       relationshipsCount: relationships.length,
+      divinationCount,
+      divinationByCategory,
+      moduleUsage,
+      daysSpan,
     };
-  }, [profiles, conversations, mbtiResults, eqScores, relationships, profileMemories]);
+  }, [profiles, conversations, mbtiResults, eqScores, relationships, profileMemories, divinationRecords, moduleHistory]);
 
-  const isEmpty = stats.totalConversations === 0 && stats.totalProfiles === 0;
+  const isEmpty = stats.totalConversations === 0 && stats.totalProfiles === 0 && stats.divinationCount === 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -273,7 +312,7 @@ export default function DashboardTab() {
               )}
 
               {/* Stat Cards Row */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <StatCard
                   label="人物画像"
                   value={stats.totalProfiles}
@@ -299,6 +338,14 @@ export default function DashboardTab() {
                   subtext={stats.totalConversations > 0 ? `${Math.round(stats.analyzedCount / stats.totalConversations * 100)}% 覆盖率` : undefined}
                 />
                 <StatCard
+                  label="玄学问卦"
+                  value={stats.divinationCount}
+                  icon={Compass}
+                  color="bg-emerald-500/10 text-emerald-400"
+                  gradient="bg-gradient-to-br from-emerald-500 to-cyan-500"
+                  subtext={stats.divinationByCategory[0] ? `最常用: ${stats.divinationByCategory[0].name}` : undefined}
+                />
+                <StatCard
                   label="AI记忆"
                   value={stats.memoriesCount}
                   icon={Zap}
@@ -314,7 +361,7 @@ export default function DashboardTab() {
                 <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
                   <div className="flex items-center gap-2 mb-4">
                     <Activity className="h-4 w-4 text-blue-400" />
-                    <h3 className="text-xs font-medium text-zinc-300">近4周对话趋势</h3>
+                    <h3 className="text-xs font-medium text-zinc-300">{stats.daysSpan <= 7 ? "近期活动" : "对话趋势"}</h3>
                   </div>
                   {stats.weeklyData.some((d) => d.count > 0) ? (
                     <ResponsiveContainer width="100%" height={160}>
@@ -341,6 +388,7 @@ export default function DashboardTab() {
                   <div className="flex items-center gap-2 mb-4">
                     <Target className="h-4 w-4 text-emerald-400" />
                     <h3 className="text-xs font-medium text-zinc-300">EQ成长曲线</h3>
+                    <span className="text-[8px] text-zinc-600">来自对话分析</span>
                     {stats.avgEQ > 0 && (
                       <span className="text-[9px] text-zinc-600 ml-auto">平均 {stats.avgEQ} 分</span>
                     )}
@@ -474,6 +522,57 @@ export default function DashboardTab() {
                   </div>
                 </div>
               )}
+
+              {/* Row 5: Module Usage + Divination Overview */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Module Usage Breakdown */}
+                {stats.moduleUsage.length > 0 && (
+                  <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Layers className="h-4 w-4 text-cyan-400" />
+                      <h3 className="text-xs font-medium text-zinc-300">功能使用概览</h3>
+                    </div>
+                    <div className="space-y-2.5">
+                      {stats.moduleUsage.map((m) => {
+                        const maxCount = Math.max(...stats.moduleUsage.map((u) => u.count), 1);
+                        const barWidth = Math.max(8, (m.count / maxCount) * 100);
+                        return (
+                          <div key={m.name} className="flex items-center gap-3">
+                            <span className="text-[10px] text-zinc-400 w-14 shrink-0 truncate">{m.name}</span>
+                            <div className="flex-1 h-3 rounded-full bg-zinc-800 overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${barWidth}%`, backgroundColor: m.color, opacity: 0.6 }} />
+                            </div>
+                            <span className="text-[10px] text-zinc-500 w-8 shrink-0 text-right">{m.count}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Divination History Summary */}
+                {stats.divinationCount > 0 && (
+                  <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Compass className="h-4 w-4 text-emerald-400" />
+                      <h3 className="text-xs font-medium text-zinc-300">玄学问卦记录</h3>
+                      <span className="text-[9px] text-zinc-600 ml-auto">共 {stats.divinationCount} 次</span>
+                    </div>
+                    {stats.divinationByCategory.length > 0 ? (
+                      <div className="space-y-2">
+                        {stats.divinationByCategory.map((cat) => (
+                          <div key={cat.name} className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-800/30 px-3 py-2">
+                            <span className="text-[11px] text-zinc-300">{cat.name}</span>
+                            <span className="text-[10px] text-zinc-500">{cat.count} 次</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-[80px] text-[10px] text-zinc-600">使用风水玄学后显示统计</div>
+                    )}
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>

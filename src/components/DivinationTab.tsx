@@ -161,7 +161,7 @@ const FLOOR_RANGES = [
 ];
 
 export default function DivinationTab() {
-  const { profiles } = useAppStore();
+  const { profiles, addDivinationRecord } = useAppStore();
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -662,6 +662,21 @@ export default function DivinationTab() {
 
       if (fullText) {
         setMessages([...newMessages, { role: "assistant", content: fullText }]);
+        // Save to divination history
+        const firstUserMsg = newMessages.find((m) => m.role === "user");
+        if (firstUserMsg && selectedCategory) {
+          addDivinationRecord({
+            id: `div-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            category: selectedCategory,
+            categoryLabel: category?.label || selectedCategory,
+            question: firstUserMsg.content,
+            answer: fullText,
+            ritualResult: ritualResult || undefined,
+            linkedProfileId: linkedProfileId || undefined,
+            linkedProfileName: profiles.find((p) => p.id === linkedProfileId)?.name,
+            createdAt: new Date().toISOString(),
+          });
+        }
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") return;
@@ -822,7 +837,7 @@ export default function DivinationTab() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
         {messages.length === 0 && !loading && (
           <div className="space-y-4 max-w-xl mx-auto py-4">
             {category && (
@@ -1091,7 +1106,7 @@ export default function DivinationTab() {
         )}
 
         {/* Ritual simulation area - stays visible after completion */}
-        {(selectedCategory === "yijing" || selectedCategory === "liuyao") && (
+        {selectedCategory === "liuyao" && (
           <div className="mb-3">
             <CoinTossRitual
               key={ritualKey}
@@ -1128,11 +1143,12 @@ export default function DivinationTab() {
           </div>
         )}
 
+        <div className="max-w-3xl mx-auto w-full">
         {messages.map((msg, i) => (
-          <div key={i} className="mb-3">
+          <div key={i} className="mb-4">
             {msg.role === "user" ? (
               <div className="flex justify-end">
-                <div className="max-w-[85%] rounded-xl bg-violet-500/10 border border-violet-500/20 px-4 py-3">
+                <div className="max-w-[80%] rounded-xl bg-violet-500/10 border border-violet-500/20 px-4 py-3">
                   <p className="text-xs text-violet-200 leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                 </div>
               </div>
@@ -1142,7 +1158,7 @@ export default function DivinationTab() {
                   {category && <category.icon className={cn("h-3.5 w-3.5", category.color)} />}
                   <span className="text-[10px] font-medium text-zinc-400">{category?.label || "解读"} · AI 解析</span>
                 </div>
-                <div className="px-4 py-3">
+                <div className="px-5 py-4">
                   <MarkdownRenderer content={msg.content} />
                 </div>
               </div>
@@ -1151,13 +1167,13 @@ export default function DivinationTab() {
         ))}
 
         {loading && streamingText && (
-          <div className="mb-3">
+          <div className="mb-4">
             <div className="rounded-xl bg-zinc-800/40 border border-zinc-700/40 overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-2 border-b border-zinc-700/30 bg-zinc-800/60">
                 {category && <category.icon className={cn("h-3.5 w-3.5 animate-pulse", category.color)} />}
                 <span className="text-[10px] font-medium text-zinc-400">{category?.label || "解读"} · 推演中...</span>
               </div>
-              <div className="px-4 py-3">
+              <div className="px-5 py-4">
                 <MarkdownRenderer content={streamingText} />
               </div>
             </div>
@@ -1167,6 +1183,7 @@ export default function DivinationTab() {
         {loading && !streamingText && (
           <StreamingIndicator text="" label="正在推算中" onAbort={() => { abortRef.current?.abort(); setLoading(false); }} />
         )}
+        </div>
 
         <div ref={messagesEndRef} />
       </div>

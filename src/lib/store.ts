@@ -46,6 +46,18 @@ export interface ModuleHistoryEntry {
   summary?: string; // short summary for list display
 }
 
+export interface DivinationRecord {
+  id: string;
+  category: string;      // yijing, bazi, tarot, etc.
+  categoryLabel: string;
+  question: string;
+  answer: string;
+  ritualResult?: string;  // coin toss / tarot draw summary
+  linkedProfileId?: string;
+  linkedProfileName?: string;
+  createdAt: string;
+}
+
 // ============================================================
 // State Interface
 // ============================================================
@@ -63,6 +75,7 @@ export interface DataExport {
   coachingTips?: CoachingTip[];
   playbookVersions?: PlaybookVersion[];
   profileMemories?: ProfileMemoryEntry[];
+  divinationRecords?: DivinationRecord[];
 }
 
 interface AppState {
@@ -179,6 +192,13 @@ interface AppState {
   updateApiSettings: (updates: Partial<AppState["apiSettings"]>) => void;
   addCustomModel: (model: string) => void;
   removeCustomModel: (model: string) => void;
+
+  // ---- Divination History ----
+  divinationRecords: DivinationRecord[];
+  addDivinationRecord: (record: DivinationRecord) => void;
+  getDivinationRecords: (category?: string) => DivinationRecord[];
+  deleteDivinationRecord: (id: string) => void;
+  clearDivinationRecords: () => void;
 
   // ---- Adaptive Learning ----
   learningProfile: LearningProfile;
@@ -446,6 +466,7 @@ export const useAppStore = create<AppState>()(
           coachingTips: state.coachingTips,
           playbookVersions: state.playbookVersions,
           profileMemories: state.profileMemories,
+          divinationRecords: state.divinationRecords,
         };
       },
 
@@ -469,6 +490,7 @@ export const useAppStore = create<AppState>()(
             coachingTips: data.coachingTips || [],
             playbookVersions: data.playbookVersions || [],
             profileMemories: data.profileMemories || [],
+            divinationRecords: data.divinationRecords || [],
           });
         } else {
           // Merge mode: add items that don't already exist (by id)
@@ -500,6 +522,10 @@ export const useAppStore = create<AppState>()(
           const existingMemIds = new Set(state.profileMemories.map((m) => m.id));
           const newMem = (data.profileMemories || []).filter((m) => !existingMemIds.has(m.id));
 
+          // Merge divination records
+          const existingDivIds = new Set(state.divinationRecords.map((r) => r.id));
+          const newDiv = (data.divinationRecords || []).filter((r) => !existingDivIds.has(r.id));
+
           // Merge module history (combine per-module arrays)
           const mergedModuleHistory = { ...state.moduleHistory };
           for (const [mod, entries] of Object.entries(data.moduleHistory || {})) {
@@ -518,6 +544,7 @@ export const useAppStore = create<AppState>()(
             playbookVersions: [...state.playbookVersions, ...newPb],
             profileMemories: [...state.profileMemories, ...newMem],
             moduleHistory: mergedModuleHistory,
+            divinationRecords: [...state.divinationRecords, ...newDiv],
           });
         }
 
@@ -536,6 +563,7 @@ export const useAppStore = create<AppState>()(
           profileMemories: [],
           playbookVersions: [],
           moduleHistory: {},
+          divinationRecords: [],
           toasts: [],
           preSelectedProfileId: null,
           scenarioContext: null,
@@ -690,6 +718,22 @@ export const useAppStore = create<AppState>()(
           },
         })),
 
+      // ---- Divination History ----
+      divinationRecords: [],
+      addDivinationRecord: (record) =>
+        set((state) => ({
+          divinationRecords: [record, ...state.divinationRecords].slice(0, 200),
+        })),
+      getDivinationRecords: (category) => {
+        const records = get().divinationRecords;
+        return category ? records.filter((r) => r.category === category) : records;
+      },
+      deleteDivinationRecord: (id) =>
+        set((state) => ({
+          divinationRecords: state.divinationRecords.filter((r) => r.id !== id),
+        })),
+      clearDivinationRecords: () => set({ divinationRecords: [] }),
+
       // ---- Adaptive Learning ----
       learningProfile: getDefaultLearningProfile(),
       feedbackHistory: [],
@@ -731,6 +775,7 @@ export const useAppStore = create<AppState>()(
           moduleHistory: {},
           profileMemories: [],
           playbookVersions: [],
+          divinationRecords: [],
         })),
       exportAnonymizedData: () => {
         const state = get();
@@ -764,6 +809,12 @@ export const useAppStore = create<AppState>()(
             content: "[已脱敏]",
             sourceQuote: undefined,
           })),
+          divinationRecords: state.divinationRecords.map((r) => ({
+            ...r,
+            question: "[已脱敏]",
+            answer: "[已脱敏]",
+            linkedProfileName: r.linkedProfileName ? anonymize(r.linkedProfileName) : undefined,
+          })),
         };
       },
     }),
@@ -795,6 +846,7 @@ export const useAppStore = create<AppState>()(
         learningProfile: state.learningProfile,
         feedbackHistory: state.feedbackHistory,
         privacySettings: state.privacySettings,
+        divinationRecords: state.divinationRecords,
       }),
     }
   )
