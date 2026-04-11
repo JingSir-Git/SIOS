@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-fetch";
 import { useAppStore } from "@/lib/store";
 import StreamingIndicator from "./StreamingIndicator";
+import MarkdownRenderer from "./MarkdownRenderer";
+import { CoinTossRitual, TarotDrawRitual, QimenRitual } from "./DivinationRituals";
 
 const DIVINATION_CATEGORIES = [
   {
@@ -185,6 +187,11 @@ export default function DivinationTab() {
   const [houseType, setHouseType] = useState("");
   const [floorRange, setFloorRange] = useState("");
   const [facingDirection, setFacingDirection] = useState("");
+
+  // Ritual results
+  const [ritualResult, setRitualResult] = useState("");
+  const [ritualCompleted, setRitualCompleted] = useState(false);
+  const [ritualKey, setRitualKey] = useState(0);
 
   const category = DIVINATION_CATEGORIES.find((c) => c.id === selectedCategory);
 
@@ -586,7 +593,13 @@ export default function DivinationTab() {
   const handleSend = async () => {
     if (!input.trim() || loading) return;
 
-    const userMessage: Message = { role: "user", content: input.trim() };
+    // Prepend ritual result to the first message if available
+    let content = input.trim();
+    if (ritualResult && messages.length === 0) {
+      content = `${ritualResult}\n\n我的问题是：${content}`;
+    }
+
+    const userMessage: Message = { role: "user", content };
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput("");
@@ -665,6 +678,9 @@ export default function DivinationTab() {
     setMessages([]);
     setStreamingText("");
     setInput("");
+    setRitualResult("");
+    setRitualCompleted(false);
+    setRitualKey((k) => k + 1);
     if (abortRef.current) {
       abortRef.current.abort();
       abortRef.current = null;
@@ -1072,24 +1088,76 @@ export default function DivinationTab() {
           </div>
         )}
 
+        {/* Ritual simulation area - stays visible after completion */}
+        {(selectedCategory === "yijing" || selectedCategory === "liuyao") && (
+          <div className="mb-3">
+            <CoinTossRitual
+              key={ritualKey}
+              onComplete={(_lines, summary) => {
+                setRitualResult(summary);
+                setRitualCompleted(true);
+              }}
+            />
+          </div>
+        )}
+
+        {selectedCategory === "tarot" && (
+          <div className="mb-3">
+            <TarotDrawRitual
+              key={ritualKey}
+              spread={selectedSpread || "three"}
+              onComplete={(_cards, summary) => {
+                setRitualResult(summary);
+                setRitualCompleted(true);
+              }}
+            />
+          </div>
+        )}
+
+        {selectedCategory === "qimen" && (
+          <div className="mb-3">
+            <QimenRitual
+              key={ritualKey}
+              onComplete={(summary) => {
+                setRitualResult(summary);
+                setRitualCompleted(true);
+              }}
+            />
+          </div>
+        )}
+
         {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={cn(
-              "rounded-lg p-3 text-xs leading-relaxed",
-              msg.role === "user"
-                ? "bg-violet-500/10 border border-violet-500/20 text-violet-200 ml-12"
-                : "bg-zinc-800/50 border border-zinc-700/50 text-zinc-300 mr-4"
+          <div key={i} className="mb-3">
+            {msg.role === "user" ? (
+              <div className="flex justify-end">
+                <div className="max-w-[85%] rounded-xl bg-violet-500/10 border border-violet-500/20 px-4 py-3">
+                  <p className="text-xs text-violet-200 leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl bg-zinc-800/40 border border-zinc-700/40 overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-2 border-b border-zinc-700/30 bg-zinc-800/60">
+                  {category && <category.icon className={cn("h-3.5 w-3.5", category.color)} />}
+                  <span className="text-[10px] font-medium text-zinc-400">{category?.label || "解读"} · AI 解析</span>
+                </div>
+                <div className="px-4 py-3">
+                  <MarkdownRenderer content={msg.content} />
+                </div>
+              </div>
             )}
-          >
-            <div className="whitespace-pre-wrap">{msg.content}</div>
           </div>
         ))}
 
         {loading && streamingText && (
-          <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 p-3 mr-4">
-            <div className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap">
-              {streamingText}
+          <div className="mb-3">
+            <div className="rounded-xl bg-zinc-800/40 border border-zinc-700/40 overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-2 border-b border-zinc-700/30 bg-zinc-800/60">
+                {category && <category.icon className={cn("h-3.5 w-3.5 animate-pulse", category.color)} />}
+                <span className="text-[10px] font-medium text-zinc-400">{category?.label || "解读"} · 推演中...</span>
+              </div>
+              <div className="px-4 py-3">
+                <MarkdownRenderer content={streamingText} />
+              </div>
             </div>
           </div>
         )}
@@ -1102,15 +1170,28 @@ export default function DivinationTab() {
       </div>
 
       {/* Input */}
-      <div className="border-t border-zinc-800 p-3 shrink-0">
+      <div className="border-t border-zinc-800 p-3 shrink-0 space-y-2">
+        {ritualCompleted && messages.length === 0 && (
+          <div className="flex items-center gap-2 px-2">
+            <Check className="h-3 w-3 text-emerald-400 shrink-0" />
+            <span className="text-[10px] text-emerald-400/80">
+              {selectedCategory === "tarot" ? "牌阵已就绪" : selectedCategory === "qimen" ? "盘局已起" : "卦象已成"} — 请输入您的问题，结果将一并提交解读
+            </span>
+          </div>
+        )}
         <div className="flex gap-2">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-            placeholder="描述你的问题..."
-            className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800/80 px-3 py-2 text-sm text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500/50"
+            placeholder={ritualCompleted && messages.length === 0 ? "请描述您想问的具体问题..." : "描述你的问题..."}
+            className={cn(
+              "flex-1 rounded-lg border bg-zinc-800/80 px-3 py-2 text-sm text-zinc-300 placeholder:text-zinc-600 focus:outline-none transition-colors",
+              ritualCompleted && messages.length === 0
+                ? "border-emerald-500/30 focus:border-emerald-500/50"
+                : "border-zinc-700 focus:border-violet-500/50"
+            )}
           />
           <button
             onClick={handleSend}
@@ -1119,7 +1200,9 @@ export default function DivinationTab() {
               "rounded-lg px-4 py-2 text-sm font-medium transition-all",
               !input.trim() || loading
                 ? "bg-zinc-800 text-zinc-600 cursor-not-allowed"
-                : "bg-violet-600 text-white hover:bg-violet-500"
+                : category
+                  ? `bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-500 hover:to-purple-500 shadow-lg shadow-violet-500/10`
+                  : "bg-violet-600 text-white hover:bg-violet-500"
             )}
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
