@@ -350,7 +350,7 @@ export default function EQTrainingTab() {
               </button>
 
               {showConversations && (
-                <div className="absolute top-full right-0 mt-2 z-20 w-[380px] max-h-[320px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in-0 slide-in-from-top-2 duration-200">
+                <div className="absolute top-full right-0 mt-2 z-20 w-[calc(100vw-2rem)] sm:w-[380px] max-h-[70vh] sm:max-h-[320px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in-0 slide-in-from-top-2 duration-200">
                   <div className="px-3 py-2 border-b border-zinc-800 flex items-center justify-between">
                     <span className="text-[11px] text-zinc-400 font-medium">历史对话</span>
                     <button onClick={() => setShowConversations(false)} className="text-zinc-600 hover:text-zinc-400">
@@ -416,7 +416,7 @@ export default function EQTrainingTab() {
                 </button>
 
                 {showExamples && (
-                  <div className="absolute top-full right-0 mt-2 z-20 w-[420px] max-h-[380px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in-0 slide-in-from-top-2 duration-200">
+                  <div className="absolute top-full right-0 mt-2 z-20 w-[calc(100vw-2rem)] sm:w-[420px] max-h-[70vh] sm:max-h-[380px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in-0 slide-in-from-top-2 duration-200">
                     <div className="flex border-b border-zinc-800 overflow-x-auto">
                       {EQ_EXAMPLE_CATEGORIES.map((cat) => (
                         <button

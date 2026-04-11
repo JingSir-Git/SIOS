@@ -238,13 +238,8 @@ ${result.redLines.map((r) => `- ${r}`).join("\n")}`;
 
   return (
     <div className="flex flex-col h-full">
-      <div className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-zinc-100">对话策略规划</h1>
-          <p className="text-xs text-zinc-500 mt-1">
-            基于对方画像，为即将到来的重要对话制定完整策略方案
-          </p>
-        </div>
+      <div className="border-b border-zinc-800 px-4 sm:px-6 py-2 flex items-center justify-between">
+        <p className="text-[11px] text-zinc-500">基于画像制定完整对话策略方案</p>
         <ModuleHistoryPanel
           module="strategy"
           label="策略规划"
@@ -311,7 +306,7 @@ ${result.redLines.map((r) => `- ${r}`).join("\n")}`;
               </button>
 
               {showExamples && (
-                <div className="absolute top-full left-0 mt-2 z-20 w-[500px] max-h-[400px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in-0 slide-in-from-top-2 duration-200">
+                <div className="absolute top-full left-0 mt-2 z-20 w-[calc(100vw-2rem)] sm:w-[500px] max-h-[70vh] sm:max-h-[400px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in-0 slide-in-from-top-2 duration-200">
                   <div className="flex border-b border-zinc-800 overflow-x-auto">
                     {STRATEGY_EXAMPLE_CATEGORIES.map((cat) => (
                       <button

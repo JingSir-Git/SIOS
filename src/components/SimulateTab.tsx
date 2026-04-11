@@ -227,14 +227,9 @@ export default function SimulateTab() {
     <div className="flex h-full">
       {/* Main Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <div className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-zinc-100">模拟对练</h1>
-            <p className="text-xs text-zinc-500 mt-1">
-              与对方的AI数字分身进行对话演练，提前压力测试你的策略
-            </p>
-          </div>
+        {/* Action Bar */}
+        <div className="border-b border-zinc-800 px-4 sm:px-6 py-2 flex items-center justify-between">
+          <p className="text-[11px] text-zinc-500">与对方AI数字分身对话演练</p>
           {started && (
             <div className="flex items-center gap-2">
               <button
@@ -307,7 +302,7 @@ export default function SimulateTab() {
                 </button>
 
                 {showExamples && (
-                  <div className="absolute top-full right-0 mt-2 z-20 w-[480px] max-h-[400px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in-0 slide-in-from-top-2 duration-200">
+                  <div className="absolute top-full right-0 mt-2 z-20 w-[calc(100vw-2rem)] sm:w-[480px] max-h-[70vh] sm:max-h-[400px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in-0 slide-in-from-top-2 duration-200">
                     <div className="flex border-b border-zinc-800 overflow-x-auto">
                       {SIMULATE_EXAMPLE_CATEGORIES.map((cat) => (
                         <button

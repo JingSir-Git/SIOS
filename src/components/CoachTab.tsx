@@ -221,16 +221,8 @@ export default function CoachTab() {
     <div className="flex h-full flex-col lg:flex-row">
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <div className="border-b border-zinc-800 px-6 py-4">
-          <h1 className="text-lg font-semibold text-zinc-100">实时沟通教练</h1>
-          <p className="text-xs text-zinc-500 mt-1">
-            输入双方对话，AI教练实时分析并给出策略建议
-          </p>
-        </div>
-
         {/* Config Bar */}
-        <div className="border-b border-zinc-800 px-6 py-3 flex items-center gap-3 flex-wrap">
+        <div className="border-b border-zinc-800 px-4 sm:px-6 py-2.5 flex items-center gap-2 sm:gap-3 flex-wrap">
           <select
             value={selectedProfileId}
             onChange={(e) => setSelectedProfileId(e.target.value)}
@@ -261,7 +253,7 @@ export default function CoachTab() {
             </button>
 
             {showExamples && (
-              <div className="absolute top-full right-0 mt-2 z-20 w-[460px] max-h-[400px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in-0 slide-in-from-top-2 duration-200">
+              <div className="absolute top-full right-0 mt-2 z-20 w-[calc(100vw-2rem)] sm:w-[460px] max-h-[70vh] sm:max-h-[400px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in-0 slide-in-from-top-2 duration-200">
                 <div className="flex border-b border-zinc-800 overflow-x-auto">
                   {COACH_EXAMPLE_CATEGORIES.map((cat) => (
                     <button
@@ -373,7 +365,7 @@ export default function CoachTab() {
         </div>
 
         {/* Input Area */}
-        <div className="border-t border-zinc-800 px-6 py-3 space-y-2">
+        <div className="border-t border-zinc-800 px-4 sm:px-6 py-2 sm:py-3 space-y-1.5 sm:space-y-2">
           {/* Other's message input */}
           <div className="flex gap-2">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cyan-500/10">
@@ -447,7 +439,7 @@ export default function CoachTab() {
             ) : (
               <>
                 <Sparkles className="h-3.5 w-3.5" />
-                获取AI教练建议
+                交互分析 · 获取AI教练建议
               </>
             )}
           </button>

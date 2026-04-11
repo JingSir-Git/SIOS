@@ -419,7 +419,7 @@ ${result.reviewSchedule}`;
               </button>
 
               {showExamples && (
-                <div className="absolute top-full left-0 mt-2 z-20 w-[520px] max-h-[420px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in-0 slide-in-from-top-2 duration-200">
+                <div className="absolute top-full left-0 mt-2 z-20 w-[calc(100vw-2rem)] sm:w-[520px] max-h-[70vh] sm:max-h-[420px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in-0 slide-in-from-top-2 duration-200">
                   <div className="flex border-b border-zinc-800 overflow-x-auto">
                     {PLANNING_EXAMPLE_CATEGORIES.map((cat) => (
                       <button
