@@ -981,10 +981,24 @@ function ProfileDetail({
                       </span>
                     </div>
                   </div>
-                  <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                  <div className="relative h-1.5 rounded-full bg-zinc-800">
+                    <div className="absolute inset-0 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${dim.value}%`,
+                          background: `linear-gradient(to right, #3f3f46, ${dim.value > 65 ? "#34d399" : dim.value < 35 ? "#f87171" : "#a1a1aa"})`,
+                          opacity: 0.25 + (dim.confidence / 100) * 0.35,
+                        }}
+                      />
+                    </div>
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-violet-600 to-violet-400 transition-all duration-500"
-                      style={{ width: `${dim.value}%`, opacity: 0.3 + (dim.confidence / 100) * 0.7 }}
+                      className="absolute top-[-1px] w-0.5 h-2.5 rounded-sm transition-all duration-500"
+                      style={{
+                        left: `${dim.value}%`,
+                        transform: "translateX(-50%)",
+                        backgroundColor: dim.value > 65 ? "#34d399" : dim.value < 35 ? "#f87171" : "#a1a1aa",
+                      }}
                     />
                   </div>
                   {dim.evidence.length > 0 && (

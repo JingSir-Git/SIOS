@@ -300,18 +300,24 @@ export default function ProfileCompare({ isOpen, onClose }: Props) {
                           )}
                         </span>
                       </div>
-                      {/* Double bar */}
-                      <div className="space-y-1">
+                      {/* Double needle gauge */}
+                      <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
-                          <span className="text-[8px] text-violet-400 w-10 shrink-0 text-right">{profileA.name.slice(0, 3)}</span>
-                          <div className="flex-1 h-2 rounded-full bg-zinc-800 overflow-hidden">
-                            <div className="h-full rounded-full bg-violet-500/60" style={{ width: `${barWidthA}%` }} />
+                          <span className="text-[8px] text-violet-400 w-10 shrink-0 text-right font-mono">{profileA.name.slice(0, 3)}</span>
+                          <div className="relative flex-1 h-1.5 rounded-full bg-zinc-800">
+                            <div className="absolute inset-0 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${barWidthA}%`, background: "linear-gradient(to right, #3f3f46, #8b5cf6)", opacity: 0.3 }} />
+                            </div>
+                            <div className="absolute top-[-1px] w-0.5 h-2.5 rounded-sm bg-violet-400" style={{ left: `${barWidthA}%`, transform: "translateX(-50%)" }} />
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[8px] text-pink-400 w-10 shrink-0 text-right">{profileB.name.slice(0, 3)}</span>
-                          <div className="flex-1 h-2 rounded-full bg-zinc-800 overflow-hidden">
-                            <div className="h-full rounded-full bg-pink-500/60" style={{ width: `${barWidthB}%` }} />
+                          <span className="text-[8px] text-pink-400 w-10 shrink-0 text-right font-mono">{profileB.name.slice(0, 3)}</span>
+                          <div className="relative flex-1 h-1.5 rounded-full bg-zinc-800">
+                            <div className="absolute inset-0 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${barWidthB}%`, background: "linear-gradient(to right, #3f3f46, #ec4899)", opacity: 0.3 }} />
+                            </div>
+                            <div className="absolute top-[-1px] w-0.5 h-2.5 rounded-sm bg-pink-400" style={{ left: `${barWidthB}%`, transform: "translateX(-50%)" }} />
                           </div>
                         </div>
                       </div>

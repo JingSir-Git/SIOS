@@ -410,11 +410,11 @@ export default function ProfileShareFusion({ profile, onClose }: Props) {
                       {delta > 0 ? "+" : ""}{delta}
                     </span>
                   )}
-                  <div className="flex-1 h-1 rounded-full bg-zinc-800 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-violet-500/50 transition-all"
-                      style={{ width: `${change.newConfidence}%` }}
-                    />
+                  <div className="relative flex-1 h-1.5 rounded-full bg-zinc-800">
+                    <div className="absolute inset-0 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${change.newConfidence}%`, background: "linear-gradient(to right, #3f3f46, #8b5cf6)", opacity: 0.3 }} />
+                    </div>
+                    <div className="absolute top-[-1px] w-0.5 h-2.5 rounded-sm bg-violet-400 transition-all" style={{ left: `${change.newConfidence}%`, transform: "translateX(-50%)" }} />
                   </div>
                   <span className="text-[9px] text-zinc-600 font-mono w-10 text-right">
                     信{change.newConfidence}%

@@ -106,30 +106,30 @@ export default function SubjectiveImpressionEditor({ profileId, profileName, exi
             </span>
           </div>
 
-          {/* Trust & Comfort bars */}
+          {/* Trust & Comfort needle gauges */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] text-zinc-500">信任度</span>
-                <span className="text-[10px] text-zinc-400">{existing.trustLevel}%</span>
+                <span className="text-[10px] font-mono text-emerald-400">{existing.trustLevel}%</span>
               </div>
-              <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-emerald-500 transition-all"
-                  style={{ width: `${existing.trustLevel}%` }}
-                />
+              <div className="relative h-1.5 rounded-full bg-zinc-800">
+                <div className="absolute inset-0 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all" style={{ width: `${existing.trustLevel}%`, background: "linear-gradient(to right, #3f3f46, #34d399)", opacity: 0.3 }} />
+                </div>
+                <div className="absolute top-[-1px] w-0.5 h-2.5 rounded-sm bg-emerald-400 transition-all" style={{ left: `${existing.trustLevel}%`, transform: "translateX(-50%)" }} />
               </div>
             </div>
             <div>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] text-zinc-500">舒适度</span>
-                <span className="text-[10px] text-zinc-400">{existing.comfortLevel}%</span>
+                <span className="text-[10px] font-mono text-violet-400">{existing.comfortLevel}%</span>
               </div>
-              <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-violet-500 transition-all"
-                  style={{ width: `${existing.comfortLevel}%` }}
-                />
+              <div className="relative h-1.5 rounded-full bg-zinc-800">
+                <div className="absolute inset-0 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all" style={{ width: `${existing.comfortLevel}%`, background: "linear-gradient(to right, #3f3f46, #8b5cf6)", opacity: 0.3 }} />
+                </div>
+                <div className="absolute top-[-1px] w-0.5 h-2.5 rounded-sm bg-violet-400 transition-all" style={{ left: `${existing.comfortLevel}%`, transform: "translateX(-50%)" }} />
               </div>
             </div>
           </div>

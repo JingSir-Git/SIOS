@@ -464,13 +464,13 @@ export default function PsychologyTab() {
                                 <div>
                                   <span className="text-zinc-600 block">强度</span>
                                   <div className="flex items-center gap-1">
-                                    <div className="flex-1 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-                                      <div
-                                        className="h-full rounded-full bg-rose-500"
-                                        style={{ width: `${msg.analysis.emotionAnalysis.intensityLevel * 10}%` }}
-                                      />
+                                    <div className="relative flex-1 h-1.5 rounded-full bg-zinc-800">
+                                      <div className="absolute inset-0 rounded-full overflow-hidden">
+                                        <div className="h-full rounded-full" style={{ width: `${msg.analysis.emotionAnalysis.intensityLevel * 10}%`, background: "linear-gradient(to right, #3f3f46, #f43f5e)", opacity: 0.3 }} />
+                                      </div>
+                                      <div className="absolute top-[-1px] w-0.5 h-2.5 rounded-sm bg-rose-400" style={{ left: `${msg.analysis.emotionAnalysis.intensityLevel * 10}%`, transform: "translateX(-50%)" }} />
                                     </div>
-                                    <span className="text-zinc-400">{msg.analysis.emotionAnalysis.intensityLevel}/10</span>
+                                    <span className="text-zinc-400 font-mono text-[10px]">{msg.analysis.emotionAnalysis.intensityLevel}/10</span>
                                   </div>
                                 </div>
                               </div>

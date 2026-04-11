@@ -257,11 +257,11 @@ export default function MemorySummary({ isOpen, onClose }: Props) {
                         <div key={d.cat} className="flex items-center gap-2">
                           <Icon className={cn("h-3 w-3 shrink-0", meta.color.split(" ")[0])} />
                           <span className="text-[10px] text-zinc-500 w-14 shrink-0">{meta.label}</span>
-                          <div className="flex-1 h-2 rounded-full bg-zinc-800 overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-gradient-to-r from-violet-500/50 to-cyan-500/50"
-                              style={{ width: `${Math.max(4, pct)}%` }}
-                            />
+                          <div className="relative flex-1 h-1.5 rounded-full bg-zinc-800">
+                            <div className="absolute inset-0 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${Math.max(4, pct)}%`, background: "linear-gradient(to right, #3f3f46, #8b5cf6)", opacity: 0.3 }} />
+                            </div>
+                            <div className="absolute top-[-1px] w-0.5 h-2.5 rounded-sm bg-violet-400" style={{ left: `${Math.max(4, pct)}%`, transform: "translateX(-50%)" }} />
                           </div>
                           <span className="text-[9px] text-zinc-600 w-12 text-right shrink-0">{d.count}条 {pct}%</span>
                         </div>
