@@ -266,22 +266,31 @@ export default function RelationshipTrends() {
                 </div>
               )}
 
-              {/* Sentiment indicator bar */}
+              {/* Sentiment needle gauge */}
               <div className="flex items-center gap-2 mt-2">
                 <span className="text-[9px] text-zinc-600 shrink-0">情感温度</span>
-                <div className="flex-1 h-1 rounded-full bg-zinc-800 overflow-hidden">
+                <div className="relative flex-1 h-1.5 rounded-full bg-zinc-800">
+                  <div className="absolute inset-0 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${pt.recentSentiment}%`,
+                        background: `linear-gradient(to right, #3f3f46, ${pt.recentSentiment >= 65 ? "#34d399" : pt.recentSentiment >= 40 ? "#fbbf24" : "#60a5fa"})`,
+                        opacity: 0.35,
+                      }}
+                    />
+                  </div>
                   <div
-                    className={cn(
-                      "h-full rounded-full transition-all duration-700",
-                      pt.recentSentiment >= 65 ? "bg-emerald-500" :
-                      pt.recentSentiment >= 40 ? "bg-amber-500" :
-                      "bg-blue-500"
-                    )}
-                    style={{ width: `${pt.recentSentiment}%` }}
+                    className="absolute top-[-1px] w-0.5 h-2.5 rounded-sm transition-all duration-700"
+                    style={{
+                      left: `${pt.recentSentiment}%`,
+                      transform: "translateX(-50%)",
+                      backgroundColor: pt.recentSentiment >= 65 ? "#34d399" : pt.recentSentiment >= 40 ? "#fbbf24" : "#60a5fa",
+                    }}
                   />
                 </div>
                 <span className={cn(
-                  "text-[9px] font-mono",
+                  "text-[9px] font-mono font-medium",
                   pt.recentSentiment >= 65 ? "text-emerald-400" :
                   pt.recentSentiment >= 40 ? "text-amber-400" :
                   "text-blue-400"

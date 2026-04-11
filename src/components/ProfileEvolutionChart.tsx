@@ -2,7 +2,7 @@
 
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, Legend,
+  CartesianGrid, Legend, ReferenceLine,
 } from "recharts";
 import { DIMENSION_LABELS, type DimensionKey, type ProfileSnapshot, type PersonProfile } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -112,11 +112,11 @@ export default function ProfileEvolutionChart({ profile }: Props) {
   return (
     <div className="rounded-lg border border-zinc-800 p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
+        <h3 className="text-[11px] font-semibold text-zinc-200 flex items-center gap-2">
           <History className="h-4 w-4 text-violet-400" />
           画像演变时间轴
         </h3>
-        <span className="text-[10px] text-zinc-600">{snapshots.length} 个历史快照</span>
+        <span className="text-[8px] text-zinc-600 font-mono">{snapshots.length} snapshots · {chartData.length} data points</span>
       </div>
 
       {/* Dimension Toggle Chips */}
@@ -143,32 +143,29 @@ export default function ProfileEvolutionChart({ profile }: Props) {
       </div>
 
       {/* Evolution Line Chart */}
+      <p className="text-[8px] text-zinc-600 italic ml-1 mb-1">各维度随时间变化趋势 · 点击图例筛选</p>
       <div className="h-[220px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: -15 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
             <XAxis
               dataKey="date"
-              tick={{ fill: "#71717a", fontSize: 10 }}
+              tick={{ fill: "#52525b", fontSize: 9 }}
               axisLine={{ stroke: "#3f3f46" }}
+              tickLine={false}
             />
             <YAxis
               domain={[0, 100]}
-              tick={{ fill: "#71717a", fontSize: 10 }}
+              tick={{ fill: "#52525b", fontSize: 9 }}
               axisLine={{ stroke: "#3f3f46" }}
+              tickLine={false}
             />
             <Tooltip
-              contentStyle={{
-                backgroundColor: "#18181b",
-                border: "1px solid #3f3f46",
-                borderRadius: "8px",
-                fontSize: "11px",
-              }}
+              contentStyle={{ backgroundColor: "#18181b", border: "1px solid #3f3f46", borderRadius: "8px", fontSize: "10px" }}
               labelStyle={{ color: "#a1a1aa" }}
             />
-            <Legend
-              wrapperStyle={{ fontSize: "10px", paddingTop: "8px" }}
-            />
+            <ReferenceLine y={50} stroke="#3f3f46" strokeDasharray="2 2" />
+            <Legend iconType="circle" iconSize={6} wrapperStyle={{ fontSize: 9 }} />
             {Array.from(selectedDims).map((dimKey) => (
               <Line
                 key={dimKey}
@@ -176,8 +173,9 @@ export default function ProfileEvolutionChart({ profile }: Props) {
                 dataKey={dimKey}
                 name={DIMENSION_LABELS[dimKey]?.zh || dimKey}
                 stroke={DIMENSION_COLORS[dimKey] || "#a1a1aa"}
-                strokeWidth={2}
-                dot={{ r: 3, fill: DIMENSION_COLORS[dimKey] || "#a1a1aa" }}
+                strokeWidth={1.5}
+                dot={{ r: 3, fill: DIMENSION_COLORS[dimKey] || "#a1a1aa", strokeWidth: 0 }}
+                activeDot={{ r: 5 }}
                 connectNulls
               />
             ))}

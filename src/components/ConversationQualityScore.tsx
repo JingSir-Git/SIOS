@@ -323,31 +323,30 @@ export default function ConversationQualityScore({ analysis, previousAnalyses, c
         </div>
       </div>
 
-      {/* Dimension Bars */}
-      <div className="space-y-2">
+      {/* Dimension Gauges */}
+      <div className="space-y-2.5">
         {result.dimensions.map((dim) => {
           const Icon = dim.icon;
+          const needleColor = dim.score >= 80 ? "#34d399" : dim.score >= 65 ? "#22d3ee" : dim.score >= 50 ? "#fbbf24" : "#f87171";
           return (
-            <div key={dim.key} className="space-y-0.5">
-              <div className="flex items-center justify-between">
+            <div key={dim.key}>
+              <div className="flex items-center justify-between mb-0.5">
                 <div className="flex items-center gap-1.5">
                   <Icon className={cn("h-3 w-3", dim.color)} />
                   <span className="text-[10px] text-zinc-400">{dim.label}</span>
                 </div>
-                <span className="text-[10px] text-zinc-500">{dim.score}</span>
+                <span className="text-[10px] font-mono font-medium" style={{ color: needleColor }}>{dim.score}</span>
               </div>
-              <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-                <div
-                  className={cn(
-                    "h-full rounded-full transition-all duration-500",
-                    dim.score >= 80 ? "bg-emerald-500" :
-                    dim.score >= 65 ? "bg-cyan-500" :
-                    dim.score >= 50 ? "bg-amber-500" : "bg-red-500"
-                  )}
-                  style={{ width: `${dim.score}%` }}
-                />
+              <div className="relative h-1.5 rounded-full bg-zinc-800">
+                <div className="absolute inset-0 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${dim.score}%`, background: `linear-gradient(to right, #3f3f46, ${needleColor})`, opacity: 0.3 }}
+                  />
+                </div>
+                <div className="absolute top-[-1px] w-0.5 h-2.5 rounded-sm transition-all duration-500" style={{ left: `${dim.score}%`, transform: "translateX(-50%)", backgroundColor: needleColor }} />
               </div>
-              <p className="text-[9px] text-zinc-600 leading-tight">{dim.detail}</p>
+              <p className="text-[9px] text-zinc-600 leading-tight mt-0.5">{dim.detail}</p>
             </div>
           );
         })}

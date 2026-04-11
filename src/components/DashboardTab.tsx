@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef, useState, useCallback } from "react";
 import {
   BarChart3,
   Users,
@@ -22,6 +22,8 @@ import {
   FileDown,
   Compass,
   Layers,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import {
   AreaChart,
@@ -49,6 +51,7 @@ import type { DimensionKey } from "@/lib/types";
 import { DIMENSION_LABELS, DIMENSION_KEYS } from "@/lib/types";
 import { detectTrendAlerts, alertToToast, type TrendAlert } from "@/lib/trend-alerts";
 import { exportDashboardReport } from "@/lib/export-report";
+import { apiFetch } from "@/lib/api-fetch";
 
 // ---- Stat Card ----
 
@@ -91,6 +94,8 @@ function StatCard({
 export default function DashboardTab() {
   const { profiles, conversations, mbtiResults, eqScores, relationships, profileMemories, divinationRecords, moduleHistory, addToast, setActiveTab } = useAppStore();
   const toastPushedRef = useRef(false);
+  const [aiInsight, setAiInsight] = useState<string | null>(null);
+  const [insightLoading, setInsightLoading] = useState(false);
 
   // Trend alerts
   const alerts = useMemo(() => {
@@ -312,6 +317,38 @@ export default function DashboardTab() {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profiles, conversations, mbtiResults, eqScores, relationships, profileMemories, divinationRecords, moduleHistory]);
+
+  // AI Insight generator
+  const generateInsight = useCallback(async () => {
+    if (insightLoading) return;
+    setInsightLoading(true);
+    setAiInsight(null);
+    try {
+      const snapshot = [
+        `总对话: ${stats.totalConversations}, 已分析: ${stats.analyzedCount}, 覆盖率: ${stats.engagementRate}%`,
+        `人物画像: ${stats.totalProfiles}, 总消息: ${stats.totalMessages}`,
+        `EQ均分: ${stats.avgEQ || "无"}, EQ次数: ${eqScores.length}`,
+        `MBTI: ${stats.latestMBTI?.type || "无"}`,
+        stats.sentimentDist.n > 0 ? `情绪分布: μ=${stats.sentimentDist.mean.toFixed(2)}, σ=${stats.sentimentDist.std.toFixed(2)}, 95%CI=[${stats.sentimentDist.ci95.map((v: number) => v.toFixed(2)).join(",")}], n=${stats.sentimentDist.n}` : "",
+        `占卜: ${stats.divinationCount}次`,
+        `活跃天数: ${stats.daysSpan}, 日均对话: ${stats.avgMsgsPerConvo}条/对话`,
+        `画像维度均值: ${stats.dimAverages.map((d: any) => `${d.dimension}=${d.avg}`).join(", ")}`,
+        stats.profileActivity.length > 0 ? `最活跃: ${stats.profileActivity.slice(0, 3).map((p: any) => `${p.name}(${p.count}次)`).join(", ")}` : "",
+      ].filter(Boolean).join("\n");
+
+      const res = await apiFetch("/api/dashboard-insight", {
+        method: "POST",
+        body: JSON.stringify({ statsSnapshot: snapshot }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setAiInsight(data.insight);
+    } catch (e: any) {
+      setAiInsight(`洞察生成失败: ${e.message || "未知错误"}`);
+    } finally {
+      setInsightLoading(false);
+    }
+  }, [stats, eqScores.length, insightLoading]);
 
   const isEmpty = stats.totalConversations === 0 && stats.totalProfiles === 0 && stats.divinationCount === 0;
 
@@ -734,6 +771,42 @@ export default function DashboardTab() {
                   </div>
                 </div>
               )}
+
+              {/* ─── Row 6: AI Data Insight ─── */}
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-amber-400" />
+                    <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">AI 数据洞察</h3>
+                  </div>
+                  <button
+                    onClick={generateInsight}
+                    disabled={insightLoading}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all",
+                      insightLoading
+                        ? "bg-zinc-800 text-zinc-600 cursor-not-allowed"
+                        : "bg-violet-600/20 text-violet-400 border border-violet-500/30 hover:bg-violet-600/30"
+                    )}
+                  >
+                    {insightLoading ? (
+                      <><Loader2 className="h-3 w-3 animate-spin" /> 分析中…</>
+                    ) : (
+                      <><Sparkles className="h-3 w-3" /> 生成洞察报告</>
+                    )}
+                  </button>
+                </div>
+                <p className="text-[8px] text-zinc-600 italic mb-3">基于当前数据大盘统计快照，由LLM生成专业数据解读</p>
+                {aiInsight ? (
+                  <div className="rounded-lg border border-zinc-800/60 bg-zinc-800/20 p-4">
+                    <p className="text-[11px] text-zinc-300 leading-relaxed whitespace-pre-wrap">{aiInsight}</p>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-[60px] text-[10px] text-zinc-600">
+                    点击「生成洞察报告」获取AI数据解读
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
