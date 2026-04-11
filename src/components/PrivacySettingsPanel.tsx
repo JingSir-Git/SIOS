@@ -1,12 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import {
   Shield,
   Lock,
-  Trash2,
   Download,
-  AlertTriangle,
   Clock,
   Eye,
 } from "lucide-react";
@@ -17,24 +14,12 @@ export default function PrivacySettingsPanel() {
   const {
     privacySettings,
     updatePrivacySettings,
-    purgeAllPersonalData,
     exportAnonymizedData,
     addToast,
     profiles,
     conversations,
     profileMemories,
   } = useAppStore();
-  const [confirmPurge, setConfirmPurge] = useState(false);
-
-  const handlePurge = () => {
-    if (!confirmPurge) {
-      setConfirmPurge(true);
-      return;
-    }
-    purgeAllPersonalData();
-    addToast({ type: "success", title: "数据已清除", message: "所有个人数据已永久删除" });
-    setConfirmPurge(false);
-  };
 
   const handleAnonymizedExport = () => {
     const data = exportAnonymizedData();
@@ -173,39 +158,12 @@ export default function PrivacySettingsPanel() {
         </p>
       </div>
 
-      {/* Data Deletion */}
+      {/* Data Deletion Note */}
       <div className="space-y-2 pt-4 border-t border-white/10">
-        <label className="flex items-center gap-2 text-sm font-medium text-red-400">
-          <Trash2 className="w-4 h-4" />
-          数据删除 (GDPR Right to Erasure)
-        </label>
-        <div className="p-3 bg-red-500/5 border border-red-500/20 rounded-lg space-y-3">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
-            <p className="text-xs text-red-300/70">
-              此操作将永久删除所有个人数据，包括人物画像、对话记录、AI记忆、分析历史等。此操作不可撤销。
-            </p>
-          </div>
-          <button
-            onClick={handlePurge}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all",
-              confirmPurge
-                ? "bg-red-500 text-white hover:bg-red-600"
-                : "bg-red-500/20 text-red-300 hover:bg-red-500/30"
-            )}
-          >
-            <Trash2 className="w-4 h-4" />
-            {confirmPurge ? "确认永久删除所有数据" : "清除所有个人数据"}
-          </button>
-          {confirmPurge && (
-            <button
-              onClick={() => setConfirmPurge(false)}
-              className="text-xs text-white/40 hover:text-white/60 ml-3"
-            >
-              取消
-            </button>
-          )}
+        <div className="p-3 bg-zinc-800/50 border border-zinc-700/50 rounded-lg">
+          <p className="text-xs text-zinc-400">
+            💡 完整数据导出、导入和删除功能请使用上方「数据管理」模块。此处仅提供脱敏导出等隐私相关功能。
+          </p>
         </div>
       </div>
     </div>

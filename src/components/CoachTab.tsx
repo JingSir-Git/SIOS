@@ -34,6 +34,7 @@ export default function CoachTab() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [selfInput, setSelfInput] = useState("");
   const [otherInput, setOtherInput] = useState("");
+  const [showMobileCoachPanel, setShowMobileCoachPanel] = useState(false);
   const [userGoal, setUserGoal] = useState("");
   const [selectedProfileId, setSelectedProfileId] = useState("");
 
@@ -169,6 +170,8 @@ export default function CoachTab() {
               if (data.suggestedReply) setSuggestedReply(data.suggestedReply as string);
               if (data.currentDynamic) setCurrentDynamic(data.currentDynamic as string);
               if (data.scriptTemplates) setScriptTemplates(data.scriptTemplates as {scenario: string; script: string; rationale: string}[]);
+              // Auto-show mobile panel when results arrive
+              setShowMobileCoachPanel(true);
             } else if (event.type === "error") {
               streamError = event.text || "教练分析出错";
             }
@@ -212,8 +215,10 @@ export default function CoachTab() {
     setTimeout(() => setCopiedScript(null), 2000);
   };
 
+  const hasCoachResult = tips.length > 0 || currentDynamic || suggestedReply || scriptTemplates.length > 0 || loading;
+
   return (
-    <div className="flex h-full">
+    <div className="flex h-full flex-col lg:flex-row">
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
@@ -449,7 +454,86 @@ export default function CoachTab() {
         </div>
       </div>
 
-      {/* Coaching Sidebar */}
+      {/* Mobile coach panel toggle */}
+      {hasCoachResult && (
+        <div className="lg:hidden border-t border-zinc-800 px-4 py-2">
+          <button
+            onClick={() => setShowMobileCoachPanel(!showMobileCoachPanel)}
+            className="w-full flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-medium bg-violet-500/20 text-violet-300 hover:bg-violet-500/30 transition-all"
+          >
+            <Bot className="h-3.5 w-3.5" />
+            {showMobileCoachPanel ? "收起AI教练建议" : `查看AI教练建议${tips.length > 0 ? ` (${tips.length})` : ""}`}
+          </button>
+        </div>
+      )}
+
+      {/* Mobile coach panel (shown below chat) */}
+      {showMobileCoachPanel && (
+        <div className="lg:hidden border-t border-zinc-800 max-h-[50vh] overflow-y-auto p-4 space-y-4 bg-zinc-900/80">
+          {loading && (
+            <StreamingIndicator
+              text={streamingText}
+              label="AI教练正在分析"
+              onAbort={abortStreaming}
+            />
+          )}
+          {currentDynamic && (
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Target className="h-3 w-3 text-violet-400" />
+                <span className="text-[10px] font-medium text-zinc-400">当前局势</span>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">{currentDynamic}</p>
+            </div>
+          )}
+          {tips.length > 0 && (
+            <div className="space-y-2">
+              {tips.map((tip, i) => (
+                <div key={i} className={cn("rounded-lg border p-3", getTipTypeColor(tip.type))}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span>{getTipTypeIcon(tip.type)}</span>
+                    <span className="text-xs font-medium">{tip.title}</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed opacity-80">{tip.content}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          {suggestedReply && (
+            <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-medium text-violet-300">推荐回复</span>
+                <button onClick={copyReply} className="flex items-center gap-1 text-[10px] text-violet-400 hover:text-violet-300">
+                  {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  {copied ? "已复制" : "复制"}
+                </button>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed italic">&ldquo;{suggestedReply}&rdquo;</p>
+            </div>
+          )}
+          {scriptTemplates.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <BookOpen className="h-3 w-3 text-cyan-400" />
+                <span className="text-[10px] font-medium text-cyan-300">参考话术</span>
+              </div>
+              {scriptTemplates.map((st, i) => (
+                <div key={i} className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-cyan-400 font-medium">{st.scenario}</span>
+                    <button onClick={() => copyScript(st.script, i)} className="flex items-center gap-1 text-[9px] text-cyan-400 hover:text-cyan-300">
+                      {copiedScript === i ? <Check className="h-2.5 w-2.5" /> : <Copy className="h-2.5 w-2.5" />}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-zinc-200 leading-relaxed font-medium">&ldquo;{st.script}&rdquo;</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Coaching Sidebar (desktop only) */}
       <div className="w-80 border-l border-zinc-800 flex flex-col shrink-0 hidden lg:flex">
         <div className="border-b border-zinc-800 px-4 py-3 flex items-center gap-2">
           <Bot className="h-4 w-4 text-violet-400" />

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "SIOS — Social Intelligence OS",
-  description: "社交智能操作系统：理解他人，理解自己，优化一切人际交互",
+  description: "社交智能：理解他人，理解自己，优化人际",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

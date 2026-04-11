@@ -54,6 +54,8 @@ export default function PsychologyTab() {
   const [loading, setLoading] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [includeProfiles, setIncludeProfiles] = useState(true);
+  const [selectedProfileIds, setSelectedProfileIds] = useState<Set<string>>(new Set());
+  const [showProfilePicker, setShowProfilePicker] = useState(false);
   const [focusProfileId, setFocusProfileId] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -77,10 +79,15 @@ export default function PsychologyTab() {
 
   const buildProfilesSummary = (): string => {
     if (!includeProfiles || profiles.length === 0) return "";
+    // Filter by selected profiles if any are chosen
+    const filtered = selectedProfileIds.size > 0
+      ? profiles.filter((p) => selectedProfileIds.has(p.id))
+      : profiles;
+    if (filtered.length === 0) return "";
     // Put focused profile first if available
     const sorted = focusProfileId
-      ? [...profiles].sort((a, b) => (a.id === focusProfileId ? -1 : b.id === focusProfileId ? 1 : 0))
-      : profiles;
+      ? [...filtered].sort((a, b) => (a.id === focusProfileId ? -1 : b.id === focusProfileId ? 1 : 0))
+      : filtered;
     return sorted
       .map((p) => {
         const sub = p.subjectiveImpression;
@@ -263,11 +270,65 @@ export default function PsychologyTab() {
               onChange={(e) => setIncludeProfiles(e.target.checked)}
               className="rounded border-zinc-700 bg-zinc-800 accent-rose-500 h-3 w-3"
             />
-            共享画像数据给顾问
-            <span className="text-zinc-600">
-              ({profiles.length} 人)
-            </span>
+            共享画像
           </label>
+          {includeProfiles && profiles.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowProfilePicker(!showProfilePicker)}
+                className={cn(
+                  "flex items-center gap-1 text-[10px] px-2 py-1 rounded border transition-colors",
+                  showProfilePicker
+                    ? "text-violet-300 border-violet-500/30 bg-violet-500/10"
+                    : "text-zinc-500 border-zinc-700 hover:text-zinc-300"
+                )}
+              >
+                <Eye className="h-3 w-3" />
+                {selectedProfileIds.size > 0
+                  ? `已选 ${selectedProfileIds.size}/${profiles.length}`
+                  : `全部 ${profiles.length} 人`
+                }
+                {showProfilePicker ? <ChevronUp className="h-2.5 w-2.5" /> : <ChevronDown className="h-2.5 w-2.5" />}
+              </button>
+              {showProfilePicker && (
+                <div className="absolute top-full left-0 mt-1 z-40 min-w-[200px] rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl p-2 space-y-1 animate-in fade-in-0 slide-in-from-top-1 duration-150">
+                  <div className="flex items-center justify-between px-1 pb-1 border-b border-zinc-800 mb-1">
+                    <span className="text-[9px] text-zinc-500">选择要共享的画像</span>
+                    <button
+                      onClick={() => {
+                        if (selectedProfileIds.size === profiles.length) {
+                          setSelectedProfileIds(new Set());
+                        } else {
+                          setSelectedProfileIds(new Set(profiles.map((p) => p.id)));
+                        }
+                      }}
+                      className="text-[9px] text-violet-400 hover:text-violet-300"
+                    >
+                      {selectedProfileIds.size === profiles.length ? "取消全选" : "全选"}
+                    </button>
+                  </div>
+                  {profiles.map((p) => (
+                    <label key={p.id} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-zinc-800 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedProfileIds.size === 0 || selectedProfileIds.has(p.id)}
+                        onChange={(e) => {
+                          const next = new Set(selectedProfileIds.size === 0 ? profiles.map((pr) => pr.id) : selectedProfileIds);
+                          if (e.target.checked) next.add(p.id); else next.delete(p.id);
+                          setSelectedProfileIds(next);
+                        }}
+                        className="rounded border-zinc-700 bg-zinc-800 accent-violet-500 h-3 w-3"
+                      />
+                      <span className="text-[10px] text-zinc-300">{p.name}</span>
+                      {p.tags?.length ? (
+                        <span className="text-[9px] text-zinc-600 truncate max-w-[100px]">{p.tags.slice(0, 2).join("、")}</span>
+                      ) : null}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {focusProfile && (
             <div className="flex items-center gap-1.5 text-[10px] text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded px-2 py-1">
               <User className="h-3 w-3" />

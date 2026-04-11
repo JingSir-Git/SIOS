@@ -36,6 +36,8 @@ import StreamingIndicator from "./StreamingIndicator";
 import { extractMemoriesFromAnalysis, formatMemoriesForPrompt } from "@/lib/memory-utils";
 import { retrieveRAGContext } from "@/lib/rag-memory";
 import { apiFetch } from "@/lib/api-fetch";
+import VoiceInputButton from "./VoiceInputButton";
+import { verifyTimeOrder, type TimeOrderIssue } from "@/lib/timestamp-parser";
 
 // ---- Types ----
 
@@ -117,6 +119,9 @@ export default function AnalyzeTab() {
   // Stage management
   const [stage, setStage] = useState<AnalyzeStage>("input");
 
+  // Input mode: "conversation" (full dialogue), "single" (one person's message to interpret), "eq-review" (EQ review)
+  const [inputMode, setInputMode] = useState<"conversation" | "single" | "eq-review">("conversation");
+
   // Input stage state
   const [conversation, setConversation] = useState("");
   const [targetName, setTargetName] = useState("");
@@ -160,6 +165,8 @@ export default function AnalyzeTab() {
 
   // History panel
   const [showHistory, setShowHistory] = useState(false);
+  // Time order issues
+  const [timeIssues, setTimeIssues] = useState<TimeOrderIssue[]>([]);
 
   const { addConversation, addProfile, updateProfile, snapshotProfile, profiles, conversations, mbtiResults, addModuleHistory, navigateToTab, getActiveMemoriesForProfile, addMemoriesBatch, addToast, activeTab } = useAppStore();
 
@@ -194,14 +201,25 @@ export default function AnalyzeTab() {
 
   const reAnalyzeFromHistory = (convoId: string) => {
     const convo = conversations.find((c) => c.id === convoId);
-    if (!convo?.rawText) return;
-    setConversation(convo.rawText);
+    if (!convo) return;
     setTargetName(convo.targetName || convo.participants?.find((p) => p !== "我") || "");
     if (convo.context) { setContext(convo.context); setShowContext(true); }
     setResult(null);
     setError("");
     setSaved(false);
-    setStage("input");
+
+    // If conversation has attributed messages, use them directly
+    // instead of re-parsing the raw text (preserves previous attribution)
+    if (convo.messages && convo.messages.length > 0) {
+      const formatted = formatMessagesForLLM(convo.messages);
+      setConversation(convo.rawText || formatted);
+      setParsedMessages(convo.messages);
+      setFormattedConversation(formatted);
+      setStage("input");
+    } else if (convo.rawText) {
+      setConversation(convo.rawText);
+      setStage("input");
+    }
     setShowHistory(false);
   };
 
@@ -230,6 +248,17 @@ export default function AnalyzeTab() {
     setSaved(false);
     setOriginalRawText(conversation.trim());
 
+    // Single-paragraph mode: wrap as "对方：..." and go directly to analysis
+    if (inputMode === "single") {
+      const name = targetName.trim() || "对方";
+      const wrapped = `${name}：${conversation.trim()}`;
+      setFormattedConversation(wrapped);
+      setParsedMessages([]);
+      setDetectedPlatform(null);
+      runAnalysis(wrapped, name);
+      return;
+    }
+
     const parseResult = parseConversation(conversation.trim());
 
     // Show detected platform badge
@@ -239,8 +268,32 @@ export default function AnalyzeTab() {
       setDetectedPlatform(null);
     }
 
+    // Verify time order
+    const issues = verifyTimeOrder(parseResult.messages);
+    setTimeIssues(issues);
+    if (issues.length > 0) {
+      addToast({
+        type: "warning",
+        title: "时间顺序异常",
+        message: `检测到 ${issues.length} 处时间顺序问题，可能影响分析准确性`,
+      });
+    }
+
     if (parseResult.needsAttribution) {
-      // Unstructured chat — show attribution editor
+      // If user already provided a targetName, use it to pre-assign:
+      // the targetName matches an "other" participant, "我" is self
+      if (targetName.trim() && parseResult.participants.length === 2) {
+        const tn = targetName.trim();
+        const matchedParticipant = parseResult.participants.find(
+          (p) => p === tn || p.includes(tn) || tn.includes(p)
+        );
+        if (matchedParticipant) {
+          for (const msg of parseResult.messages) {
+            msg.role = msg.senderName === matchedParticipant ? "other" : "self";
+          }
+        }
+      }
+      // Show attribution editor for confirmation
       setParsedMessages(parseResult.messages);
       setStage("attribution");
     } else {
@@ -251,7 +304,7 @@ export default function AnalyzeTab() {
 
       // Auto-detect target name from participants if not set
       if (!targetName.trim() && parseResult.participants.length > 0) {
-        const selfNames = ["我", "自己", "me", "Me", "ME"];
+        const selfNames = ["我", "自己", "me", "Me", "ME", "本人"];
         const other = parseResult.participants.find((p) => !selfNames.includes(p));
         if (other) setTargetName(other);
       }
@@ -330,7 +383,13 @@ export default function AnalyzeTab() {
         body: JSON.stringify({
           conversation: convoText,
           targetName: finalTargetName,
-          context: (context.trim() || "") + (memoryContext ? `\n\n${memoryContext}` : "") || undefined,
+          context: [
+            inputMode === "single" ? "【单向揣摩模式】这不是双向对话，只有对方单方面说的话。请重点分析：1)对方真实意图和潜台词 2)对方情绪状态变化 3)可能的回复策略建议。注意：因为没有我方发言，情绪曲线只需分析对方(otherEmotion)，selfEmotion全部设为0。分析结果中请避免使用'对话'一词，改用'表述'或'发言'。所有分析层标题和内容必须使用中文，不要出现英文标题。"
+            : inputMode === "eq-review" ? "【情商复盘模式】请特别关注情商维度的分析。在五层分析之外，额外添加一个'情商复盘'板块(eqReview)，包含：1)我方每条关键发言的情商评分(1-10)和改进建议 2)错失的共情机会 3)可以更好的表达方式 4)整体情商表现评分(0-100)。所有标题和内容必须使用中文。"
+            : "",
+            context.trim() || "",
+            memoryContext || "",
+          ].filter(Boolean).join("\n\n") || undefined,
           mbtiInfo: (effectiveSelfMBTI || otherMBTI || showMBTI) ? {
             selfMBTI: effectiveSelfMBTI || undefined,
             otherMBTI: otherMBTI || undefined,
@@ -439,15 +498,16 @@ export default function AnalyzeTab() {
     const existingProfile = profiles.find((p) => p.name === name);
     const profileId = existingProfile?.id || (result.profileUpdate ? uuidv4() : undefined);
 
+    const isSingleMode = inputMode === "single";
     addConversation({
       id: convoId,
-      title: `与${name}的对话分析`,
-      participants: ["我", name],
+      title: isSingleMode ? `${name}的单向揣摩` : `与${name}的对话分析`,
+      participants: isSingleMode ? [name] : ["我", name],
       messages: parsedMessages.length > 0 ? parsedMessages : [],
       createdAt: conversationDate || new Date().toISOString(),
       rawText: originalRawText || conversation,
       targetName: name,
-      context: context || undefined,
+      context: (isSingleMode ? "[单向揣摩] " : "") + (context || ""),
       linkedProfileId: profileId,
       analysis: {
         id: uuidv4(),
@@ -481,7 +541,9 @@ export default function AnalyzeTab() {
           if (!incoming || typeof incoming !== 'object') continue;
 
           const oldConf = Math.max(1, existing?.confidence ?? 10);
-          const newConf = Math.max(1, typeof incoming.confidence === 'number' ? incoming.confidence : 10);
+          // Single-mode (单向揣摩) has lower confidence since it's one-sided observation
+          const rawNewConf = Math.max(1, typeof incoming.confidence === 'number' ? incoming.confidence : 10);
+          const newConf = isSingleMode ? Math.round(rawNewConf * 0.6) : rawNewConf;
           const totalConf = oldConf + newConf;
 
           // Weighted average: higher confidence data has more influence
@@ -720,13 +782,50 @@ export default function AnalyzeTab() {
           {/* ===== STAGE: INPUT ===== */}
           {(stage === "input" || stage === "results") && (
             <div className="space-y-4">
-              <div className="flex items-center gap-3">
+              {/* Mode toggle: conversation vs single-paragraph */}
+              <div className="flex items-center gap-1 p-1 bg-zinc-900 rounded-lg border border-zinc-800 w-fit">
+                <button
+                  onClick={() => setInputMode("conversation")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                    inputMode === "conversation"
+                      ? "bg-violet-500/20 text-violet-300 shadow-sm"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                >
+                  💬 对话分析
+                </button>
+                <button
+                  onClick={() => setInputMode("single")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                    inputMode === "single"
+                      ? "bg-amber-500/20 text-amber-300 shadow-sm"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                >
+                  🔍 单向揣摩
+                </button>
+                <button
+                  onClick={() => setInputMode("eq-review")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                    inputMode === "eq-review"
+                      ? "bg-emerald-500/20 text-emerald-300 shadow-sm"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                >
+                  🎯 情商复盘
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap">
                 <input
                   type="text"
-                  placeholder="对方称呼（如：王总、李经理，可留空）"
+                  placeholder={inputMode === "single" ? "说话人称呼（如：王总，可留空）" : inputMode === "eq-review" ? "对方称呼（情商复盘对象）" : "对方称呼（如：王总、李经理，可留空）"}
                   value={targetName}
                   onChange={(e) => setTargetName(e.target.value)}
-                  className="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/20"
+                  className="flex-1 min-w-[180px] rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/20"
                 />
                 <button
                   onClick={() => setShowContext(!showContext)}
@@ -734,16 +833,18 @@ export default function AnalyzeTab() {
                 >
                   {showContext ? "隐藏背景" : "+ 添加背景"}
                 </button>
-                <button
-                  onClick={() => setShowMBTI(!showMBTI)}
-                  className={cn(
-                    "flex items-center gap-1 text-xs transition-colors whitespace-nowrap",
-                    showMBTI ? "text-violet-400" : "text-zinc-500 hover:text-zinc-300"
-                  )}
-                >
-                  <Fingerprint className="h-3 w-3" />
-                  {showMBTI ? "隐藏MBTI" : "+ MBTI"}
-                </button>
+                {inputMode === "conversation" && (
+                  <button
+                    onClick={() => setShowMBTI(!showMBTI)}
+                    className={cn(
+                      "flex items-center gap-1 text-xs transition-colors whitespace-nowrap",
+                      showMBTI ? "text-violet-400" : "text-zinc-500 hover:text-zinc-300"
+                    )}
+                  >
+                    <Fingerprint className="h-3 w-3" />
+                    {showMBTI ? "隐藏MBTI" : "+ MBTI"}
+                  </button>
+                )}
               </div>
 
               {/* Conversation date picker */}
@@ -752,8 +853,16 @@ export default function AnalyzeTab() {
                 <span className="text-[10px] text-zinc-500">对话发生时间</span>
                 <input
                   type="datetime-local"
-                  value={conversationDate ? conversationDate.slice(0, 16) : ""}
-                  onChange={(e) => setConversationDate(e.target.value ? new Date(e.target.value).toISOString() : "")}
+                  value={conversationDate ? new Date(conversationDate).toLocaleString("sv-SE", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).replace(" ", "T") : ""}
+                  onChange={(e) => {
+                    if (!e.target.value) { setConversationDate(""); return; }
+                    // datetime-local returns "YYYY-MM-DDTHH:mm" in local time — preserve it correctly
+                    const [datePart, timePart] = e.target.value.split("T");
+                    const [y, m, d] = datePart.split("-").map(Number);
+                    const [hr, min] = timePart.split(":").map(Number);
+                    const local = new Date(y, m - 1, d, hr, min);
+                    setConversationDate(local.toISOString());
+                  }}
                   className="rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1 text-[11px] text-zinc-400 focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/20"
                 />
                 {!conversationDate && (
@@ -903,11 +1012,25 @@ export default function AnalyzeTab() {
                       setError("");
                     }
                   }}
-                  placeholder={`直接粘贴对话内容即可，支持以下格式：\n\n✅ 有标记格式：\n我：你好\n对方：你好啊\n\n✅ 无标记格式（微信直接粘贴）：\n你好\n你好啊\n最近忙吗？\n还行\n\n系统会自动识别格式，无标记时会让你手动标注每句话是谁说的。`}
-                  rows={10}
+                  placeholder={inputMode === "single"
+                    ? `粘贴对方说的话（一段或多段均可）\n\n适合场景：\n• 收到一长段语音转文字，想知道对方什么意思\n• 收到一条消息，不确定该怎么理解和回复\n• 想揣摩对方的真实意图和情绪状态`
+                    : inputMode === "eq-review"
+                    ? `粘贴完整对话内容，系统将重点复盘你的情商表现\n\n分析内容包括：\n• 每条关键发言的情商评分和改进建议\n• 错失的共情机会\n• 更好的表达方式建议\n• 整体情商表现评分`
+                    : `直接粘贴对话内容即可，支持以下格式：\n\n✅ 有标记格式：\n我：你好\n对方：你好啊\n\n✅ 无标记格式（微信直接粘贴）：\n你好\n你好啊\n最近忙吗？\n还行\n\n系统会自动识别格式，无标记时会让你手动标注每句话是谁说的。`}
+                  rows={inputMode === "single" ? 6 : 10}
                   className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/20 resize-none font-mono leading-relaxed"
                 />
                 <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                  <VoiceInputButton
+                    compact
+                    onTranscript={(text) => setConversation((prev) => prev ? prev + "\n" + text : text)}
+                    onComplete={(_text, metrics) => {
+                      if (metrics.duration > 5 && inputMode === "single") {
+                        const hint = `\n[语音特征：${Math.floor(metrics.duration)}秒, ${metrics.pauseCount}次停顿, ${metrics.wordsPerMinute}字/分${metrics.confidence < 0.7 ? ", 识别不确定" : ""}]`;
+                        setContext((prev) => prev + hint);
+                      }
+                    }}
+                  />
                   <span className="text-[10px] text-zinc-600">
                     {conversation.length} 字 · {conversation.split("\n").filter((l) => l.trim()).length} 行
                   </span>
@@ -957,7 +1080,7 @@ export default function AnalyzeTab() {
                     )}
                   >
                     <FileText className="h-4 w-4" />
-                    解析对话 & 开始分析
+                    {inputMode === "single" ? "开始揣摩分析" : inputMode === "eq-review" ? "开始情商复盘" : "解析对话 & 开始分析"}
                   </button>
                   {detectedPlatform && (
                     <p className="text-[10px] text-center text-cyan-400">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { useDraggable } from "@/hooks/useDraggable";
 import {
   MessageCircle,
   X,
@@ -17,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { apiFetch } from "@/lib/api-fetch";
 import { formatMemoriesForPrompt } from "@/lib/memory-utils";
+import VoiceInputButton from "./VoiceInputButton";
 
 interface QuickCoachResult {
   suggestedReply: string;
@@ -28,6 +30,11 @@ interface QuickCoachResult {
 export default function QuickAssistPanel() {
   const { profiles, mbtiResults, getActiveMemoriesForProfile } = useAppStore();
   const [isOpen, setIsOpen] = useState(false);
+  const wasDragRef = useRef(false);
+  const { positionStyle, isDragging, handlePointerDown, handlePointerMove, handlePointerUp } = useDraggable({
+    initialOffset: { bottom: 80, right: 16 },
+    storageKey: "sios-fab-position",
+  });
   const [incomingMessage, setIncomingMessage] = useState("");
   const [context, setContext] = useState("");
   const [selectedProfileId, setSelectedProfileId] = useState("");
@@ -79,13 +86,20 @@ ${memoryText ? `\nAI记忆:\n${memoryText}` : ""}`;
       const res = await apiFetch("/api/coach?stream=true", {
         method: "POST",
         body: JSON.stringify({
-          messages: [
-            { role: "other", content: incomingMessage.trim() },
-          ],
-          profileDescription: profileContext || "对方是一个你正在沟通的人",
-          goal: context.trim() || "有效回应对方的消息，保持良好的沟通氛围",
-          selfMBTI: latestMBTI?.type || undefined,
-          quickAssistMode: true,
+          messages: `对方：${incomingMessage.trim()}`,
+          targetProfile: selectedProfile ? {
+            name: selectedProfile.name,
+            dimensions: Object.fromEntries(
+              Object.entries(selectedProfile.dimensions).map(([k, d]) => [k, { value: d.value, confidence: d.confidence }])
+            ),
+            communicationStyle: selectedProfile.communicationStyle,
+            patterns: selectedProfile.patterns,
+          } : undefined,
+          userGoal: [
+            context.trim() || "有效回应对方的消息，保持良好的沟通氛围",
+            mbtiContext,
+            profileContext ? `\n\n${profileContext}` : "",
+          ].filter(Boolean).join("\n"),
         }),
         signal: controller.signal,
       });
@@ -147,19 +161,33 @@ ${memoryText ? `\nAI记忆:\n${memoryText}` : ""}`;
 
   if (!isOpen) {
     return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-50 h-12 w-12 rounded-full bg-gradient-to-br from-violet-600 to-pink-600 text-white shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 hover:scale-105 transition-all flex items-center justify-center group"
-        title="快速对话辅助"
+      <div
+        style={positionStyle}
+        className="z-40 touch-none"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={(e) => {
+          const wasDrag = handlePointerUp(e);
+          wasDragRef.current = !!wasDrag;
+        }}
       >
-        <MessageCircle className="h-5 w-5 group-hover:scale-110 transition-transform" />
-        <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-400 border-2 border-zinc-900 animate-pulse" />
-      </button>
+        <button
+          onClick={() => { if (!wasDragRef.current) setIsOpen(true); wasDragRef.current = false; }}
+          className={cn(
+            "h-12 w-12 rounded-full bg-gradient-to-br from-violet-600 to-pink-600 text-white shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 transition-all flex items-center justify-center group",
+            isDragging ? "scale-110 cursor-grabbing" : "hover:scale-105 cursor-grab"
+          )}
+          title="快速对话辅助（可拖动）"
+        >
+          <MessageCircle className="h-5 w-5 group-hover:scale-110 transition-transform" />
+          <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-400 border-2 border-zinc-900 animate-pulse" />
+        </button>
+      </div>
     );
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-[380px] max-h-[560px] rounded-2xl border border-zinc-700/80 bg-zinc-900/95 backdrop-blur-xl shadow-2xl shadow-black/50 flex flex-col overflow-hidden">
+    <div className="fixed bottom-0 right-0 md:bottom-6 md:right-6 z-50 w-full md:w-[380px] max-h-[85vh] md:max-h-[560px] rounded-t-2xl md:rounded-2xl border border-zinc-700/80 bg-zinc-900/95 backdrop-blur-xl shadow-2xl shadow-black/50 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
         <div className="flex items-center gap-2">
@@ -201,11 +229,18 @@ ${memoryText ? `\nAI记忆:\n${memoryText}` : ""}`;
 
         {/* Incoming Message */}
         <div>
-          <label className="text-[10px] text-zinc-500 mb-1 block">对方说了什么？</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-[10px] text-zinc-500">对方说了什么？</label>
+            <VoiceInputButton
+              compact
+              onTranscript={(text) => setIncomingMessage((prev) => prev ? prev + " " + text : text)}
+              className="scale-90 origin-right"
+            />
+          </div>
           <textarea
             value={incomingMessage}
             onChange={(e) => setIncomingMessage(e.target.value)}
-            placeholder="粘贴对方发给你的消息..."
+            placeholder="粘贴或语音输入对方发给你的消息..."
             rows={3}
             className="w-full rounded-lg border border-zinc-700 bg-zinc-800/80 px-3 py-2 text-[11px] text-zinc-300 placeholder-zinc-600 resize-none focus:outline-none focus:border-violet-500/50"
           />

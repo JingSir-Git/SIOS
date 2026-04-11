@@ -49,21 +49,28 @@ function StatCard({
   icon: Icon,
   color,
   subtext,
+  gradient,
 }: {
   label: string;
   value: string | number;
   icon: React.ElementType;
   color: string;
   subtext?: string;
+  gradient?: string;
 }) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 flex items-start gap-3">
-      <div className={cn("rounded-lg p-2", color)}>
-        <Icon className="h-4 w-4" />
+    <div className={cn(
+      "rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 flex items-start gap-3 relative overflow-hidden group hover:border-zinc-700 transition-all",
+    )}>
+      {gradient && (
+        <div className={cn("absolute inset-0 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity", gradient)} />
+      )}
+      <div className={cn("rounded-lg p-2.5 relative", color)}>
+        <Icon className="h-5 w-5" />
       </div>
-      <div>
-        <p className="text-2xl font-bold text-zinc-100">{value}</p>
-        <p className="text-[10px] text-zinc-500 mt-0.5">{label}</p>
+      <div className="relative">
+        <p className="text-2xl font-bold text-zinc-100 tracking-tight">{value}</p>
+        <p className="text-[10px] text-zinc-500 mt-0.5 font-medium">{label}</p>
         {subtext && <p className="text-[9px] text-zinc-600 mt-0.5">{subtext}</p>}
       </div>
     </div>
@@ -272,6 +279,7 @@ export default function DashboardTab() {
                   value={stats.totalProfiles}
                   icon={Users}
                   color="bg-violet-500/10 text-violet-400"
+                  gradient="bg-gradient-to-br from-violet-500 to-purple-500"
                   subtext={`${stats.relationshipsCount} 个关系`}
                 />
                 <StatCard
@@ -279,6 +287,7 @@ export default function DashboardTab() {
                   value={stats.totalConversations}
                   icon={MessageSquare}
                   color="bg-blue-500/10 text-blue-400"
+                  gradient="bg-gradient-to-br from-blue-500 to-cyan-500"
                   subtext={`${stats.totalMessages} 条消息`}
                 />
                 <StatCard
@@ -286,6 +295,7 @@ export default function DashboardTab() {
                   value={stats.analyzedCount}
                   icon={Brain}
                   color="bg-emerald-500/10 text-emerald-400"
+                  gradient="bg-gradient-to-br from-emerald-500 to-teal-500"
                   subtext={stats.totalConversations > 0 ? `${Math.round(stats.analyzedCount / stats.totalConversations * 100)}% 覆盖率` : undefined}
                 />
                 <StatCard
@@ -293,6 +303,7 @@ export default function DashboardTab() {
                   value={stats.memoriesCount}
                   icon={Zap}
                   color="bg-pink-500/10 text-pink-400"
+                  gradient="bg-gradient-to-br from-pink-500 to-rose-500"
                   subtext={stats.latestMBTI ? `MBTI: ${stats.latestMBTI.type}` : undefined}
                 />
               </div>

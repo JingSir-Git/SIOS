@@ -9,6 +9,8 @@ import {
   Plus,
   UserPlus,
   MousePointerClick,
+  Trash2,
+  Undo2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/lib/types";
@@ -52,11 +54,40 @@ export default function MessageAttributionEditor({
 }: MessageAttributionEditorProps) {
   const { profiles } = useAppStore();
 
-  // Initialize speakers: "我" + "对方" by default
-  const [speakers, setSpeakers] = useState<Speaker[]>([
-    { id: "self", name: "我", role: "self", color: SPEAKER_COLORS[0] },
-    { id: "other-1", name: "对方", role: "other", color: SPEAKER_COLORS[1] },
-  ]);
+  // Detect unique sender names from messages for multi-party
+  const uniqueSenders = Array.from(new Set(initialMessages.map((m) => m.senderName).filter(Boolean)));
+  const selfNames = ["我", "自己", "me", "Me", "ME", "本人"];
+  const isMultiParty = uniqueSenders.filter((n) => !selfNames.includes(n) && n !== "未归属").length > 1;
+
+  // Initialize speakers based on detected participants
+  const [speakers, setSpeakers] = useState<Speaker[]>(() => {
+    if (isMultiParty && uniqueSenders.length > 2) {
+      // Multi-party: create a speaker for each detected sender
+      const result: Speaker[] = [
+        { id: "self", name: "我", role: "self", color: SPEAKER_COLORS[0] },
+      ];
+      let colorIdx = 1;
+      for (const name of uniqueSenders) {
+        if (selfNames.includes(name)) continue;
+        if (name === "未归属" || name === "未知") continue;
+        result.push({
+          id: `other-${colorIdx}`,
+          name,
+          role: "other",
+          color: SPEAKER_COLORS[colorIdx % SPEAKER_COLORS.length],
+        });
+        colorIdx++;
+      }
+      if (result.length === 1) {
+        result.push({ id: "other-1", name: "对方", role: "other", color: SPEAKER_COLORS[1] });
+      }
+      return result;
+    }
+    return [
+      { id: "self", name: "我", role: "self", color: SPEAKER_COLORS[0] },
+      { id: "other-1", name: "对方", role: "other", color: SPEAKER_COLORS[1] },
+    ];
+  });
 
   // Check if smart attribution was applied (messages already have role assignments)
   const hasSmartAttribution = initialMessages.some(
@@ -67,10 +98,23 @@ export default function MessageAttributionEditor({
   const [assignments, setAssignments] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
     for (const msg of initialMessages) {
-      init[msg.id] = msg.role === "self" ? "self" : "other-1";
+      if (msg.role === "self" || selfNames.includes(msg.senderName)) {
+        init[msg.id] = "self";
+      } else if (isMultiParty && msg.senderName) {
+        // Try to match sender name to a speaker
+        const matchedSpeaker = speakers.find(
+          (s) => s.role === "other" && s.name === msg.senderName
+        );
+        init[msg.id] = matchedSpeaker?.id || "other-1";
+      } else {
+        init[msg.id] = "other-1";
+      }
     }
     return init;
   });
+
+  // Track deleted message IDs
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
 
   // Current "paint" speaker for click-to-assign mode
   const [activeSpeakerId, setActiveSpeakerId] = useState<string>("self");
@@ -89,16 +133,17 @@ export default function MessageAttributionEditor({
     [activeSpeakerId]
   );
 
-  // Toggle a single message between self and other-1 (quick mode)
+  // Toggle a single message through speakers (cycle mode for multi-party)
   const toggleMessage = useCallback(
     (messageId: string) => {
       setAssignments((prev) => {
         const current = prev[messageId];
-        if (current === "self") return { ...prev, [messageId]: "other-1" };
-        return { ...prev, [messageId]: "self" };
+        const currentIdx = speakers.findIndex((s) => s.id === current);
+        const nextIdx = (currentIdx + 1) % speakers.length;
+        return { ...prev, [messageId]: speakers[nextIdx].id };
       });
     },
-    []
+    [speakers]
   );
 
   // Batch assign: select a range
@@ -171,8 +216,23 @@ export default function MessageAttributionEditor({
     setLinkingProfileFor(null);
   };
 
+  const deleteMessage = useCallback((messageId: string) => {
+    setDeletedIds((prev) => new Set(prev).add(messageId));
+  }, []);
+
+  const undeleteMessage = useCallback((messageId: string) => {
+    setDeletedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(messageId);
+      return next;
+    });
+  }, []);
+
+  // Visible messages (excluding deleted)
+  const visibleMessages = initialMessages.filter((m) => !deletedIds.has(m.id));
+
   const handleConfirm = () => {
-    const updatedMessages: ChatMessage[] = initialMessages.map((msg) => {
+    const updatedMessages: ChatMessage[] = visibleMessages.map((msg) => {
       const speakerId = assignments[msg.id] || "other-1";
       const speaker = speakers.find((s) => s.id === speakerId);
       return {
@@ -194,10 +254,11 @@ export default function MessageAttributionEditor({
     return SPEAKER_DOT_COLORS[idx % SPEAKER_DOT_COLORS.length];
   };
 
-  // Stats
+  // Stats (excluding deleted messages)
+  const visibleAssignments = Object.entries(assignments).filter(([id]) => !deletedIds.has(id));
   const speakerStats = speakers.map((s) => ({
     ...s,
-    count: Object.values(assignments).filter((id) => id === s.id).length,
+    count: visibleAssignments.filter(([, sid]) => sid === s.id).length,
   }));
 
   return (
@@ -334,7 +395,7 @@ export default function MessageAttributionEditor({
 
       {/* Message Bubbles */}
       <div className="rounded-lg border border-zinc-800 p-4 max-h-[50vh] overflow-y-auto space-y-1.5">
-        {initialMessages.map((msg, idx) => {
+        {visibleMessages.map((msg, idx) => {
           const speaker = getSpeakerForMessage(msg.id);
           const isSelf = speaker.role === "self";
           const dotColor = getSpeakerDotColor(assignments[msg.id] || "other-1");
@@ -364,10 +425,30 @@ export default function MessageAttributionEditor({
                   {msg.content}
                 </p>
               </div>
-              <ArrowLeftRight className="h-3 w-3 text-zinc-600 shrink-0 mt-1" />
+              <div className="flex flex-col gap-0.5 shrink-0 mt-0.5">
+                <ArrowLeftRight className="h-3 w-3 text-zinc-600" />
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteMessage(msg.id); }}
+                  className="p-0.5 rounded text-zinc-600 hover:text-red-400 transition-colors"
+                  title="删除这条消息"
+                >
+                  <Trash2 className="h-2.5 w-2.5" />
+                </button>
+              </div>
             </div>
           );
         })}
+        {deletedIds.size > 0 && (
+          <div className="flex items-center justify-between rounded-lg bg-red-500/5 border border-red-500/20 px-3 py-1.5 mt-2">
+            <span className="text-[10px] text-red-300">已删除 {deletedIds.size} 条消息</span>
+            <button
+              onClick={() => setDeletedIds(new Set())}
+              className="flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300"
+            >
+              <Undo2 className="h-2.5 w-2.5" /> 全部恢复
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Actions */}

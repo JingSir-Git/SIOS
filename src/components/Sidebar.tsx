@@ -8,11 +8,9 @@ import {
   MessageSquareText,
   Users,
   Swords,
-  GraduationCap,
   PanelLeftClose,
   PanelLeftOpen,
   Sparkles,
-  Map,
   Fingerprint,
   CalendarClock,
   Settings,
@@ -21,9 +19,16 @@ import {
   Menu,
   X,
   Zap,
+  Compass,
 } from "lucide-react";
 
 export const NAV_ITEMS = [
+  {
+    id: "dashboard",
+    label: "数据大盘",
+    sublabel: "Analytics Dashboard",
+    icon: BarChart3,
+  },
   {
     id: "analyze",
     label: "对话分析",
@@ -37,28 +42,10 @@ export const NAV_ITEMS = [
     icon: Users,
   },
   {
-    id: "coach",
-    label: "实时教练",
-    sublabel: "Real-time Coach",
-    icon: Sparkles,
-  },
-  {
-    id: "simulate",
-    label: "模拟对练",
-    sublabel: "Simulation Arena",
+    id: "drill",
+    label: "模拟演练",
+    sublabel: "Simulation & Coaching",
     icon: Swords,
-  },
-  {
-    id: "eq-training",
-    label: "情商训练",
-    sublabel: "EQ Training",
-    icon: GraduationCap,
-  },
-  {
-    id: "strategy",
-    label: "策略规划",
-    sublabel: "Strategy Planner",
-    icon: Map,
   },
   {
     id: "psychology",
@@ -73,16 +60,16 @@ export const NAV_ITEMS = [
     icon: CalendarClock,
   },
   {
+    id: "divination",
+    label: "风水玄学",
+    sublabel: "Metaphysics & Divination",
+    icon: Compass,
+  },
+  {
     id: "realtime",
     label: "实时助手",
     sublabel: "Realtime Assistant",
     icon: Zap,
-  },
-  {
-    id: "dashboard",
-    label: "数据大盘",
-    sublabel: "Analytics Dashboard",
-    icon: BarChart3,
   },
   {
     id: "mbti",
@@ -125,11 +112,11 @@ export function MobileHeader() {
 // ---- Mobile bottom tab bar (quick access to most-used tabs) ----
 
 const BOTTOM_TABS = [
+  { id: "dashboard", icon: BarChart3, label: "大盘" },
   { id: "analyze", icon: MessageSquareText, label: "分析" },
   { id: "profiles", icon: Users, label: "画像" },
-  { id: "coach", icon: Sparkles, label: "教练" },
-  { id: "dashboard", icon: BarChart3, label: "大盘" },
-  { id: "settings", icon: Settings, label: "设置" },
+  { id: "drill", icon: Swords, label: "演练" },
+  { id: "settings", icon: Settings, label: "更多" },
 ];
 
 export function MobileBottomBar() {
@@ -258,7 +245,7 @@ export default function Sidebar() {
               <p className="text-xs text-zinc-400 leading-relaxed">
                 <span className="text-violet-300 font-medium">Social Intelligence OS</span>
                 <br />
-                理解他人，理解自己，优化一切人际交互。
+                理解他人，理解自己，优化人际。
               </p>
             </div>
           </div>

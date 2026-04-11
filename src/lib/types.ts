@@ -150,6 +150,9 @@ export interface PersonProfile {
   // Side B: User's subjective impression (below)
   subjectiveImpression?: SubjectiveImpression;
 
+  // ---- Personal Preferences (AI-inferred from conversations) ----
+  preferences?: PersonalPreferences;
+
   // Metadata
   conversationCount: number;
   totalMessages: number;
@@ -158,6 +161,29 @@ export interface PersonProfile {
 
   // Tags for quick filtering
   tags?: string[];
+}
+
+/** Personal preferences and interests inferred from conversation analysis. */
+export interface PersonalPreferences {
+  /** Communication preferences: likes/dislikes in conversation */
+  communicationLikes?: string[];
+  communicationDislikes?: string[];
+  /** Known interests and hobbies */
+  interests?: string[];
+  /** Topics they frequently bring up or show enthusiasm for */
+  frequentTopics?: string[];
+  /** Sensitive topics to avoid */
+  sensitiveTopics?: string[];
+  /** Preferred interaction times/modes */
+  preferredContactMode?: string;
+  /** Food/drink preferences (if mentioned) */
+  foodPreferences?: string[];
+  /** Decision-making style */
+  decisionStyle?: string;
+  /** Values they hold dear */
+  coreValues?: string[];
+  /** Last updated timestamp */
+  updatedAt?: string;
 }
 
 // ============================================================
@@ -317,6 +343,46 @@ export interface SimulationMessage {
 
 export type RelationshipStatus = "warming" | "stable" | "cooling" | "unknown";
 
+/** Fine-grained relationship categories */
+export type RelationshipCategory =
+  | "family_parent"     // 父母
+  | "family_child"      // 子女
+  | "family_sibling"    // 兄弟姐妹
+  | "family_spouse"     // 配偶
+  | "family_relative"   // 亲戚
+  | "friend_close"      // 密友
+  | "friend_normal"     // 普通朋友
+  | "friend_childhood"  // 发小
+  | "work_colleague"    // 同事
+  | "work_boss"         // 上级
+  | "work_subordinate"  // 下属
+  | "work_client"       // 客户
+  | "work_partner"      // 合作伙伴
+  | "school_classmate"  // 同学
+  | "school_teacher"    // 老师
+  | "school_student"    // 学生
+  | "romantic_partner"  // 恋人
+  | "romantic_ex"       // 前任
+  | "romantic_crush"    // 暗恋对象
+  | "social_neighbor"   // 邻居
+  | "social_acquaintance" // 认识的人
+  | "medical_doctor"    // 医生
+  | "medical_patient"   // 病人
+  | "other";            // 其他
+
+export const RELATIONSHIP_CATEGORY_LABELS: Record<RelationshipCategory, string> = {
+  family_parent: "父母", family_child: "子女", family_sibling: "兄弟姐妹",
+  family_spouse: "配偶", family_relative: "亲戚",
+  friend_close: "密友", friend_normal: "朋友", friend_childhood: "发小",
+  work_colleague: "同事", work_boss: "上级", work_subordinate: "下属",
+  work_client: "客户", work_partner: "合作伙伴",
+  school_classmate: "同学", school_teacher: "老师", school_student: "学生",
+  romantic_partner: "恋人", romantic_ex: "前任", romantic_crush: "暗恋对象",
+  social_neighbor: "邻居", social_acquaintance: "认识的人",
+  medical_doctor: "医生", medical_patient: "病人",
+  other: "其他",
+};
+
 export interface RelationshipEdge {
   id: string;
   profileId: string;
@@ -329,6 +395,26 @@ export interface RelationshipEdge {
   followUpReason?: string;      // why we suggest following up
   healthScore: number;          // 0-100 composite relationship health
   history: RelationshipEvent[];
+  /** Fine-grained relationship category */
+  category?: RelationshipCategory;
+  /** Custom label if category is "other" */
+  customLabel?: string;
+  /** Previous categories (relationship evolution) */
+  categoryHistory?: { category: RelationshipCategory; changedAt: string; note?: string }[];
+}
+
+/** Peer-to-peer relationship between two profiles (not involving self) */
+export interface PeerRelationship {
+  id: string;
+  profileAId: string;
+  profileBId: string;
+  category: RelationshipCategory;
+  customLabel?: string;
+  note?: string;
+  /** User-defined — not inferred from conversations */
+  isManual: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface RelationshipEvent {

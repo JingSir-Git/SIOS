@@ -13,6 +13,7 @@ import type {
   CoachingTip,
   ChatMessage,
   RelationshipEdge,
+  PeerRelationship,
   DimensionKey,
   ProfileSnapshot,
   MBTITestResult,
@@ -20,6 +21,8 @@ import type {
   ProfileMemoryEntry,
   PlaybookVersion,
 } from "./types";
+import type { LearningProfile, FeedbackEntry } from "./adaptive-learning";
+import { getDefaultLearningProfile, processFeedback } from "./adaptive-learning";
 
 // ---- Theme & Preferences Types ----
 export type ThemeKey = "dark" | "violet-dark" | "green-eye" | "sepia" | "blue-night";
@@ -83,6 +86,13 @@ interface AppState {
   upsertRelationship: (edge: RelationshipEdge) => void;
   getRelationship: (profileId: string) => RelationshipEdge | undefined;
   deleteRelationship: (profileId: string) => void;
+
+  // ---- Peer Relationships (between profiles, not self) ----
+  peerRelationships: PeerRelationship[];
+  addPeerRelationship: (rel: PeerRelationship) => void;
+  updatePeerRelationship: (id: string, updates: Partial<PeerRelationship>) => void;
+  deletePeerRelationship: (id: string) => void;
+  getPeerRelationshipsForProfile: (profileId: string) => PeerRelationship[];
 
   // ---- Coaching ----
   coachingTips: CoachingTip[];
@@ -169,6 +179,12 @@ interface AppState {
   updateApiSettings: (updates: Partial<AppState["apiSettings"]>) => void;
   addCustomModel: (model: string) => void;
   removeCustomModel: (model: string) => void;
+
+  // ---- Adaptive Learning ----
+  learningProfile: LearningProfile;
+  feedbackHistory: FeedbackEntry[];
+  addFeedback: (entry: FeedbackEntry) => void;
+  resetLearningProfile: () => void;
 
   // ---- Data Privacy (GDPR) ----
   privacySettings: {
@@ -289,6 +305,31 @@ export const useAppStore = create<AppState>()(
             (r) => r.profileId !== profileId
           ),
         })),
+
+      // ---- Peer Relationships ----
+      peerRelationships: [],
+
+      addPeerRelationship: (rel) =>
+        set((state) => ({
+          peerRelationships: [...state.peerRelationships, rel],
+        })),
+
+      updatePeerRelationship: (id, updates) =>
+        set((state) => ({
+          peerRelationships: state.peerRelationships.map((r) =>
+            r.id === id ? { ...r, ...updates, updatedAt: new Date().toISOString() } : r
+          ),
+        })),
+
+      deletePeerRelationship: (id) =>
+        set((state) => ({
+          peerRelationships: state.peerRelationships.filter((r) => r.id !== id),
+        })),
+
+      getPeerRelationshipsForProfile: (profileId) =>
+        get().peerRelationships.filter(
+          (r) => r.profileAId === profileId || r.profileBId === profileId
+        ),
 
       // ---- Coaching ----
       coachingTips: [],
@@ -649,6 +690,25 @@ export const useAppStore = create<AppState>()(
           },
         })),
 
+      // ---- Adaptive Learning ----
+      learningProfile: getDefaultLearningProfile(),
+      feedbackHistory: [],
+
+      addFeedback: (entry) =>
+        set((state) => {
+          const updated = processFeedback(state.learningProfile, entry);
+          return {
+            learningProfile: updated,
+            feedbackHistory: [...state.feedbackHistory.slice(-200), entry], // keep last 200
+          };
+        }),
+
+      resetLearningProfile: () =>
+        set(() => ({
+          learningProfile: getDefaultLearningProfile(),
+          feedbackHistory: [],
+        })),
+
       // ---- Data Privacy (GDPR) ----
       privacySettings: {
         dataEncryptionEnabled: false,
@@ -723,6 +783,7 @@ export const useAppStore = create<AppState>()(
         profiles: state.profiles,
         conversations: state.conversations,
         relationships: state.relationships,
+        peerRelationships: state.peerRelationships,
         mbtiResults: state.mbtiResults,
         eqScores: state.eqScores,
         fontSize: state.fontSize,
@@ -731,6 +792,8 @@ export const useAppStore = create<AppState>()(
         profileMemories: state.profileMemories,
         playbookVersions: state.playbookVersions,
         apiSettings: state.apiSettings,
+        learningProfile: state.learningProfile,
+        feedbackHistory: state.feedbackHistory,
         privacySettings: state.privacySettings,
       }),
     }

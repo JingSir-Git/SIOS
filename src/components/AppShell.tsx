@@ -4,10 +4,8 @@ import { useAppStore } from "@/lib/store";
 import Sidebar, { MobileHeader, MobileBottomBar } from "./Sidebar";
 import AnalyzeTab from "./AnalyzeTab";
 import ProfilesTab from "./ProfilesTab";
-import CoachTab from "./CoachTab";
-import SimulateTab from "./SimulateTab";
-import EQTrainingTab from "./EQTrainingTab";
-import StrategyTab from "./StrategyTab";
+import DrillTab from "./DrillTab";
+import DivinationTab from "./DivinationTab";
 import PsychologyTab from "./PsychologyTab";
 import PlanningTab from "./PlanningTab";
 import DashboardTab from "./DashboardTab";
@@ -78,17 +76,11 @@ export default function AppShell() {
           <TabPane id="profiles" active={activeTab === "profiles"}>
             <ProfilesTab />
           </TabPane>
-          <TabPane id="coach" active={activeTab === "coach"}>
-            <CoachTab />
+          <TabPane id="drill" active={activeTab === "drill" || activeTab === "coach" || activeTab === "simulate" || activeTab === "strategy"}>
+            <DrillTab />
           </TabPane>
-          <TabPane id="simulate" active={activeTab === "simulate"}>
-            <SimulateTab />
-          </TabPane>
-          <TabPane id="eq-training" active={activeTab === "eq-training"}>
-            <EQTrainingTab />
-          </TabPane>
-          <TabPane id="strategy" active={activeTab === "strategy"}>
-            <StrategyTab />
+          <TabPane id="divination" active={activeTab === "divination"}>
+            <DivinationTab />
           </TabPane>
           <TabPane id="psychology" active={activeTab === "psychology"}>
             <PsychologyTab />

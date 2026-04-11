@@ -339,3 +339,52 @@ const PLATFORM_LABELS: Record<ChatPlatform, string> = {
 export function getPlatformLabel(platform: ChatPlatform): string {
   return PLATFORM_LABELS[platform] || platform;
 }
+
+// ============================================================
+// Time Sequence Verification
+// ============================================================
+
+export interface TimeOrderIssue {
+  index: number;
+  timestamp: string;
+  prevTimestamp: string;
+  message: string;
+}
+
+/**
+ * Verify that messages with timestamps are in chronological order.
+ * Returns a list of issues where time goes backwards.
+ */
+export function verifyTimeOrder(
+  messages: { content: string; timestamp?: string }[]
+): TimeOrderIssue[] {
+  const issues: TimeOrderIssue[] = [];
+  let lastTime = 0;
+  let lastTs = "";
+
+  for (let i = 0; i < messages.length; i++) {
+    const ts = messages[i].timestamp;
+    if (!ts) continue;
+
+    const time = new Date(ts).getTime();
+    if (isNaN(time)) continue;
+
+    if (lastTime > 0 && time < lastTime) {
+      const diff = lastTime - time;
+      const diffMinutes = Math.round(diff / 60000);
+      issues.push({
+        index: i,
+        timestamp: ts,
+        prevTimestamp: lastTs,
+        message: `第${i + 1}条消息时间(${new Date(ts).toLocaleString("zh-CN")})早于前一条(${new Date(lastTs).toLocaleString("zh-CN")})，差距${diffMinutes}分钟`,
+      });
+    }
+
+    if (time > lastTime) {
+      lastTime = time;
+      lastTs = ts;
+    }
+  }
+
+  return issues;
+}

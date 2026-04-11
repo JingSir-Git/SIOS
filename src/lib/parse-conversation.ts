@@ -157,20 +157,36 @@ function parseStructured(
   }
 
   // Determine self vs other
-  const selfNames = ["\u6211", "\u81ea\u5df1", "me", "Me", "ME"];
+  // Priority: explicit "我" > all others are "other" > fallback needs attribution
+  const selfNames = ["\u6211", "\u81ea\u5df1", "me", "Me", "ME", "\u672c\u4eba"];
   let selfName = participants.find((p) => selfNames.includes(p));
-  const selfExplicit = !!selfName; // did we find a clear "我" speaker?
-  if (!selfName && participants.length > 0) {
-    selfName = participants[0]; // fallback: assume first speaker is self
+  const selfExplicit = !!selfName;
+
+  // If we found an explicit self, all other names are "other" — this is clear
+  // If no explicit self: when there are 2 participants, the one with a REAL name
+  // (not "我"/"自己") is likely the OTHER person. The unnamed/generic one is self.
+  // However, if BOTH are real names, we can't guess — need attribution.
+  if (!selfName && participants.length === 2) {
+    // Check if either looks like a generic self-reference
+    const genericSelfPattern = /^(我|自己|me|本人|I)$/i;
+    const selfIdx = participants.findIndex((p) => genericSelfPattern.test(p));
+    if (selfIdx >= 0) {
+      selfName = participants[selfIdx];
+    }
+    // If both are specific names, we need attribution — don't guess
   }
-  for (const msg of messages) {
-    msg.role = msg.senderName === selfName ? "self" : "other";
+
+  if (selfName) {
+    for (const msg of messages) {
+      msg.role = msg.senderName === selfName ? "self" : "other";
+    }
   }
 
   // Show attribution editor when:
   // 1. Multi-party (>2 speakers) — always needs confirmation
   // 2. Two speakers but no explicit "我" — user should confirm who is self
-  const needsAttribution = participants.length > 2 || (!selfExplicit && participants.length >= 2);
+  // 3. No selfName identified at all
+  const needsAttribution = participants.length > 2 || !selfExplicit;
 
   return {
     messages,

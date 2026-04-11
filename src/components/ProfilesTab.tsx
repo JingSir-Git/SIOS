@@ -33,6 +33,7 @@ import {
   Brain,
   Sparkles,
   FileDown,
+  Users,
 } from "lucide-react";
 import { cn, getConfidenceLabel, getConfidenceColor, formatDate } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
@@ -46,6 +47,8 @@ import ProfileEvolutionChart from "./ProfileEvolutionChart";
 import ProfileShareFusion from "./ProfileShareFusion";
 import ProfileMemoryPanel from "./ProfileMemoryPanel";
 import RelationshipGraph from "./RelationshipGraph";
+import GroupDynamicsPanel from "./GroupDynamicsPanel";
+import PeerRelationshipEditor from "./PeerRelationshipEditor";
 import PlaybookGenerator from "./PlaybookGenerator";
 import EmotionHeatmap from "./EmotionHeatmap";
 import GlobalEmotionDashboard from "./GlobalEmotionDashboard";
@@ -87,6 +90,8 @@ export default function ProfilesTab() {
   const [showMemoryGraph, setShowMemoryGraph] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [showMemorySummary, setShowMemorySummary] = useState(false);
+  const [showGroupDynamics, setShowGroupDynamics] = useState(false);
+  const [showPeerRelations, setShowPeerRelations] = useState(false);
 
   const selectedProfile = profiles.find((p) => p.id === selectedId);
 
@@ -274,6 +279,34 @@ export default function ProfilesTab() {
             )}
             {profiles.length >= 2 && (
               <button
+                onClick={() => setShowGroupDynamics(!showGroupDynamics)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors border",
+                  showGroupDynamics
+                    ? "bg-blue-500/15 text-blue-300 border-blue-500/30"
+                    : "text-zinc-500 border-zinc-700 hover:text-blue-300 hover:border-blue-500/30"
+                )}
+              >
+                <Users className="h-3.5 w-3.5" />
+                群体动力学
+              </button>
+            )}
+            {profiles.length >= 2 && (
+              <button
+                onClick={() => setShowPeerRelations(!showPeerRelations)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors border",
+                  showPeerRelations
+                    ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/30"
+                    : "text-zinc-500 border-zinc-700 hover:text-cyan-300 hover:border-cyan-500/30"
+                )}
+              >
+                <Heart className="h-3.5 w-3.5" />
+                人物关系
+              </button>
+            )}
+            {profiles.length >= 2 && (
+              <button
                 onClick={() => setShowCompare(true)}
                 className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors border text-zinc-500 border-zinc-700 hover:text-pink-300 hover:border-pink-500/30"
               >
@@ -332,6 +365,18 @@ export default function ProfilesTab() {
             setShowGraph(false);
             setSelectedId(id);
           }}
+        />
+
+        {/* Group Dynamics */}
+        <GroupDynamicsPanel
+          isOpen={showGroupDynamics}
+          onClose={() => setShowGroupDynamics(false)}
+        />
+
+        {/* Peer Relationship Editor */}
+        <PeerRelationshipEditor
+          isOpen={showPeerRelations}
+          onClose={() => setShowPeerRelations(false)}
         />
 
         {/* Profile Merge Panel */}
