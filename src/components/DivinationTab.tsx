@@ -14,6 +14,12 @@ import {
   Check,
   Hash,
   Type,
+  Clock,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-fetch";
@@ -21,6 +27,7 @@ import { useAppStore } from "@/lib/store";
 import StreamingIndicator from "./StreamingIndicator";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { CoinTossRitual, TarotDrawRitual, QimenRitual } from "./DivinationRituals";
+import { isMuted, setMuted } from "@/lib/sound-effects";
 
 const DIVINATION_CATEGORIES = [
   {
@@ -161,7 +168,7 @@ const FLOOR_RANGES = [
 ];
 
 export default function DivinationTab() {
-  const { profiles, addDivinationRecord } = useAppStore();
+  const { profiles, addDivinationRecord, divinationRecords, deleteDivinationRecord } = useAppStore();
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -192,6 +199,13 @@ export default function DivinationTab() {
   const [ritualResult, setRitualResult] = useState("");
   const [ritualCompleted, setRitualCompleted] = useState(false);
   const [ritualKey, setRitualKey] = useState(0);
+
+  // History panel
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
+
+  // Sound
+  const [soundMuted, setSoundMuted] = useState(() => isMuted());
 
   const category = DIVINATION_CATEGORIES.find((c) => c.id === selectedCategory);
 
@@ -748,6 +762,64 @@ export default function DivinationTab() {
               本模块基于中国传统数术文化体系与西方经典神秘学理论，所有解读仅供参考。重大人生决策建议综合多方信息、咨询相关专业人士后审慎判断。
             </p>
           </div>
+
+          {/* Divination History */}
+          {divinationRecords.length > 0 && (
+            <div className="max-w-2xl mx-auto mt-4">
+              <button
+                onClick={() => setHistoryOpen(!historyOpen)}
+                className="w-full flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5" />
+                  历史问卦记录（{divinationRecords.length}）
+                </span>
+                {historyOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </button>
+              {historyOpen && (
+                <div className="mt-2 space-y-2 max-h-80 overflow-y-auto">
+                  {divinationRecords.slice(0, 30).map((rec) => {
+                    const isExpanded = expandedRecord === rec.id;
+                    const catInfo = DIVINATION_CATEGORIES.find((c) => c.id === rec.category);
+                    const CatIcon = catInfo?.icon || Compass;
+                    return (
+                      <div key={rec.id} className="rounded-lg border border-zinc-800 bg-zinc-900/50 overflow-hidden">
+                        <div className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-zinc-800/30" onClick={() => setExpandedRecord(isExpanded ? null : rec.id)}>
+                          <CatIcon className={cn("h-3.5 w-3.5 shrink-0", catInfo?.color || "text-zinc-400")} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] text-zinc-300 truncate">{rec.question}</p>
+                            <p className="text-[9px] text-zinc-600">
+                              {rec.categoryLabel} · {new Date(rec.createdAt).toLocaleDateString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                              {rec.linkedProfileName && <span className="ml-1 text-violet-400/60">· {rec.linkedProfileName}</span>}
+                            </p>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); deleteDivinationRecord(rec.id); }}
+                            className="shrink-0 text-zinc-600 hover:text-red-400 transition-colors p-1"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                        {isExpanded && (
+                          <div className="border-t border-zinc-800 px-3 py-3">
+                            {rec.ritualResult && (
+                              <div className="mb-2 rounded-md bg-amber-500/5 border border-amber-500/10 px-3 py-2">
+                                <p className="text-[9px] text-amber-400/80 font-medium mb-1">仪式结果</p>
+                                <pre className="text-[9px] text-zinc-400 whitespace-pre-wrap font-mono">{rec.ritualResult}</pre>
+                              </div>
+                            )}
+                            <div className="max-h-60 overflow-y-auto">
+                              <MarkdownRenderer content={rec.answer} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -773,6 +845,13 @@ export default function DivinationTab() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => { const next = !soundMuted; setSoundMuted(next); setMuted(next); }}
+              className="text-zinc-500 hover:text-zinc-300 transition-colors p-1"
+              title={soundMuted ? "开启音效" : "静音"}
+            >
+              {soundMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+            </button>
             {profiles.length > 0 && (
               <select
                 value={linkedProfileId}
@@ -850,36 +929,35 @@ export default function DivinationTab() {
             {/* Yijing: proper Bagua octagonal layout */}
             {selectedCategory === "yijing" && (
               <InteractiveSection title="心选卦象（凭直觉选一个）" step={1}>
-                <div className="relative w-48 h-48 mx-auto">
+                <div className="relative w-36 h-36 sm:w-44 sm:h-44 mx-auto">
                   {/* Center Taiji symbol */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-10 h-10 rounded-full border border-zinc-700/50 bg-zinc-800/30 flex items-center justify-center text-sm text-zinc-500">☯</div>
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-8 h-8 rounded-full border border-zinc-700/40 bg-zinc-800/30 flex items-center justify-center text-xs text-zinc-600">☯</div>
                   </div>
-                  {/* 后天八卦 positions: S top, N bottom */}
+                  {/* 后天八卦 positions: S top, N bottom — tighter radius */}
                   {[
-                    { ...TRIGRAMS[5], x: 50, y: 2 },   /* 离-南 top */
-                    { ...TRIGRAMS[3], x: 85, y: 15 },   /* 巽-东南 */
-                    { ...TRIGRAMS[2], x: 98, y: 50 },   /* 震-东 right */
-                    { ...TRIGRAMS[6], x: 85, y: 85 },   /* 艮-东北 */
-                    { ...TRIGRAMS[4], x: 50, y: 98 },   /* 坎-北 bottom */
-                    { ...TRIGRAMS[0], x: 15, y: 85 },   /* 乾-西北 */
-                    { ...TRIGRAMS[7], x: 2, y: 50 },    /* 兑-西 left */
-                    { ...TRIGRAMS[1], x: 15, y: 15 },   /* 坤-西南 */
+                    { ...TRIGRAMS[5], x: 50, y: 4 },   /* 离-南 top */
+                    { ...TRIGRAMS[3], x: 83, y: 17 },   /* 巽-东南 */
+                    { ...TRIGRAMS[2], x: 96, y: 50 },   /* 震-东 right */
+                    { ...TRIGRAMS[6], x: 83, y: 83 },   /* 艮-东北 */
+                    { ...TRIGRAMS[4], x: 50, y: 96 },   /* 坎-北 bottom */
+                    { ...TRIGRAMS[0], x: 17, y: 83 },   /* 乾-西北 */
+                    { ...TRIGRAMS[7], x: 4, y: 50 },    /* 兑-西 left */
+                    { ...TRIGRAMS[1], x: 17, y: 17 },   /* 坤-西南 */
                   ].map((t) => (
                     <button
                       key={t.id}
                       onClick={() => setSelectedTrigram(selectedTrigram === t.id ? "" : t.id)}
                       className={cn(
-                        "absolute flex flex-col items-center rounded-lg border px-1 py-1 transition-all -translate-x-1/2 -translate-y-1/2",
+                        "absolute flex flex-col items-center rounded-md border px-0.5 py-0.5 transition-all -translate-x-1/2 -translate-y-1/2 w-9 sm:w-10",
                         selectedTrigram === t.id
                           ? "border-amber-500/50 bg-amber-500/15 text-amber-200 shadow-lg shadow-amber-500/10 z-10"
                           : "border-zinc-700/50 bg-zinc-900/80 text-zinc-400 hover:border-amber-500/30 hover:bg-zinc-800/80"
                       )}
-                      style={{ left: `${t.x}%`, top: `${t.y}%`, width: 44 }}
+                      style={{ left: `${t.x}%`, top: `${t.y}%` }}
                     >
-                      <span className="text-sm leading-none">{t.label.split(" ")[1]}</span>
-                      <span className="text-[9px] font-medium">{t.label.split(" ")[0]}</span>
-                      <span className="text-[7px] text-zinc-500">{t.nature}</span>
+                      <span className="text-xs sm:text-sm leading-none">{t.label.split(" ")[1]}</span>
+                      <span className="text-[8px] sm:text-[9px] font-medium leading-tight">{t.label.split(" ")[0]}</span>
                     </button>
                   ))}
                 </div>

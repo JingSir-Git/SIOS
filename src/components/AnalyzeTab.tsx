@@ -328,12 +328,21 @@ export default function AnalyzeTab() {
     setConversation(formatted);
 
     // Set target name from the first "other" speaker
-    const otherSpeaker = speakers.find((s) => s.role === "other");
+    const otherSpeakers = speakers.filter((s) => s.role === "other");
+    const otherSpeaker = otherSpeakers[0];
     const resolvedTargetName = (otherSpeaker && !targetName.trim())
       ? otherSpeaker.name
       : targetName.trim();
     if (otherSpeaker && !targetName.trim()) {
       setTargetName(resolvedTargetName);
+    }
+
+    // Multi-party context: inject group chat hint when >2 speakers
+    let multiPartyContext = "";
+    if (otherSpeakers.length > 1) {
+      const names = otherSpeakers.map((s) => s.name).join("、");
+      multiPartyContext = `【多方群聊模式】这是一个${otherSpeakers.length + 1}人群聊对话，参与者包括"我"和${names}。请分别分析每位参与者的沟通风格、立场和互动模式。在情绪曲线中，otherEmotion取所有对方参与者的平均情绪值。特别注意群体动力学：谁主导话题、谁附和、谁有独立见解。`;
+      setContext((prev) => prev ? `${prev}\n\n${multiPartyContext}` : multiPartyContext);
     }
 
     // Go directly to analysis (skip "input" stage to avoid flash)

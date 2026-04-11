@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Sparkles, RotateCcw } from "lucide-react";
+import { playCoinSound, playCardFlipSound, playRevealSound } from "@/lib/sound-effects";
 
 // ============================================================
 // 1. Coin Toss Ritual (六爻 / 周易)
@@ -47,6 +48,7 @@ export function CoinTossRitual({
 
     intervalRef.current = setInterval(() => {
       flips++;
+      if (flips % 3 === 0) playCoinSound();
       setAnimCoins([
         Math.random() < 0.5 ? 2 : 3,
         Math.random() < 0.5 ? 2 : 3,
@@ -92,6 +94,7 @@ export function CoinTossRitual({
       const movingInfo = movingYao.length > 0
         ? `\n动爻${movingYao.length}个`
         : "\n无动爻（六爻皆静）";
+      playRevealSound();
       onComplete(lines, `摇卦结果（从初爻到上爻）：\n${summary}${movingInfo}`);
     }
   }, [lines, onComplete]);
@@ -105,6 +108,71 @@ export function CoinTossRitual({
   };
 
   const LINE_NAMES = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"];
+
+  // Render a single 大五帝钱 coin: round with square center hole
+  const renderCoin = (value: number, size: "sm" | "md" | "lg" = "md", animating = false) => {
+    const isYang = value === 3;
+    const dims = size === "sm" ? "w-7 h-7" : size === "lg" ? "w-11 h-11" : "w-9 h-9";
+    const holeDims = size === "sm" ? "w-2 h-2" : size === "lg" ? "w-3 h-3" : "w-2.5 h-2.5";
+    const fontSize = size === "sm" ? "text-[7px]" : size === "lg" ? "text-[10px]" : "text-[8px]";
+    const rimText = size === "sm" ? "text-[5px]" : size === "lg" ? "text-[7px]" : "text-[6px]";
+
+    return (
+      <div className={cn(
+        dims, "rounded-full relative flex items-center justify-center transition-all",
+        animating && "animate-spin",
+        isYang
+          ? "bg-gradient-to-br from-amber-600 via-yellow-500 to-amber-700 shadow-md shadow-amber-500/30"
+          : "bg-gradient-to-br from-zinc-500 via-zinc-400 to-zinc-600 shadow-md shadow-zinc-500/20"
+      )}>
+        {/* Rim ring */}
+        <div className={cn(
+          "absolute inset-[2px] rounded-full border",
+          isYang ? "border-amber-800/40" : "border-zinc-600/40"
+        )} />
+        {/* Square center hole */}
+        <div className={cn(
+          holeDims, "rounded-[1px] border",
+          isYang
+            ? "bg-amber-900/80 border-amber-800/60"
+            : "bg-zinc-700/80 border-zinc-600/60"
+        )} />
+        {/* Top inscription */}
+        {size !== "sm" && (
+          <span className={cn("absolute font-serif", fontSize,
+            isYang ? "text-amber-900/70" : "text-zinc-700/70",
+            "top-[2px]"
+          )}>
+            {isYang ? "通" : "　"}
+          </span>
+        )}
+        {/* Bottom inscription */}
+        {size !== "sm" && (
+          <span className={cn("absolute font-serif", fontSize,
+            isYang ? "text-amber-900/70" : "text-zinc-700/70",
+            "bottom-[2px]"
+          )}>
+            {isYang ? "宝" : "　"}
+          </span>
+        )}
+        {/* Left/Right inscriptions for large */}
+        {size === "lg" && (
+          <>
+            <span className={cn("absolute font-serif left-[3px]", rimText,
+              isYang ? "text-amber-900/60" : "text-zinc-700/60"
+            )}>
+              {isYang ? "开" : ""}
+            </span>
+            <span className={cn("absolute font-serif right-[3px]", rimText,
+              isYang ? "text-amber-900/60" : "text-zinc-700/60"
+            )}>
+              {isYang ? "元" : ""}
+            </span>
+          </>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="rounded-xl border border-amber-500/20 bg-gradient-to-b from-amber-500/5 to-transparent p-4">
@@ -120,53 +188,46 @@ export function CoinTossRitual({
       </div>
 
       <p className="text-[10px] text-zinc-500 mb-3">
-        模拟三枚铜钱摇卦，共需摇六次。每次三枚铜钱落下得一爻。
+        模拟三枚大五帝钱摇卦，共需摇六次。字面(阳)为三，背面(阴)为二。
       </p>
 
       {/* Hexagram display (bottom to top) */}
-      <div className="space-y-1 mb-3">
+      <div className="space-y-1.5 mb-3">
         {[...Array(6)].map((_, idx) => {
-          const lineIdx = 5 - idx; // Display top to bottom = 上爻 to 初爻
+          const lineIdx = 5 - idx;
           const line = lines[lineIdx];
           const isNext = lineIdx === currentLine && !tossing;
           return (
-            <div key={lineIdx} className="flex items-center gap-3">
+            <div key={lineIdx} className="flex items-center gap-2">
               <span className="text-[10px] text-zinc-600 w-8 text-right shrink-0">{LINE_NAMES[lineIdx]}</span>
               {line ? (
                 <div className="flex items-center gap-2 flex-1">
+                  {/* Show actual coins for completed lines */}
+                  <div className="flex gap-1">
+                    {line.coins.map((c, ci) => (
+                      <div key={ci}>{renderCoin(c, "sm")}</div>
+                    ))}
+                  </div>
                   <span className={cn(
-                    "font-mono text-sm tracking-widest",
+                    "font-mono text-xs tracking-widest",
                     (line.type === "old_yin" || line.type === "old_yang") ? "text-amber-400" : "text-zinc-400"
                   )}>
                     {line.symbol}
                   </span>
-                  <span className="text-[10px] text-zinc-500">{line.label}</span>
-                  <span className="text-[10px] text-zinc-600">
-                    ({line.coins.map(c => c === 3 ? "字" : "背").join(" ")})
-                  </span>
+                  <span className="text-[9px] text-zinc-500">{line.label}</span>
                 </div>
               ) : lineIdx === currentLine && tossing && animCoins ? (
                 <div className="flex items-center gap-2 flex-1">
                   <div className="flex gap-1.5">
                     {animCoins.map((c, ci) => (
-                      <div
-                        key={ci}
-                        className={cn(
-                          "w-7 h-7 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition-all duration-75",
-                          c === 3
-                            ? "border-amber-500 bg-amber-500/20 text-amber-300"
-                            : "border-zinc-600 bg-zinc-800 text-zinc-500"
-                        )}
-                      >
-                        {c === 3 ? "字" : "背"}
-                      </div>
+                      <div key={ci}>{renderCoin(c, "md", true)}</div>
                     ))}
                   </div>
                   <span className="text-[10px] text-amber-400 animate-pulse">摇卦中...</span>
                 </div>
               ) : (
                 <div className={cn(
-                  "flex-1 h-6 rounded bg-zinc-800/30 border border-dashed",
+                  "flex-1 h-7 rounded bg-zinc-800/30 border border-dashed",
                   isNext ? "border-amber-500/40" : "border-zinc-800"
                 )} />
               )}
@@ -191,12 +252,69 @@ export function CoinTossRitual({
         </button>
       )}
 
-      {lines.length === 6 && (
-        <div className="text-center">
-          <p className="text-[10px] text-emerald-400 font-medium">✓ 六爻已成，卦象已定</p>
-          <p className="text-[10px] text-zinc-500 mt-1">摇卦结果将自动附加到您的提问中</p>
-        </div>
-      )}
+      {lines.length === 6 && (() => {
+        const hasMoving = lines.some(l => l.type === "old_yin" || l.type === "old_yang");
+        // 本卦 lines
+        const benLines = lines.map(l => (l.type === "young_yang" || l.type === "old_yang") ? "yang" : "yin");
+        // 变卦 lines (moving lines flip)
+        const bianLines = lines.map(l => {
+          if (l.type === "old_yang") return "yin";
+          if (l.type === "old_yin") return "yang";
+          return (l.type === "young_yang") ? "yang" : "yin";
+        });
+        const renderYao = (type: string, isMoving: boolean) => (
+          <div className="flex items-center gap-0.5 justify-center h-3">
+            {type === "yang" ? (
+              <div className={cn("h-[3px] rounded-full w-full", isMoving ? "bg-amber-400" : "bg-zinc-400")} />
+            ) : (
+              <>
+                <div className={cn("h-[3px] rounded-full flex-1", isMoving ? "bg-amber-400" : "bg-zinc-400")} />
+                <div className="w-2" />
+                <div className={cn("h-[3px] rounded-full flex-1", isMoving ? "bg-amber-400" : "bg-zinc-400")} />
+              </>
+            )}
+          </div>
+        );
+        return (
+          <div className="space-y-3">
+            {/* Visual hexagram */}
+            <div className={cn("flex justify-center gap-6", !hasMoving && "gap-0")}>
+              <div className="text-center">
+                <p className="text-[9px] text-zinc-500 mb-1.5">本卦</p>
+                <div className="w-14 space-y-1">
+                  {[...benLines].reverse().map((y, i) => {
+                    const origIdx = 5 - i;
+                    const isM = lines[origIdx].type === "old_yin" || lines[origIdx].type === "old_yang";
+                    return <div key={i}>{renderYao(y, isM)}</div>;
+                  })}
+                </div>
+              </div>
+              {hasMoving && (
+                <>
+                  <div className="flex items-center text-zinc-600 text-xs pt-4">→</div>
+                  <div className="text-center">
+                    <p className="text-[9px] text-zinc-500 mb-1.5">变卦</p>
+                    <div className="w-14 space-y-1">
+                      {[...bianLines].reverse().map((y, i) => {
+                        const origIdx = 5 - i;
+                        const isM = lines[origIdx].type === "old_yin" || lines[origIdx].type === "old_yang";
+                        return <div key={i}>{renderYao(y, isM)}</div>;
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] text-emerald-400 font-medium">✓ 六爻已成，卦象已定</p>
+              <p className="text-[10px] text-zinc-500 mt-1">摇卦结果将自动附加到您的提问中</p>
+            </div>
+            <button onClick={handleReset} className="w-full rounded-lg py-1.5 text-[10px] text-zinc-500 hover:text-zinc-300 border border-zinc-700/50 hover:border-zinc-600 transition-colors">
+              <RotateCcw className="h-3 w-3 inline mr-1" />重新摇卦
+            </button>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -316,9 +434,11 @@ export function TarotDrawRitual({
 
   const handleShuffle = () => {
     setShuffling(true);
+    playCardFlipSound();
     setTimeout(() => {
       setShuffling(false);
       setShuffled(true);
+      playRevealSound();
     }, 3500);
   };
 
@@ -341,6 +461,7 @@ export function TarotDrawRitual({
         colorClass: cardInfo.colorClass,
         isMajor: cardInfo.isMajor,
       };
+      playCardFlipSound();
       setDrawnCards((prev) => [...prev, newCard]);
       setDrawing(false);
     }, 1800);
@@ -351,6 +472,7 @@ export function TarotDrawRitual({
       const summary = drawnCards
         .map((c) => `${c.position}：${c.name}（${c.reversed ? "逆位" : "正位"}）`)
         .join("\n");
+      playRevealSound();
       onComplete(drawnCards, `塔罗抽牌结果：\n${summary}`);
     }
   }, [drawnCards, totalCards, onComplete]);
@@ -469,6 +591,7 @@ export function QimenRitual({
           setRevealStep(i + 1);
           setResult(summaryLines.slice(0, i + 1).join("\n"));
           if (i === summaryLines.length - 1) {
+            playRevealSound();
             onComplete(summaryLines.join("\n"));
           }
         }, i * 600);
