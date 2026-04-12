@@ -24,6 +24,7 @@ import {
   Layers,
   Sparkles,
   Loader2,
+  CalendarDays,
 } from "lucide-react";
 import {
   AreaChart,
@@ -219,7 +220,14 @@ export default function DashboardTab() {
       });
     });
 
-    // Sentiment distribution for violin-style
+    // Sentiment distribution with box-plot quartiles
+    const sorted = [...emotionValues].sort((a, b) => a - b);
+    const q = (arr: number[], p: number) => {
+      if (arr.length === 0) return 0;
+      const i = (arr.length - 1) * p;
+      const lo = Math.floor(i), hi = Math.ceil(i);
+      return lo === hi ? arr[lo] : arr[lo] * (hi - i) + arr[hi] * (i - lo);
+    };
     const sentimentDist = {
       positive: emotionValues.filter(v => v > 0.15).length,
       neutral: emotionValues.filter(v => v >= -0.15 && v <= 0.15).length,
@@ -228,6 +236,12 @@ export default function DashboardTab() {
       std: 0,
       ci95: [0, 0] as [number, number],
       n: emotionValues.length,
+      min: sorted[0] ?? -1,
+      max: sorted[sorted.length - 1] ?? 1,
+      q1: q(sorted, 0.25),
+      median: q(sorted, 0.5),
+      q3: q(sorted, 0.75),
+      rawValues: emotionValues,
     };
     if (emotionValues.length > 1) {
       const mean = sentimentDist.mean;
@@ -292,6 +306,35 @@ export default function DashboardTab() {
       ? Math.round(totalMessages / conversations.length * 10) / 10
       : 0;
 
+    // GitHub-style heatmap: last 16 weeks (112 days)
+    const heatmapDays = 112;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const heatmapStart = new Date(today.getTime() - (heatmapDays - 1) * dayMs);
+    // Align to Sunday
+    heatmapStart.setDate(heatmapStart.getDate() - heatmapStart.getDay());
+    const heatmap: { date: string; count: number; iso: string }[] = [];
+    const heatmapBuckets = new Map<string, number>();
+    for (const c of conversations) {
+      const d = new Date(c.createdAt);
+      d.setHours(0, 0, 0, 0);
+      const key = d.toISOString().slice(0, 10);
+      heatmapBuckets.set(key, (heatmapBuckets.get(key) || 0) + 1);
+    }
+    for (const r of divinationRecords) {
+      const d = new Date(r.createdAt);
+      d.setHours(0, 0, 0, 0);
+      const key = d.toISOString().slice(0, 10);
+      heatmapBuckets.set(key, (heatmapBuckets.get(key) || 0) + 1);
+    }
+    const totalHeatmapDays = Math.ceil((today.getTime() - heatmapStart.getTime()) / dayMs) + 1;
+    for (let i = 0; i < totalHeatmapDays; i++) {
+      const d = new Date(heatmapStart.getTime() + i * dayMs);
+      const iso = d.toISOString().slice(0, 10);
+      heatmap.push({ date: d.toLocaleDateString("zh-CN", { month: "short", day: "numeric" }), count: heatmapBuckets.get(iso) || 0, iso });
+    }
+    const heatmapMax = Math.max(1, ...heatmap.map(h => h.count));
+
     return {
       totalMessages,
       totalProfiles,
@@ -314,15 +357,17 @@ export default function DashboardTab() {
       daysSpan,
       engagementRate,
       avgMsgsPerConvo,
+      heatmap,
+      heatmapMax,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profiles, conversations, mbtiResults, eqScores, relationships, profileMemories, divinationRecords, moduleHistory]);
 
-  // AI Insight generator
+  // AI Insight generator — SSE streaming with typewriter effect
   const generateInsight = useCallback(async () => {
     if (insightLoading) return;
     setInsightLoading(true);
-    setAiInsight(null);
+    setAiInsight("");
     try {
       const snapshot = [
         `总对话: ${stats.totalConversations}, 已分析: ${stats.analyzedCount}, 覆盖率: ${stats.engagementRate}%`,
@@ -336,15 +381,45 @@ export default function DashboardTab() {
         stats.profileActivity.length > 0 ? `最活跃: ${stats.profileActivity.slice(0, 3).map((p: any) => `${p.name}(${p.count}次)`).join(", ")}` : "",
       ].filter(Boolean).join("\n");
 
-      const res = await apiFetch("/api/dashboard-insight", {
+      const res = await apiFetch("/api/dashboard-insight?stream=true", {
         method: "POST",
         body: JSON.stringify({ statsSnapshot: snapshot }),
       });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setAiInsight(data.insight);
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "请求失败" }));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No stream reader");
+      const decoder = new TextDecoder();
+      let accumulated = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const text = decoder.decode(value, { stream: true });
+        const lines = text.split("\n");
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === "chunk" && event.text) {
+              accumulated += event.text;
+              setAiInsight(accumulated);
+            } else if (event.type === "error") {
+              throw new Error(event.text || "流式错误");
+            }
+          } catch (parseErr) {
+            if (parseErr instanceof Error && parseErr.message !== "流式错误") continue;
+            throw parseErr;
+          }
+        }
+      }
+      if (!accumulated) setAiInsight("未生成内容，请重试。");
     } catch (e: any) {
-      setAiInsight(`洞察生成失败: ${e.message || "未知错误"}`);
+      setAiInsight((prev) => prev ? prev + `\n\n⚠ ${e.message}` : `洞察生成失败: ${e.message || "未知错误"}`);
     } finally {
       setInsightLoading(false);
     }
@@ -364,19 +439,72 @@ export default function DashboardTab() {
             </div>
           </div>
           {!isEmpty && (
-            <button
-              onClick={() => {
-                const alertsHtml = alerts.map((a) => {
-                  const cls = a.severity === "critical" ? "alert-warning" : "alert-info";
-                  return `<div class="alert-box ${cls}"><strong>${a.title}</strong> ${a.message}</div>`;
-                }).join("");
-                exportDashboardReport(profiles, conversations, eqScores, profileMemories, alertsHtml);
-              }}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-500 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
-            >
-              <FileDown className="h-3.5 w-3.5" />
-              导出报告
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const alertsHtml = alerts.map((a) => {
+                    const cls = a.severity === "critical" ? "alert-warning" : "alert-info";
+                    return `<div class="alert-box ${cls}"><strong>${a.title}</strong> ${a.message}</div>`;
+                  }).join("");
+                  exportDashboardReport(profiles, conversations, eqScores, profileMemories, alertsHtml);
+                }}
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-500 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
+                title="导出为PDF报告"
+              >
+                <FileDown className="h-3.5 w-3.5" />
+                PDF
+              </button>
+              <button
+                onClick={() => {
+                  const exportData = {
+                    exportedAt: new Date().toISOString(),
+                    version: "SIOS-v1",
+                    stats: {
+                      totalConversations: stats.totalConversations,
+                      analyzedCount: stats.analyzedCount,
+                      totalProfiles: stats.totalProfiles,
+                      totalMessages: stats.totalMessages,
+                      avgEQ: stats.avgEQ,
+                      engagementRate: stats.engagementRate,
+                      avgMsgsPerConvo: stats.avgMsgsPerConvo,
+                      daysSpan: stats.daysSpan,
+                      memoriesCount: stats.memoriesCount,
+                      relationshipsCount: stats.relationshipsCount,
+                      divinationCount: stats.divinationCount,
+                      sentimentDist: {
+                        mean: stats.sentimentDist.mean,
+                        std: stats.sentimentDist.std,
+                        ci95: stats.sentimentDist.ci95,
+                        n: stats.sentimentDist.n,
+                        min: stats.sentimentDist.min,
+                        max: stats.sentimentDist.max,
+                        q1: stats.sentimentDist.q1,
+                        median: stats.sentimentDist.median,
+                        q3: stats.sentimentDist.q3,
+                      },
+                      dimAverages: stats.dimAverages,
+                      profileActivity: stats.profileActivity,
+                      eqTrend: stats.eqTrend,
+                      weeklyData: stats.weeklyData,
+                      moduleRadar: stats.moduleRadar,
+                    },
+                    aiInsight: aiInsight || null,
+                  };
+                  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `sios-dashboard-${new Date().toISOString().slice(0, 10)}.json`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-500 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
+                title="导出原始数据JSON"
+              >
+                <FileDown className="h-3.5 w-3.5" />
+                JSON
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -535,7 +663,7 @@ export default function DashboardTab() {
                     <p className="text-[8px] text-zinc-600 mb-2 italic">所有画像维度均值分布 (0-100)</p>
                     <ResponsiveContainer width="100%" height={220}>
                       <RadarChart data={stats.dimAverages} cx="50%" cy="50%" outerRadius="75%">
-                        <PolarGrid stroke="#3f3f46" />
+                        <PolarGrid stroke="#3f3f46" strokeDasharray="3 3" />
                         <PolarAngleAxis dataKey="label" tick={{ fontSize: 8, fill: "#71717a" }} />
                         <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 7, fill: "#52525b" }} axisLine={false} />
                         <Radar name="均值" dataKey="avg" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.15} strokeWidth={1.5} dot={{ r: 2.5, fill: "#f59e0b" }} />
@@ -557,7 +685,7 @@ export default function DashboardTab() {
                   <p className="text-[8px] text-zinc-600 mb-2 italic">各模块使用占比雷达图</p>
                   <ResponsiveContainer width="100%" height={220}>
                     <RadarChart data={stats.moduleRadar} cx="50%" cy="50%" outerRadius="75%">
-                      <PolarGrid stroke="#3f3f46" />
+                      <PolarGrid stroke="#3f3f46" strokeDasharray="3 3" />
                       <PolarAngleAxis dataKey="module" tick={{ fontSize: 8, fill: "#71717a" }} />
                       <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
                       <Radar name="使用占比" dataKey="value" stroke="#22d3ee" fill="#22d3ee" fillOpacity={0.12} strokeWidth={1.5} dot={{ r: 2.5, fill: "#22d3ee" }} />
@@ -599,6 +727,56 @@ export default function DashboardTab() {
                   ) : (
                     <div className="flex items-center justify-center h-[180px] text-[10px] text-zinc-600">完成对话分析后显示</div>
                   )}
+                  {/* Box Plot + Strip */}
+                  {stats.sentimentDist.n >= 3 && (
+                    <div className="mt-3 pt-3 border-t border-zinc-800/50">
+                      <p className="text-[8px] text-zinc-600 mb-2 italic">Box Plot · 四分位分布 (whisker = min/max)</p>
+                      <svg viewBox="0 0 320 56" className="w-full h-14">
+                        {(() => {
+                          const d = stats.sentimentDist;
+                          const mapX = (v: number) => 20 + ((v + 1) / 2) * 280;
+                          const cy = 22;
+                          return (
+                            <>
+                              {/* Axis */}
+                              <line x1={20} y1={44} x2={300} y2={44} stroke="#3f3f46" strokeWidth={0.5} />
+                              {[-1, -0.5, 0, 0.5, 1].map(v => (
+                                <g key={v}>
+                                  <line x1={mapX(v)} y1={42} x2={mapX(v)} y2={46} stroke="#52525b" strokeWidth={0.5} />
+                                  <text x={mapX(v)} y={53} textAnchor="middle" fill="#52525b" fontSize={7}>{v}</text>
+                                </g>
+                              ))}
+                              {/* Whisker line (min to max) */}
+                              <line x1={mapX(d.min)} y1={cy} x2={mapX(d.max)} y2={cy} stroke="#52525b" strokeWidth={1} />
+                              {/* Whisker caps */}
+                              <line x1={mapX(d.min)} y1={cy - 5} x2={mapX(d.min)} y2={cy + 5} stroke="#52525b" strokeWidth={1} />
+                              <line x1={mapX(d.max)} y1={cy - 5} x2={mapX(d.max)} y2={cy + 5} stroke="#52525b" strokeWidth={1} />
+                              {/* IQR box */}
+                              <rect x={mapX(d.q1)} y={cy - 8} width={mapX(d.q3) - mapX(d.q1)} height={16} rx={2} fill="#8b5cf6" fillOpacity={0.15} stroke="#8b5cf6" strokeWidth={1} />
+                              {/* Median line */}
+                              <line x1={mapX(d.median)} y1={cy - 8} x2={mapX(d.median)} y2={cy + 8} stroke="#f59e0b" strokeWidth={1.5} />
+                              {/* Mean diamond */}
+                              <polygon points={`${mapX(d.mean)},${cy - 5} ${mapX(d.mean) + 4},${cy} ${mapX(d.mean)},${cy + 5} ${mapX(d.mean) - 4},${cy}`} fill="#f59e0b" fillOpacity={0.8} />
+                              {/* 95% CI bracket */}
+                              {d.n > 1 && (
+                                <rect x={mapX(d.ci95[0])} y={cy + 10} width={Math.max(1, mapX(d.ci95[1]) - mapX(d.ci95[0]))} height={3} rx={1} fill="#34d399" fillOpacity={0.4} />
+                              )}
+                              {/* Jitter strip */}
+                              {d.rawValues.map((v: number, i: number) => (
+                                <circle key={i} cx={mapX(v)} cy={cy + (((i * 7 + 3) % 11) - 5) * 0.6} r={1.5} fill={v > 0.15 ? "#34d399" : v < -0.15 ? "#f87171" : "#a1a1aa"} fillOpacity={0.5} />
+                              ))}
+                            </>
+                          );
+                        })()}
+                      </svg>
+                      <div className="flex items-center justify-center gap-4 mt-1 text-[7px] text-zinc-600">
+                        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-violet-500/40 border border-violet-500" />IQR</span>
+                        <span className="flex items-center gap-1"><span className="inline-block w-2 h-0.5 bg-amber-400" />Median</span>
+                        <span className="flex items-center gap-1"><span className="inline-block w-0 h-0 border-l-[3px] border-r-[3px] border-b-[5px] border-transparent border-b-amber-400" />Mean</span>
+                        <span className="flex items-center gap-1"><span className="inline-block w-3 h-1 rounded-sm bg-emerald-400/40" />95% CI</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Statistical Insights Panel */}
@@ -615,8 +793,11 @@ export default function DashboardTab() {
                         <span className="text-zinc-400 font-medium">分析覆盖率</span>
                         <span className="font-mono text-emerald-400">{stats.engagementRate}%</span>
                       </div>
-                      <div className="h-1 rounded-full bg-zinc-800 overflow-hidden">
-                        <div className="h-full rounded-full bg-emerald-500/60 transition-all" style={{ width: `${stats.engagementRate}%` }} />
+                      <div className="relative h-1.5 rounded-full bg-zinc-800">
+                        <div className="absolute inset-0 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${stats.engagementRate}%`, background: "linear-gradient(to right, #3f3f46, #34d399)", opacity: 0.3 }} />
+                        </div>
+                        <div className="absolute top-[-1px] w-0.5 h-2.5 rounded-sm bg-emerald-400 transition-all" style={{ left: `${stats.engagementRate}%`, transform: "translateX(-50%)" }} />
                       </div>
                       <p className="text-[8px] text-zinc-600 mt-1">{stats.analyzedCount}/{stats.totalConversations} 段对话已分析</p>
                     </div>
@@ -772,7 +953,72 @@ export default function DashboardTab() {
                 </div>
               )}
 
-              {/* ─── Row 6: AI Data Insight ─── */}
+              {/* ─── Row 6: Activity Heatmap ─── */}
+              {stats.heatmap.some((h) => h.count > 0) && (
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="h-4 w-4 text-emerald-400" />
+                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">活动热力图</h3>
+                    </div>
+                    <div className="flex items-center gap-2 text-[8px] text-zinc-600">
+                      <span className="font-mono">{stats.heatmap.filter(h => h.count > 0).length} active days</span>
+                      <span>·</span>
+                      <span className="font-mono">max {stats.heatmapMax}/day</span>
+                    </div>
+                  </div>
+                  <p className="text-[8px] text-zinc-600 italic mb-2">近16周每日活动频次 (对话 + 玄学)</p>
+                  <div className="overflow-x-auto">
+                    <div className="flex gap-[2px]" style={{ minWidth: "fit-content" }}>
+                      {(() => {
+                        const weeks: { date: string; count: number; iso: string }[][] = [];
+                        for (let i = 0; i < stats.heatmap.length; i += 7) {
+                          weeks.push(stats.heatmap.slice(i, i + 7));
+                        }
+                        const DAY_LABELS = ["日", "", "二", "", "四", "", "六"];
+                        return (
+                          <>
+                            <div className="flex flex-col gap-[2px] mr-1">
+                              {DAY_LABELS.map((label, i) => (
+                                <div key={i} className="w-3 h-[11px] flex items-center justify-end">
+                                  <span className="text-[6px] text-zinc-700">{label}</span>
+                                </div>
+                              ))}
+                            </div>
+                            {weeks.map((week, wi) => (
+                              <div key={wi} className="flex flex-col gap-[2px]">
+                                {week.map((day, di) => {
+                                  const intensity = day.count / stats.heatmapMax;
+                                  const bg = day.count === 0
+                                    ? "#1c1c1e"
+                                    : intensity <= 0.25 ? "#064e3b" : intensity <= 0.5 ? "#047857" : intensity <= 0.75 ? "#059669" : "#34d399";
+                                  return (
+                                    <div
+                                      key={di}
+                                      className="w-[11px] h-[11px] rounded-[2px] transition-colors"
+                                      style={{ backgroundColor: bg }}
+                                      title={`${day.iso}: ${day.count} 次活动`}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            ))}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end gap-1 mt-2 text-[7px] text-zinc-600">
+                    <span>少</span>
+                    {[0, 0.25, 0.5, 0.75, 1].map((v, i) => (
+                      <div key={i} className="w-[9px] h-[9px] rounded-[2px]" style={{ backgroundColor: v === 0 ? "#1c1c1e" : v <= 0.25 ? "#064e3b" : v <= 0.5 ? "#047857" : v <= 0.75 ? "#059669" : "#34d399" }} />
+                    ))}
+                    <span>多</span>
+                  </div>
+                </div>
+              )}
+
+              {/* ─── Row 7: AI Data Insight ─── */}
               <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -799,13 +1045,16 @@ export default function DashboardTab() {
                 <p className="text-[8px] text-zinc-600 italic mb-3">基于当前数据大盘统计快照，由LLM生成专业数据解读</p>
                 {aiInsight ? (
                   <div className="rounded-lg border border-zinc-800/60 bg-zinc-800/20 p-4">
-                    <p className="text-[11px] text-zinc-300 leading-relaxed whitespace-pre-wrap">{aiInsight}</p>
+                    <p className="text-[11px] text-zinc-300 leading-relaxed whitespace-pre-wrap">
+                      {aiInsight}
+                      {insightLoading && <span className="inline-block w-1.5 h-3.5 bg-violet-400 ml-0.5 animate-pulse rounded-sm" />}
+                    </p>
                   </div>
-                ) : (
+                ) : !insightLoading ? (
                   <div className="flex items-center justify-center h-[60px] text-[10px] text-zinc-600">
                     点击「生成洞察报告」获取AI数据解读
                   </div>
-                )}
+                ) : null}
               </div>
             </>
           )}

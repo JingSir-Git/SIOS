@@ -15,6 +15,16 @@ import {
   Lightbulb,
   X,
 } from "lucide-react";
+import {
+  RadarChart,
+  Radar,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  ResponsiveContainer,
+  Legend,
+  Tooltip,
+} from "recharts";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import type { PersonProfile, DimensionKey } from "@/lib/types";
@@ -278,6 +288,22 @@ export default function ProfileCompare({ isOpen, onClose }: Props) {
                     <p className="text-[9px] text-zinc-600">{profileB.communicationStyle?.overallType || "未知风格"}</p>
                   </div>
                 </div>
+              </div>
+
+              {/* Dual-Layer Radar Chart Overlay */}
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
+                <h4 className="text-[10px] font-medium text-zinc-400 uppercase tracking-wide mb-2">雷达图叠加对比</h4>
+                <ResponsiveContainer width="100%" height={280}>
+                  <RadarChart cx="50%" cy="50%" outerRadius="72%" data={comparison.dimensionDiffs.map((d) => ({ dimension: d.label, [profileA!.name]: d.valueA, [profileB!.name]: d.valueB, fullMark: 100 }))}>
+                    <PolarGrid stroke="#3f3f46" strokeDasharray="3 3" />
+                    <PolarAngleAxis dataKey="dimension" tick={{ fill: "#a1a1aa", fontSize: 9 }} />
+                    <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: "#52525b", fontSize: 7 }} tickCount={5} axisLine={false} />
+                    <Radar name={profileA!.name} dataKey={profileA!.name} stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.12} strokeWidth={1.5} dot={{ r: 3, fill: "#8b5cf6", strokeWidth: 0 }} />
+                    <Radar name={profileB!.name} dataKey={profileB!.name} stroke="#ec4899" fill="#ec4899" fillOpacity={0.08} strokeWidth={1.5} strokeDasharray="4 3" dot={{ r: 3, fill: "#ec4899", strokeWidth: 0 }} />
+                    <Legend iconType="circle" iconSize={6} wrapperStyle={{ fontSize: 10 }} />
+                    <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: "8px", fontSize: "10px" }} />
+                  </RadarChart>
+                </ResponsiveContainer>
               </div>
 
               {/* Dimension Comparison Bars */}
