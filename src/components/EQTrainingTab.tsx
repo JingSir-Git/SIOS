@@ -558,18 +558,11 @@ export default function EQTrainingTab() {
                               {score}
                             </span>
                           </div>
-                          <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-                            <div
-                              className={cn(
-                                "h-full rounded-full transition-all duration-700",
-                                score >= 80
-                                  ? "bg-gradient-to-r from-emerald-600 to-emerald-400"
-                                  : score >= 60
-                                  ? "bg-gradient-to-r from-amber-600 to-amber-400"
-                                  : "bg-gradient-to-r from-red-600 to-red-400"
-                              )}
-                              style={{ width: `${score}%` }}
-                            />
+                          <div className="relative h-1.5 rounded-full bg-zinc-800">
+                            <div className="absolute inset-0 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full transition-all duration-700" style={{ width: `${score}%`, background: `linear-gradient(to right, #3f3f46, ${score >= 80 ? "#34d399" : score >= 60 ? "#f59e0b" : "#ef4444"})`, opacity: 0.35 }} />
+                            </div>
+                            <div className="absolute top-[-1px] w-0.5 h-2.5 rounded-sm transition-all duration-700" style={{ left: `${score}%`, transform: "translateX(-50%)", backgroundColor: score >= 80 ? "#34d399" : score >= 60 ? "#f59e0b" : "#ef4444" }} />
                           </div>
                         </div>
                       );

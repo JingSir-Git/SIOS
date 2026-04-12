@@ -232,16 +232,11 @@ export default function CoachEvolution() {
                 <div key={d.key} className="flex items-center gap-2">
                   <Icon className={cn("h-3 w-3 shrink-0", d.color)} />
                   <span className="text-[9px] text-zinc-400 w-16 shrink-0">{d.label}</span>
-                  <div className="flex-1 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-                    <div
-                      className={cn(
-                        "h-full rounded-full transition-all",
-                        d.recent >= 80 ? "bg-emerald-500" :
-                        d.recent >= 60 ? "bg-cyan-500" :
-                        d.recent >= 40 ? "bg-amber-500" : "bg-red-500"
-                      )}
-                      style={{ width: `${d.recent}%` }}
-                    />
+                  <div className="relative flex-1 h-1.5 rounded-full bg-zinc-800">
+                    <div className="absolute inset-0 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${d.recent}%`, background: `linear-gradient(to right, #3f3f46, ${d.recent >= 80 ? "#34d399" : d.recent >= 60 ? "#22d3ee" : d.recent >= 40 ? "#f59e0b" : "#ef4444"})`, opacity: 0.35 }} />
+                    </div>
+                    <div className="absolute top-[-1px] w-0.5 h-2.5 rounded-sm transition-all" style={{ left: `${d.recent}%`, transform: "translateX(-50%)", backgroundColor: d.recent >= 80 ? "#34d399" : d.recent >= 60 ? "#22d3ee" : d.recent >= 40 ? "#f59e0b" : "#ef4444" }} />
                   </div>
                   <span className="text-[9px] text-zinc-500 w-6 text-right shrink-0">{d.recent}</span>
                   {d.trend !== "unknown" && (

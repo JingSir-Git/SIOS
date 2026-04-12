@@ -135,6 +135,7 @@ export default function AnalyzeTab() {
 
   // Attribution stage state
   const [parsedMessages, setParsedMessages] = useState<ChatMessage[]>([]);
+  const [confirmedSpeakers, setConfirmedSpeakers] = useState<{ id: string; name: string; role: string }[]>([]);
   const [detectedPlatform, setDetectedPlatform] = useState<string | null>(null);
 
   // Results stage state
@@ -318,8 +319,9 @@ export default function AnalyzeTab() {
     messages: ChatMessage[],
     speakers: { id: string; name: string; role: string }[]
   ) => {
-    // Store the user-confirmed messages for saving later
+    // Store the user-confirmed messages and speakers for saving later
     setParsedMessages(messages);
+    setConfirmedSpeakers(speakers);
 
     const formatted = formatMessagesForLLM(messages);
     setFormattedConversation(formatted);
@@ -510,8 +512,16 @@ export default function AnalyzeTab() {
     const isSingleMode = inputMode === "single";
     addConversation({
       id: convoId,
-      title: isSingleMode ? `${name}的单向揣摩` : `与${name}的对话分析`,
-      participants: isSingleMode ? [name] : ["我", name],
+      title: isSingleMode
+        ? `${name}的单向揣摩`
+        : confirmedSpeakers.filter((s) => s.role === "other").length > 1
+          ? `群聊分析：${confirmedSpeakers.filter((s) => s.role === "other").map((s) => s.name).join("、")}`
+          : `与${name}的对话分析`,
+      participants: isSingleMode
+        ? [name]
+        : confirmedSpeakers.length > 0
+          ? ["我", ...confirmedSpeakers.filter((s) => s.role === "other").map((s) => s.name)]
+          : ["我", name],
       messages: parsedMessages.length > 0 ? parsedMessages : [],
       createdAt: conversationDate || new Date().toISOString(),
       rawText: originalRawText || conversation,

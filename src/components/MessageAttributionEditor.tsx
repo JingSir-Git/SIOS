@@ -41,6 +41,15 @@ const SPEAKER_DOT_COLORS = [
   "bg-blue-400",
 ];
 
+const SPEAKER_BORDER_COLORS = [
+  "#8b5cf6",
+  "#22d3ee",
+  "#f59e0b",
+  "#34d399",
+  "#ec4899",
+  "#3b82f6",
+];
+
 interface MessageAttributionEditorProps {
   messages: ChatMessage[];
   onConfirm: (messages: ChatMessage[], speakers: Speaker[]) => void;
@@ -163,12 +172,9 @@ export default function MessageAttributionEditor({
           return updated;
         });
         setRangeStart(null);
-      } else if (speakers.length === 2) {
-        // Simple 2-speaker mode: click to toggle
-        toggleMessage(messageId);
       } else {
-        // Multi-speaker mode: click to assign active speaker
-        assignMessage(messageId);
+        // Click to cycle through all speakers (works for 2-party and multi-party)
+        toggleMessage(messageId);
       }
       setRangeStart(index);
     },
@@ -282,7 +288,7 @@ export default function MessageAttributionEditor({
               系统已根据对话节奏、语言特征自动识别发言者。请检查标注是否正确，如有错误点击消息即可修正。
               <br />
               <span className="text-zinc-500">
-                点击消息切换归属 · Shift+点击批量选择 · 大部分情况只需微调几条
+                点击消息在{speakers.length > 2 ? `${speakers.length}位参与者` : "「我」和「对方」"}之间循环切换 · Shift+点击批量选择 · 大部分情况只需微调几条
               </span>
             </>
           ) : (
@@ -290,7 +296,8 @@ export default function MessageAttributionEditor({
               系统检测到这段对话没有明确的发言者标记。请点击每条消息来标注是谁说的。
               <br />
               <span className="text-zinc-500">
-                点击消息可在「我」和「对方」之间切换。Shift+点击可批量选择。
+                点击消息在{speakers.length > 2 ? `${speakers.length}位参与者` : "「我」和「对方」"}之间循环切换 · Shift+点击可批量选择
+                {speakers.length <= 2 && " · 群聊请点击「添加」增加参与者"}
               </span>
             </>
           )}
@@ -390,15 +397,33 @@ export default function MessageAttributionEditor({
         <p className="text-[10px] text-zinc-600 mt-2">
           双击名字可重命名 · 点击{" "}
           <UserPlus className="h-2.5 w-2.5 inline" /> 可关联已有画像
+          {speakers.length > 2 && " · 点击消息循环切换参与者 · Shift+点击使用选中参与者批量标注"}
         </p>
+        {speakers.length > 2 && (
+          <div className="mt-2 pt-2 border-t border-zinc-800/50">
+            <div className="flex items-center gap-3 text-[9px]">
+              <span className="text-zinc-600">消息布局:</span>
+              <span className="text-violet-400">我 → 右侧</span>
+              <span className="text-zinc-500">|</span>
+              {speakers.filter(s => s.role === "other").map((s, i) => (
+                <span key={s.id} className="flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: SPEAKER_BORDER_COLORS[(i + 1) % SPEAKER_BORDER_COLORS.length] }} />
+                  <span className="text-zinc-400">{s.name} → 左侧</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Message Bubbles */}
+      {/* Message Bubbles — WeChat-style: self right, all others left */}
       <div className="rounded-lg border border-zinc-800 p-4 max-h-[50vh] overflow-y-auto space-y-1.5">
         {visibleMessages.map((msg, idx) => {
           const speaker = getSpeakerForMessage(msg.id);
           const isSelf = speaker.role === "self";
           const dotColor = getSpeakerDotColor(assignments[msg.id] || "other-1");
+          const speakerIdx = speakers.findIndex((s) => s.id === (assignments[msg.id] || "other-1"));
+          const borderAccent = SPEAKER_DOT_COLORS[speakerIdx % SPEAKER_DOT_COLORS.length];
 
           return (
             <div
@@ -408,20 +433,21 @@ export default function MessageAttributionEditor({
                 "flex items-start gap-2 rounded-lg border px-3 py-2 cursor-pointer transition-all select-none",
                 "hover:ring-1 hover:ring-white/10",
                 isSelf
-                  ? "bg-violet-500/10 border-violet-500/20 ml-12"
+                  ? "bg-violet-500/10 border-violet-500/20 ml-12 flex-row-reverse text-right"
                   : "bg-zinc-800/50 border-zinc-700/50 mr-12",
                 speakers.length > 2 && speaker.color
               )}
+              style={!isSelf && speakers.length > 2 ? { borderLeftWidth: 3, borderLeftColor: SPEAKER_BORDER_COLORS[speakerIdx % SPEAKER_BORDER_COLORS.length] } : undefined}
             >
               <div className={cn("h-2 w-2 rounded-full mt-1.5 shrink-0", dotColor)} />
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
+                <div className={cn("flex items-center gap-2 mb-0.5", isSelf && "justify-end")}>
                   <span className="text-[10px] font-medium opacity-60">
                     {speaker.name}
                   </span>
                   <span className="text-[10px] opacity-30">#{idx + 1}</span>
                 </div>
-                <p className="text-xs text-zinc-200 leading-relaxed break-all">
+                <p className={cn("text-xs text-zinc-200 leading-relaxed break-all", isSelf && "text-right")}>
                   {msg.content}
                 </p>
               </div>

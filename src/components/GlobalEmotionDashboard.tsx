@@ -296,32 +296,24 @@ export default function GlobalEmotionDashboard({ isOpen, onClose, onSelectProfil
                       )}
                     </div>
 
-                    {/* Emotion Bars */}
+                    {/* Emotion Needle Gauges */}
                     <div className="shrink-0 w-20 space-y-0.5">
                       <div className="flex items-center gap-1">
                         <span className="text-[7px] text-zinc-600 w-4">我</span>
-                        <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{
-                              width: `${((s.avgSelfEmotion + 1) / 2) * 100}%`,
-                              backgroundColor: s.avgSelfEmotion >= 0 ? "#ef4444" : "#60a5fa",
-                              opacity: 0.7,
-                            }}
-                          />
+                        <div className="relative flex-1 h-1.5 rounded-full bg-zinc-800">
+                          <div className="absolute inset-0 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all" style={{ width: `${((s.avgSelfEmotion + 1) / 2) * 100}%`, background: `linear-gradient(to right, #3f3f46, ${s.avgSelfEmotion >= 0 ? "#ef4444" : "#60a5fa"})`, opacity: 0.3 }} />
+                          </div>
+                          <div className="absolute top-[-1px] w-0.5 h-2.5 rounded-sm transition-all" style={{ left: `${((s.avgSelfEmotion + 1) / 2) * 100}%`, transform: "translateX(-50%)", backgroundColor: s.avgSelfEmotion >= 0 ? "#ef4444" : "#60a5fa" }} />
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="text-[7px] text-zinc-600 w-4">对</span>
-                        <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{
-                              width: `${((s.avgOtherEmotion + 1) / 2) * 100}%`,
-                              backgroundColor: s.avgOtherEmotion >= 0 ? "#ef4444" : "#60a5fa",
-                              opacity: 0.7,
-                            }}
-                          />
+                        <div className="relative flex-1 h-1.5 rounded-full bg-zinc-800">
+                          <div className="absolute inset-0 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all" style={{ width: `${((s.avgOtherEmotion + 1) / 2) * 100}%`, background: `linear-gradient(to right, #3f3f46, ${s.avgOtherEmotion >= 0 ? "#ef4444" : "#60a5fa"})`, opacity: 0.3 }} />
+                          </div>
+                          <div className="absolute top-[-1px] w-0.5 h-2.5 rounded-sm transition-all" style={{ left: `${((s.avgOtherEmotion + 1) / 2) * 100}%`, transform: "translateX(-50%)", backgroundColor: s.avgOtherEmotion >= 0 ? "#ef4444" : "#60a5fa" }} />
                         </div>
                       </div>
                     </div>
