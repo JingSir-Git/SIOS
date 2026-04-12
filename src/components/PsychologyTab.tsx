@@ -26,6 +26,10 @@ import { apiFetch } from "@/lib/api-fetch";
 import { exportChatSessionReport } from "@/lib/export-report";
 import ChatHistoryPanel from "./ChatHistoryPanel";
 import type { ChatSessionEntry } from "@/lib/types";
+import ChatImageAttach, { type AttachedImage, formatAttachedImages } from "./ChatImageAttach";
+import ResponseFeedback from "./ResponseFeedback";
+import { useT, getAILanguageInstruction } from "@/lib/i18n";
+import VoiceInputButton from "./VoiceInputButton";
 
 interface PsyMessage {
   id: string;
@@ -51,7 +55,8 @@ interface PsyAnalysis {
 }
 
 export default function PsychologyTab() {
-  const { profiles, preSelectedProfileId, clearPreSelection, addToast, addUserMemory, getActiveUserMemories, addChatSession, appendChatMessage, updateChatSession } = useAppStore();
+  const { profiles, preSelectedProfileId, clearPreSelection, addToast, addUserMemory, getActiveUserMemories, addChatSession, appendChatMessage, updateChatSession, language } = useAppStore();
+  const t = useT();
   const [messages, setMessages] = useState<PsyMessage[]>([]);
   const [input, setInput] = useState("");
   const [selfDescription, setSelfDescription] = useState("");
@@ -64,6 +69,7 @@ export default function PsychologyTab() {
   const [focusProfileId, setFocusProfileId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const ensureSession = useCallback((): string => {
@@ -169,14 +175,19 @@ export default function PsychologyTab() {
   }, []);
 
   const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+    if ((!input.trim() && attachedImages.length === 0) || loading) return;
+
+    // Append image descriptions if any images are attached
+    const imageCtx = formatAttachedImages(attachedImages);
+    const rawInput = input.trim() || "请分析这张图片";
+    const currentInput = imageCtx ? `${rawInput}\n\n${imageCtx}` : rawInput;
+    setAttachedImages([]);
 
     const userMsg: PsyMessage = {
       id: Date.now().toString(),
       role: "user",
-      content: input.trim(),
+      content: rawInput,
     };
-    const currentInput = input.trim();
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
@@ -207,6 +218,7 @@ export default function PsychologyTab() {
           profilesSummary: buildProfilesSummary() || undefined,
           selfDescription: enrichedSelfDesc || undefined,
           conversationHistory: buildConversationHistory() || undefined,
+          languageInstruction: getAILanguageInstruction(language),
         }),
         signal: controller.signal,
       });
@@ -350,9 +362,9 @@ export default function PsychologyTab() {
               <HeartHandshake className="h-5 w-5 text-rose-400" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-zinc-100">心理顾问</h1>
+              <h1 className="text-lg font-semibold text-zinc-100">{t.psychology.title}</h1>
               <p className="text-[10px] text-zinc-500">
-                关系网络画像 · 个性化心理疏导 · 关系优化建议
+                {t.psychology.subtitle}
               </p>
             </div>
           </div>
@@ -370,14 +382,14 @@ export default function PsychologyTab() {
                 className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300 transition-colors"
               >
                 <FileDown className="h-3 w-3" />
-                导出
+                {t.common.export}
               </button>
               <button
                 onClick={resetSession}
                 className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300 transition-colors"
               >
                 <RotateCcw className="h-3 w-3" />
-                新对话
+                {t.common.newChat}
               </button>
             </div>
           )}
@@ -499,11 +511,10 @@ export default function PsychologyTab() {
             <div className="flex flex-col items-center justify-center h-full text-center">
               <HeartHandshake className="h-12 w-12 text-zinc-700 mb-4" />
               <h3 className="text-sm font-medium text-zinc-400 mb-2">
-                你好，我是你的心理顾问
+                {t.psychology.greeting}
               </h3>
               <p className="text-xs text-zinc-600 max-w-md leading-relaxed mb-6">
-                你可以跟我聊任何人际关系的困扰、情绪压力、沟通难题。
-                我会基于你的关系网络画像数据，给你个性化的分析和建议。
+                {t.psychology.greetingSub}
               </p>
               <div className="grid gap-2 max-w-sm w-full">
                 {[
@@ -547,6 +558,11 @@ export default function PsychologyTab() {
                       <p className="text-xs text-zinc-200 leading-relaxed whitespace-pre-wrap">
                         {msg.analysis?.empathyResponse || msg.content}
                       </p>
+                      {msg.content && (
+                        <div className="flex justify-end mt-1.5 border-t border-zinc-700/30 pt-1">
+                          <ResponseFeedback messageId={msg.id} module="psychology" responseSnippet={msg.analysis?.empathyResponse || msg.content} compact />
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -714,6 +730,14 @@ export default function PsychologyTab() {
         {/* Input Bar */}
         <div className="border-t border-zinc-800 px-6 py-3">
           <div className="flex gap-2 items-end">
+            <ChatImageAttach
+              images={attachedImages}
+              onChange={setAttachedImages}
+              maxCount={3}
+              disabled={loading}
+              ocrMode="chat"
+              compact
+            />
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -723,13 +747,19 @@ export default function PsychologyTab() {
                   sendMessage();
                 }
               }}
-              placeholder="说说你的困扰、情绪、或者想聊的关系问题..."
+              placeholder={attachedImages.length > 0 ? t.common.describeImage : t.psychology.inputPlaceholder}
               rows={2}
               className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800/50 px-4 py-3 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-rose-500/50 resize-none"
             />
+            <div className="flex flex-col gap-1.5 shrink-0">
+              <VoiceInputButton
+                onTranscript={(text) => setInput((prev) => prev + text)}
+                compact
+              />
+            </div>
             <button
               onClick={sendMessage}
-              disabled={loading || !input.trim()}
+              disabled={loading || (!input.trim() && attachedImages.length === 0)}
               className="shrink-0 rounded-xl bg-rose-600 p-3 text-white hover:bg-rose-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-rose-500/20"
             >
               {loading ? (
@@ -740,7 +770,7 @@ export default function PsychologyTab() {
             </button>
           </div>
           <p className="text-[9px] text-zinc-700 mt-1.5 text-center">
-            AI心理顾问仅供参考，不能替代专业心理咨询。如有严重心理困扰，请寻求专业帮助。
+            {t.psychology.disclaimer}
           </p>
         </div>
       </div>

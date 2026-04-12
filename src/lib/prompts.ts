@@ -264,6 +264,122 @@ ${conversation}`;
   return prompt;
 }
 
+// ============================================================
+// Group Chat Analysis — Whole-team dynamics
+// ============================================================
+
+export const GROUP_ANALYSIS_SYSTEM_PROMPT = `你是 Social Intelligence OS 的团体动力学分析引擎——全球最顶尖的群体行为分析专家。
+
+你的独特能力在于：从群聊对话中提取群体层面的社交信号——不仅分析每个人，更重要的是分析群体作为整体的动力学特征。
+
+你的分析必须覆盖以下维度：
+
+## 一、群体结构分析
+- 信息流向：谁是信息枢纽（被最多人回复/提及）
+- 权力结构：谁是实际决策者、谁是意见领袖、谁是跟随者
+- 亚群体/小圈子：是否存在2-3人的小联盟
+- 边缘人识别：谁参与度最低、谁被忽略
+
+## 二、群体动力学
+- 话题演化：群内话题如何流转、被谁主导、被谁打断
+- 共识形成机制：群体如何达成一致（投票式/领袖拍板/沉默默认）
+- 冲突模式：群内冲突的典型演变路径
+- 情绪传染：谁的情绪最容易影响群体氛围
+
+## 三、个人在群体中的角色
+对每位参与者分析：
+- 在群体中的功能角色（领导者/协调者/挑战者/记录者/搞笑担当/观察者等）
+- 沟通风格特征（言简意赅型/长篇大论型/表情包达人等）
+- 影响力指数（0-100）
+- 被回复率和回复他人率
+- 与群体中其他人的关系亲疏
+${JSON_ENFORCEMENT}`;
+
+export function buildGroupAnalysisPrompt(
+  conversation: string,
+  participants: string[],
+  context?: string
+): string {
+  const namesList = participants.map((p, i) => `${i + 1}. ${p}`).join("\n");
+
+  let prompt = `请对以下群聊对话进行团体动力学深度分析。这是一个${participants.length}人群聊。
+
+## 参与者列表
+${namesList}
+
+## 对话内容
+${conversation}`;
+
+  if (context) {
+    prompt += `\n\n## 背景信息\n${context}`;
+  }
+
+  prompt += `\n\n## 输出要求
+直接输出以下JSON结构（不要包裹在代码块中）：
+{
+  "groupOverview": {
+    "groupSize": ${participants.length},
+    "conversationTone": "群体整体对话氛围描述",
+    "dominantTopics": ["主要讨论话题1", "主要讨论话题2"],
+    "groupCohesion": 65,
+    "groupCohesionDesc": "群体凝聚力分析（0-100），描述群体是紧密协作还是松散聚合",
+    "decisionMakingStyle": "群体决策方式描述",
+    "communicationEfficiency": "沟通效率评估——是否高效解决问题还是反复讨论"
+  },
+  "powerStructure": {
+    "leader": "实际主导者名字",
+    "leaderEvidence": "判断依据（引用原文）",
+    "influencers": ["意见领袖1", "意见领袖2"],
+    "followers": ["跟随者1"],
+    "marginalized": ["边缘参与者1"],
+    "subGroups": [
+      {"members": ["人A", "人B"], "bond": "联盟关系描述"}
+    ]
+  },
+  "topicFlow": [
+    {"topic": "话题描述", "initiator": "发起者", "duration": "持续轮次", "outcome": "话题结果"}
+  ],
+  "conflictsAndTensions": [
+    {"parties": ["人A", "人B"], "topic": "冲突话题", "style": "冲突方式", "resolution": "解决方式或未解决"}
+  ],
+  "emotionDynamics": {
+    "overallMood": "整体情绪基调",
+    "emotionCurve": [
+      {"messageIndex": 0, "groupMood": 0.6, "label": "阶段描述"}
+    ],
+    "emotionInfluencer": "最影响群体情绪的人",
+    "emotionEvidence": "情绪传染的具体例子"
+  },
+  "participantProfiles": [
+    {
+      "name": "参与者名字",
+      "role": "在群体中的功能角色",
+      "communicationStyle": "沟通风格一句话描述",
+      "influenceScore": 75,
+      "messageCount": 10,
+      "avgMessageLength": "短/中/长",
+      "initiativeLevel": "高/中/低",
+      "emotionalTone": "主要情绪基调",
+      "keyBehaviors": ["关键行为特征1", "关键行为特征2"],
+      "relationshipMap": [
+        {"target": "另一人名字", "type": "亲密/合作/竞争/冷淡/依附", "evidence": "判断依据"}
+      ],
+      "personality": {
+        "assertiveness": {"value": 60, "confidence": 25},
+        "cooperativeness": {"value": 70, "confidence": 25},
+        "emotionalStability": {"value": 65, "confidence": 20},
+        "openness": {"value": 55, "confidence": 20}
+      }
+    }
+  ],
+  "groupInsights": ["群体层面的深层洞察1", "群体层面的深层洞察2", "群体层面的深层洞察3"],
+  "interactionAdvice": ["与这个群体互动的建议1", "与这个群体互动的建议2"],
+  "summary": "整体团体分析摘要，400-600字，涵盖群体动力学特征、关键人物角色、互动模式和潜在的群体走向"
+}`;
+
+  return prompt;
+}
+
 export function buildCoachingPrompt(
   messages: string,
   targetProfile?: string,

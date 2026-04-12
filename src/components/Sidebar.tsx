@@ -22,7 +22,9 @@ import {
   Zap,
   Compass,
   Scale,
+  Trophy,
 } from "lucide-react";
+import { ACHIEVEMENTS } from "@/lib/achievements";
 
 /** Nav key mapping to i18n translation keys */
 type NavKey = "dashboard" | "analyze" | "profiles" | "drill" | "psychology" | "legal" | "planning" | "divination" | "mbti" | "settings";
@@ -76,6 +78,49 @@ export const NAV_ITEMS = NAV_ITEMS_DEF.map((item) => {
   };
   return { ...item, ...zhLabels[item.id] };
 });
+
+// ---- Achievement Mini Widget ----
+
+function AchievementMini() {
+  const achievements = useAppStore((s) => s.achievements) ?? [];
+  const language = useAppStore((s) => s.language);
+  const setActiveTab = useAppStore((s) => s.setActiveTab);
+  const totalPossible = ACHIEVEMENTS.reduce((sum, a) => sum + (a.maxLevel ?? 1), 0);
+  const unlocked = achievements.length;
+  const pct = totalPossible > 0 ? Math.round((unlocked / totalPossible) * 100) : 0;
+  const radius = 14;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - pct / 100);
+
+  return (
+    <button
+      onClick={() => setActiveTab("settings")}
+      className="flex items-center gap-2.5 w-full rounded-lg bg-amber-500/5 border border-amber-500/15 px-3 py-2 hover:bg-amber-500/10 transition-colors group"
+    >
+      <svg width="36" height="36" viewBox="0 0 36 36" className="shrink-0">
+        <circle cx="18" cy="18" r={radius} fill="none" stroke="#3f3f46" strokeWidth="2.5" />
+        <circle
+          cx="18" cy="18" r={radius}
+          fill="none" stroke="#f59e0b" strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          transform="rotate(-90 18 18)"
+          className="transition-all duration-700"
+        />
+        <Trophy className="text-amber-400" x="11" y="11" width="14" height="14" />
+      </svg>
+      <div className="flex flex-col min-w-0 text-left">
+        <span className="text-[10px] font-medium text-amber-300/80">
+          {language === "en" ? "Achievements" : "成就"}
+        </span>
+        <span className="text-[9px] text-zinc-500">
+          {unlocked}/{totalPossible} · {pct}%
+        </span>
+      </div>
+    </button>
+  );
+}
 
 // ---- Mobile top header bar ----
 
@@ -234,12 +279,13 @@ export default function Sidebar() {
 
         {/* Bottom */}
         {sidebarOpen && (
-          <div className="border-t border-zinc-800 p-4 shrink-0">
+          <div className="border-t border-zinc-800 p-4 shrink-0 space-y-3">
+            <AchievementMini />
             <div className="rounded-lg bg-gradient-to-br from-violet-500/10 to-blue-500/10 border border-violet-500/20 p-3">
               <p className="text-xs text-zinc-400 leading-relaxed">
                 <span className="text-violet-300 font-medium">Social Intelligence OS</span>
                 <br />
-                理解他人，理解自己，优化人际。
+                {t.nav.dashboard === "Dashboard" ? "Understand others, understand yourself." : "理解他人，理解自己，优化人际。"}
               </p>
             </div>
           </div>

@@ -54,6 +54,9 @@ import { DIMENSION_LABELS, DIMENSION_KEYS } from "@/lib/types";
 import { detectTrendAlerts, alertToToast, type TrendAlert } from "@/lib/trend-alerts";
 import { exportDashboardReport } from "@/lib/export-report";
 import { apiFetch } from "@/lib/api-fetch";
+import { useT, getAILanguageInstruction } from "@/lib/i18n";
+import ShareCard from "./ShareCard";
+import { Share2 } from "lucide-react";
 
 // ---- Stat Card ----
 
@@ -94,10 +97,13 @@ function StatCard({
 // ---- Main Component ----
 
 export default function DashboardTab() {
-  const { profiles, conversations, mbtiResults, eqScores, relationships, profileMemories, divinationRecords, moduleHistory, addToast, setActiveTab } = useAppStore();
+  const storeState = useAppStore();
+  const { profiles = [], conversations = [], mbtiResults = [], eqScores = [], relationships = [], profileMemories = [], divinationRecords = [], moduleHistory = {}, chatSessions = [], responseFeedback = [], addToast, setActiveTab, language } = storeState;
+  const t = useT();
   const toastPushedRef = useRef(false);
   const [aiInsight, setAiInsight] = useState<string | null>(null);
   const [insightLoading, setInsightLoading] = useState(false);
+  const [showShareCard, setShowShareCard] = useState(false);
 
   // Trend alerts
   const alerts = useMemo(() => {
@@ -146,7 +152,7 @@ export default function DashboardTab() {
         const start = now - (d + 1) * dayMs;
         const end = now - d * dayMs;
         const dayConvos = conversations.filter((c) => { const t = new Date(c.createdAt).getTime(); return t >= start && t < end; });
-        const dayLabel = d === 0 ? "今天" : d === 1 ? "昨天" : `${d}天前`;
+        const dayLabel = d === 0 ? (language === "en" ? "Today" : "今天") : d === 1 ? (language === "en" ? "Yesterday" : "昨天") : (language === "en" ? `${d}d ago` : `${d}天前`);
         weeklyData.push({ week: dayLabel, count: dayConvos.length, analyzed: dayConvos.filter((c) => c.analysis).length });
       }
     } else {
@@ -157,7 +163,7 @@ export default function DashboardTab() {
         const start = now - (w + 1) * weekMs;
         const end = now - w * weekMs;
         const weekConvos = conversations.filter((c) => { const t = new Date(c.createdAt).getTime(); return t >= start && t < end; });
-        const weekLabel = w === 0 ? "本周" : w === 1 ? "上周" : `${w + 1}周前`;
+        const weekLabel = w === 0 ? (language === "en" ? "This wk" : "本周") : w === 1 ? (language === "en" ? "Last wk" : "上周") : (language === "en" ? `${w + 1}wk ago` : `${w + 1}周前`);
         weeklyData.push({ week: weekLabel, count: weekConvos.length, analyzed: weekConvos.filter((c) => c.analysis).length });
       }
     }
@@ -166,7 +172,7 @@ export default function DashboardTab() {
     const eqTrend = eqScores.slice(-8).map((e, i) => ({
       index: i + 1,
       score: e.overallScore,
-      label: new Date(e.createdAt).toLocaleDateString("zh-CN", { month: "short", day: "numeric" }),
+      label: new Date(e.createdAt).toLocaleDateString(language === "en" ? "en-US" : "zh-CN", { month: "short", day: "numeric" }),
     }));
 
     // Divination stats
@@ -179,20 +185,32 @@ export default function DashboardTab() {
     catMap.forEach((count, name) => divinationByCategory.push({ name, count }));
     divinationByCategory.sort((a, b) => b.count - a.count);
 
+    // Chat session stats
+    const chatSessionCount = chatSessions.length;
+    const chatMessageTotal = chatSessions.reduce((s, cs) => s + cs.messages.length, 0);
+    const feedbackTotal = responseFeedback.length;
+    const feedbackUpCount = responseFeedback.filter((f) => f.rating === "up").length;
+    const feedbackDownCount = responseFeedback.filter((f) => f.rating === "down").length;
+    const feedbackPositiveRate = feedbackTotal > 0 ? Math.round(feedbackUpCount / feedbackTotal * 100) : 0;
+
     // Module usage breakdown
+    const moduleNames = language === "en"
+      ? ["Analysis", "Profiles", "Divination", "AI Memory", "EQ", "Chat"]
+      : ["对话分析", "人物画像", "风水玄学", "AI记忆", "EQ训练", "咨询会话"];
     const moduleUsage: { name: string; count: number; color: string }[] = [
-      { name: "对话分析", count: conversations.length, color: "#60a5fa" },
-      { name: "人物画像", count: profiles.length, color: "#a78bfa" },
-      { name: "风水玄学", count: divinationCount, color: "#34d399" },
-      { name: "AI记忆", count: profileMemories.length, color: "#f472b6" },
-      { name: "EQ训练", count: eqScores.length, color: "#facc15" },
+      { name: moduleNames[0], count: conversations.length, color: "#60a5fa" },
+      { name: moduleNames[1], count: profiles.length, color: "#a78bfa" },
+      { name: moduleNames[2], count: divinationCount, color: "#34d399" },
+      { name: moduleNames[3], count: profileMemories.length, color: "#f472b6" },
+      { name: moduleNames[4], count: eqScores.length, color: "#facc15" },
+      { name: moduleNames[5], count: chatSessionCount, color: "#38bdf8" },
     ].filter((m) => m.count > 0);
 
     // Profile dimension averages (across all profiles)
     const dimAverages: { key: DimensionKey; label: string; avg: number }[] = DIMENSION_KEYS.map((key) => {
       const values = profiles.map((p) => p.dimensions[key]?.value ?? 50);
       const avg = values.length > 0 ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : 50;
-      return { key, label: DIMENSION_LABELS[key].zh, avg };
+      return { key, label: language === "en" ? (DIMENSION_LABELS[key].en ?? DIMENSION_LABELS[key].zh) : DIMENSION_LABELS[key].zh, avg };
     });
 
     // Top active profiles (by conversation count)
@@ -216,7 +234,7 @@ export default function DashboardTab() {
       sentimentScatter.push({
         x: idx + 1,
         y: Math.round(avg * 100) / 100,
-        label: c.title || `对话${idx + 1}`,
+        label: c.title || `${language === "en" ? "Convo" : "对话"}${idx + 1}`,
         sentiment: avg > 0.15 ? "positive" : avg < -0.15 ? "negative" : "neutral",
       });
     });
@@ -263,7 +281,7 @@ export default function DashboardTab() {
         mean: Math.round(mean * 10) / 10,
         upper: Math.min(100, Math.round((mean + std) * 10) / 10),
         lower: Math.max(0, Math.round((mean - std) * 10) / 10),
-        label: new Date(e.createdAt).toLocaleDateString("zh-CN", { month: "short", day: "numeric" }),
+        label: new Date(e.createdAt).toLocaleDateString(language === "en" ? "en-US" : "zh-CN", { month: "short", day: "numeric" }),
       };
     });
 
@@ -284,19 +302,20 @@ export default function DashboardTab() {
       dayBuckets.set(d, entry);
     }
     dayBuckets.forEach((counts, day) => {
-      const date = new Date(baseDay + day * dayMs).toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
-      if (counts.convo > 0) activityScatter.push({ day, count: counts.convo, date, type: "对话" });
-      if (counts.div > 0) activityScatter.push({ day, count: counts.div, date, type: "玄学" });
+      const date = new Date(baseDay + day * dayMs).toLocaleDateString(language === "en" ? "en-US" : "zh-CN", { month: "short", day: "numeric" });
+      if (counts.convo > 0) activityScatter.push({ day, count: counts.convo, date, type: language === "en" ? "Convo" : "对话" });
+      if (counts.div > 0) activityScatter.push({ day, count: counts.div, date, type: language === "en" ? "Mystic" : "玄学" });
     });
 
     // Module usage proportional (for radar-like display instead of bars)
-    const totalUsage = [conversations.length, profiles.length, divinationCount, profileMemories.length, eqScores.length].reduce((a, b) => a + b, 0) || 1;
+    const totalUsage = [conversations.length, profiles.length, divinationCount, profileMemories.length, eqScores.length, chatSessionCount].reduce((a, b) => a + b, 0) || 1;
     const moduleRadar = [
-      { module: "对话分析", value: Math.round(conversations.length / totalUsage * 100), raw: conversations.length },
-      { module: "人物画像", value: Math.round(profiles.length / totalUsage * 100), raw: profiles.length },
-      { module: "风水玄学", value: Math.round(divinationCount / totalUsage * 100), raw: divinationCount },
-      { module: "AI记忆", value: Math.round(profileMemories.length / totalUsage * 100), raw: profileMemories.length },
-      { module: "EQ训练", value: Math.round(eqScores.length / totalUsage * 100), raw: eqScores.length },
+      { module: moduleNames[0], value: Math.round(conversations.length / totalUsage * 100), raw: conversations.length },
+      { module: moduleNames[1], value: Math.round(profiles.length / totalUsage * 100), raw: profiles.length },
+      { module: moduleNames[2], value: Math.round(divinationCount / totalUsage * 100), raw: divinationCount },
+      { module: moduleNames[3], value: Math.round(profileMemories.length / totalUsage * 100), raw: profileMemories.length },
+      { module: moduleNames[4], value: Math.round(eqScores.length / totalUsage * 100), raw: eqScores.length },
+      { module: moduleNames[5], value: Math.round(chatSessionCount / totalUsage * 100), raw: chatSessionCount },
     ];
 
     // Statistical summary
@@ -328,11 +347,17 @@ export default function DashboardTab() {
       const key = d.toISOString().slice(0, 10);
       heatmapBuckets.set(key, (heatmapBuckets.get(key) || 0) + 1);
     }
+    for (const s of chatSessions) {
+      const d = new Date(s.createdAt);
+      d.setHours(0, 0, 0, 0);
+      const key = d.toISOString().slice(0, 10);
+      heatmapBuckets.set(key, (heatmapBuckets.get(key) || 0) + 1);
+    }
     const totalHeatmapDays = Math.ceil((today.getTime() - heatmapStart.getTime()) / dayMs) + 1;
     for (let i = 0; i < totalHeatmapDays; i++) {
       const d = new Date(heatmapStart.getTime() + i * dayMs);
       const iso = d.toISOString().slice(0, 10);
-      heatmap.push({ date: d.toLocaleDateString("zh-CN", { month: "short", day: "numeric" }), count: heatmapBuckets.get(iso) || 0, iso });
+      heatmap.push({ date: d.toLocaleDateString(language === "en" ? "en-US" : "zh-CN", { month: "short", day: "numeric" }), count: heatmapBuckets.get(iso) || 0, iso });
     }
     const heatmapMax = Math.max(1, ...heatmap.map(h => h.count));
 
@@ -360,9 +385,15 @@ export default function DashboardTab() {
       avgMsgsPerConvo,
       heatmap,
       heatmapMax,
+      chatSessionCount,
+      chatMessageTotal,
+      feedbackTotal,
+      feedbackUpCount,
+      feedbackDownCount,
+      feedbackPositiveRate,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profiles, conversations, mbtiResults, eqScores, relationships, profileMemories, divinationRecords, moduleHistory]);
+  }, [profiles, conversations, mbtiResults, eqScores, relationships, profileMemories, divinationRecords, moduleHistory, chatSessions, responseFeedback, language]);
 
   // AI Insight generator — SSE streaming with typewriter effect
   const generateInsight = useCallback(async () => {
@@ -377,14 +408,17 @@ export default function DashboardTab() {
         `MBTI: ${stats.latestMBTI?.type || "无"}`,
         stats.sentimentDist.n > 0 ? `情绪分布: μ=${stats.sentimentDist.mean.toFixed(2)}, σ=${stats.sentimentDist.std.toFixed(2)}, 95%CI=[${stats.sentimentDist.ci95.map((v: number) => v.toFixed(2)).join(",")}], n=${stats.sentimentDist.n}` : "",
         `占卜: ${stats.divinationCount}次`,
+        `咨询会话: ${stats.chatSessionCount}次, 会话消息: ${stats.chatMessageTotal}条`,
+        stats.feedbackTotal > 0 ? `反馈: ${stats.feedbackTotal}条, 好评率: ${stats.feedbackPositiveRate}%` : "",
         `活跃天数: ${stats.daysSpan}, 日均对话: ${stats.avgMsgsPerConvo}条/对话`,
-        `画像维度均值: ${stats.dimAverages.map((d: any) => `${d.dimension}=${d.avg}`).join(", ")}`,
+        `画像维度均值: ${stats.dimAverages.map((d: any) => `${d.label}=${d.avg}`).join(", ")}`,
         stats.profileActivity.length > 0 ? `最活跃: ${stats.profileActivity.slice(0, 3).map((p: any) => `${p.name}(${p.count}次)`).join(", ")}` : "",
       ].filter(Boolean).join("\n");
 
+      const languageInstruction = getAILanguageInstruction(language);
       const res = await apiFetch("/api/dashboard-insight?stream=true", {
         method: "POST",
-        body: JSON.stringify({ statsSnapshot: snapshot }),
+        body: JSON.stringify({ statsSnapshot: snapshot, languageInstruction }),
       });
 
       if (!res.ok) {
@@ -418,9 +452,9 @@ export default function DashboardTab() {
           }
         }
       }
-      if (!accumulated) setAiInsight("未生成内容，请重试。");
+      if (!accumulated) setAiInsight(t.dashboard.noContent);
     } catch (e: any) {
-      setAiInsight((prev) => prev ? prev + `\n\n⚠ ${e.message}` : `洞察生成失败: ${e.message || "未知错误"}`);
+      setAiInsight((prev) => prev ? prev + `\n\n⚠ ${e.message}` : `${t.dashboard.insightFailed}: ${e.message || "Unknown"}`);
     } finally {
       setInsightLoading(false);
     }
@@ -437,8 +471,8 @@ export default function DashboardTab() {
               <BarChart3 className="h-5 w-5 text-violet-400" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-zinc-100">数据大盘</h1>
-              <p className="text-[10px] text-zinc-500">全局数据概览 · 趋势分析 · AI洞察</p>
+              <h1 className="text-lg font-semibold text-zinc-100">{t.dashboard.title}</h1>
+              <p className="text-[10px] text-zinc-500">{t.dashboard.subtitle}</p>
             </div>
           </div>
           {!isEmpty && (
@@ -452,7 +486,7 @@ export default function DashboardTab() {
                   exportDashboardReport(profiles, conversations, eqScores, profileMemories, alertsHtml);
                 }}
                 className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-500 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
-                title="导出为PDF报告"
+                title={t.dashboard.exportPDF}
               >
                 <FileDown className="h-3.5 w-3.5" />
                 PDF
@@ -474,6 +508,10 @@ export default function DashboardTab() {
                       memoriesCount: stats.memoriesCount,
                       relationshipsCount: stats.relationshipsCount,
                       divinationCount: stats.divinationCount,
+                      chatSessionCount: stats.chatSessionCount,
+                      chatMessageTotal: stats.chatMessageTotal,
+                      feedbackTotal: stats.feedbackTotal,
+                      feedbackPositiveRate: stats.feedbackPositiveRate,
                       sentimentDist: {
                         mean: stats.sentimentDist.mean,
                         std: stats.sentimentDist.std,
@@ -502,10 +540,18 @@ export default function DashboardTab() {
                   URL.revokeObjectURL(url);
                 }}
                 className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-500 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
-                title="导出原始数据JSON"
+                title={t.dashboard.exportJSON}
               >
                 <FileDown className="h-3.5 w-3.5" />
                 JSON
+              </button>
+              <button
+                onClick={() => setShowShareCard(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-600/10 px-3 py-1.5 text-xs text-violet-400 hover:bg-violet-600/20 hover:border-violet-500/50 transition-colors"
+                title={language === "en" ? "Share Journey" : "分享旅程"}
+              >
+                <Share2 className="h-3.5 w-3.5" />
+                {language === "en" ? "Share" : "分享"}
               </button>
             </div>
           )}
@@ -517,8 +563,8 @@ export default function DashboardTab() {
           {isEmpty ? (
             <div className="text-center py-20">
               <BarChart3 className="h-12 w-12 text-zinc-700 mx-auto mb-4" />
-              <p className="text-sm text-zinc-500">暂无数据</p>
-              <p className="text-xs text-zinc-600 mt-1">开始对话分析和创建人物画像后，数据将在此展示</p>
+              <p className="text-sm text-zinc-500">{t.common.noData}</p>
+              <p className="text-xs text-zinc-600 mt-1">{t.dashboard.noDataHint}</p>
             </div>
           ) : (
             <>
@@ -565,14 +611,16 @@ export default function DashboardTab() {
               )}
 
               {/* ─── Statistical Summary Ribbon ─── */}
-              <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+              <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
                 {[
-                  { label: "画像", val: stats.totalProfiles, unit: "人", c: "text-violet-400" },
-                  { label: "对话", val: stats.totalConversations, unit: "段", c: "text-blue-400" },
-                  { label: "消息", val: stats.totalMessages, unit: "条", c: "text-cyan-400" },
-                  { label: "分析覆盖", val: `${stats.engagementRate}%`, unit: "", c: "text-emerald-400" },
-                  { label: "均消息/对话", val: stats.avgMsgsPerConvo, unit: "", c: "text-amber-400" },
-                  { label: "玄学", val: stats.divinationCount, unit: "次", c: "text-pink-400" },
+                  { label: t.dashboard.profiles, val: stats.totalProfiles, unit: t.dashboard.personUnit, c: "text-violet-400" },
+                  { label: t.dashboard.conversations, val: stats.totalConversations, unit: t.dashboard.convUnit, c: "text-blue-400" },
+                  { label: t.dashboard.messages, val: stats.totalMessages, unit: t.dashboard.msgUnit, c: "text-cyan-400" },
+                  { label: t.dashboard.analysisCoverage, val: `${stats.engagementRate}%`, unit: "", c: "text-emerald-400" },
+                  { label: t.dashboard.avgMsgPerConvo, val: stats.avgMsgsPerConvo, unit: "", c: "text-amber-400" },
+                  { label: t.dashboard.divination, val: stats.divinationCount, unit: t.dashboard.timesUnit, c: "text-pink-400" },
+                  { label: t.dashboard.chatSessions, val: stats.chatSessionCount, unit: t.dashboard.timesUnit, c: "text-sky-400" },
+                  { label: t.dashboard.feedbackRate, val: stats.feedbackTotal > 0 ? `${stats.feedbackPositiveRate}%` : "-", unit: "", c: "text-emerald-400" },
                 ].map((s) => (
                   <div key={s.label} className="rounded-lg border border-zinc-800/60 bg-zinc-900/40 px-3 py-2.5 text-center">
                     <p className={cn("text-xl font-bold tracking-tight", s.c)}>{s.val}<span className="text-[9px] text-zinc-600 ml-0.5">{s.unit}</span></p>
@@ -588,11 +636,11 @@ export default function DashboardTab() {
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <Activity className="h-4 w-4 text-blue-400" />
-                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">活动时间线</h3>
+                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{t.dashboard.activityTimeline}</h3>
                     </div>
                     <span className="text-[8px] text-zinc-600 font-mono">n={stats.totalConversations + stats.divinationCount}</span>
                   </div>
-                  <p className="text-[8px] text-zinc-600 mb-3 italic">散点大小 ∝ 当日活动频次</p>
+                  <p className="text-[8px] text-zinc-600 mb-3 italic">{t.dashboard.scatterHint}</p>
                   {stats.activityScatter.length > 0 ? (
                     <ResponsiveContainer width="100%" height={170}>
                       <ScatterChart margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
@@ -604,13 +652,13 @@ export default function DashboardTab() {
                           formatter={(val: any, name: any) => [val, name]}
                           labelFormatter={(v) => `第${v}天`}
                         />
-                        <Scatter name="对话" data={stats.activityScatter.filter(d => d.type === "对话")} fill="#60a5fa" opacity={0.7} />
-                        <Scatter name="玄学" data={stats.activityScatter.filter(d => d.type === "玄学")} fill="#a78bfa" opacity={0.7} />
+                        <Scatter name={t.dashboard.convoLabel} data={stats.activityScatter.filter(d => d.type === "对话")} fill="#60a5fa" opacity={0.7} />
+                        <Scatter name={t.dashboard.mysticLabel} data={stats.activityScatter.filter(d => d.type === "玄学")} fill="#a78bfa" opacity={0.7} />
                         <Legend iconType="circle" iconSize={6} wrapperStyle={{ fontSize: 9, color: "#71717a" }} />
                       </ScatterChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-[170px] text-[10px] text-zinc-600">使用后生成活动时间线</div>
+                    <div className="flex items-center justify-center h-[170px] text-[10px] text-zinc-600">{t.dashboard.noEQData}</div>
                   )}
                 </div>
 
@@ -619,12 +667,12 @@ export default function DashboardTab() {
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <Target className="h-4 w-4 text-emerald-400" />
-                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">EQ成长曲线</h3>
-                      <span className="text-[7px] text-zinc-600 border border-zinc-700 rounded px-1">来自对话分析</span>
+                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{t.dashboard.eqGrowth}</h3>
+                      <span className="text-[7px] text-zinc-600 border border-zinc-700 rounded px-1">{t.dashboard.fromAnalysis}</span>
                     </div>
                     {stats.avgEQ > 0 && <span className="text-[9px] text-zinc-500 font-mono">μ={stats.avgEQ}</span>}
                   </div>
-                  <p className="text-[8px] text-zinc-600 mb-3 italic">阴影区域 = 滚动±1σ置信带</p>
+                  <p className="text-[8px] text-zinc-600 mb-3 italic">{t.dashboard.shadowBand}</p>
                   {stats.eqTrend.length >= 2 ? (
                     <ResponsiveContainer width="100%" height={170}>
                       <AreaChart data={stats.eqTrend} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
@@ -681,18 +729,18 @@ export default function DashboardTab() {
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <Layers className="h-4 w-4 text-cyan-400" />
-                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">功能使用分布</h3>
+                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{t.dashboard.moduleRadar}</h3>
                     </div>
-                    <span className="text-[8px] text-zinc-600 font-mono">占比 %</span>
+                    <span className="text-[8px] text-zinc-600 font-mono">{t.dashboard.percentLabel}</span>
                   </div>
-                  <p className="text-[8px] text-zinc-600 mb-2 italic">各模块使用占比雷达图</p>
+                  <p className="text-[8px] text-zinc-600 mb-2 italic">{t.dashboard.moduleUsageHint}</p>
                   <ResponsiveContainer width="100%" height={220}>
                     <RadarChart data={stats.moduleRadar} cx="50%" cy="50%" outerRadius="75%">
                       <PolarGrid stroke="#3f3f46" strokeDasharray="3 3" />
                       <PolarAngleAxis dataKey="module" tick={{ fontSize: 8, fill: "#71717a" }} />
                       <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                      <Radar name="使用占比" dataKey="value" stroke="#22d3ee" fill="#22d3ee" fillOpacity={0.12} strokeWidth={1.5} dot={{ r: 2.5, fill: "#22d3ee" }} />
-                      <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: "8px", fontSize: "10px" }} formatter={(val: any, _: any, entry: any) => [`${val}% (${entry?.payload?.raw ?? 0}次)`, "使用占比"]} />
+                      <Radar name={t.dashboard.usagePercent} dataKey="value" stroke="#22d3ee" fill="#22d3ee" fillOpacity={0.12} strokeWidth={1.5} dot={{ r: 2.5, fill: "#22d3ee" }} />
+                      <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: "8px", fontSize: "10px" }} formatter={(val: any, _: any, entry: any) => [`${val}% (${entry?.payload?.raw ?? 0})`, t.dashboard.usagePercent]} />
                     </RadarChart>
                   </ResponsiveContainer>
                 </div>
@@ -705,35 +753,35 @@ export default function DashboardTab() {
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <Heart className="h-4 w-4 text-pink-400" />
-                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">情绪散点图</h3>
+                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{t.dashboard.sentimentDist}</h3>
                     </div>
                     <span className="text-[8px] text-zinc-600 font-mono">n={stats.sentimentDist.n}</span>
                   </div>
-                  <p className="text-[8px] text-zinc-600 mb-3 italic">每段对话平均对方情绪值 (−1=消极, +1=积极)</p>
+                  <p className="text-[8px] text-zinc-600 mb-3 italic">{t.dashboard.sentimentHint}</p>
                   {stats.sentimentScatter.length > 0 ? (
                     <ResponsiveContainer width="100%" height={180}>
                       <ScatterChart margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
                         <XAxis dataKey="x" type="number" tick={{ fontSize: 9, fill: "#52525b" }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} name="对话序号" />
                         <YAxis dataKey="y" type="number" domain={[-1, 1]} tick={{ fontSize: 9, fill: "#52525b" }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} />
-                        <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: "8px", fontSize: "10px" }} formatter={(val: any) => [`${val}`, "情绪值"]} labelFormatter={(v) => `对话 #${v}`} />
+                        <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: "8px", fontSize: "10px" }} formatter={(val: any) => [`${val}`, t.dashboard.sentimentValue]} labelFormatter={(v) => `${t.dashboard.convoN} #${v}`} />
                         <ReferenceLine y={0} stroke="#52525b" strokeDasharray="2 2" />
                         {stats.sentimentDist.n > 1 && (
                           <ReferenceLine y={stats.sentimentDist.mean} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: `μ=${stats.sentimentDist.mean.toFixed(2)}`, position: "right", style: { fontSize: 8, fill: "#f59e0b" } }} />
                         )}
-                        <Scatter data={stats.sentimentScatter.filter(s => s.sentiment === "positive")} fill="#34d399" opacity={0.8} name="积极" />
-                        <Scatter data={stats.sentimentScatter.filter(s => s.sentiment === "neutral")} fill="#a1a1aa" opacity={0.6} name="中性" />
-                        <Scatter data={stats.sentimentScatter.filter(s => s.sentiment === "negative")} fill="#f87171" opacity={0.8} name="消极" />
+                        <Scatter data={stats.sentimentScatter.filter(s => s.sentiment === "positive")} fill="#34d399" opacity={0.8} name={t.dashboard.positive} />
+                        <Scatter data={stats.sentimentScatter.filter(s => s.sentiment === "neutral")} fill="#a1a1aa" opacity={0.6} name={t.dashboard.neutral} />
+                        <Scatter data={stats.sentimentScatter.filter(s => s.sentiment === "negative")} fill="#f87171" opacity={0.8} name={t.dashboard.negative} />
                         <Legend iconType="circle" iconSize={6} wrapperStyle={{ fontSize: 9 }} />
                       </ScatterChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-[180px] text-[10px] text-zinc-600">完成对话分析后显示</div>
+                    <div className="flex items-center justify-center h-[180px] text-[10px] text-zinc-600">{t.dashboard.noEQData}</div>
                   )}
                   {/* Box Plot + Strip */}
                   {stats.sentimentDist.n >= 3 && (
                     <div className="mt-3 pt-3 border-t border-zinc-800/50">
-                      <p className="text-[8px] text-zinc-600 mb-2 italic">Box Plot · 四分位分布 (whisker = min/max)</p>
+                      <p className="text-[8px] text-zinc-600 mb-2 italic">{t.dashboard.boxPlotTitle} (whisker = min/max)</p>
                       <svg viewBox="0 0 320 56" className="w-full h-14">
                         {(() => {
                           const d = stats.sentimentDist;
@@ -786,14 +834,14 @@ export default function DashboardTab() {
                 <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <Brain className="h-4 w-4 text-violet-400" />
-                    <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">统计洞察</h3>
+                    <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{t.dashboard.statisticalInsight}</h3>
                     <span className="text-[7px] text-zinc-600 border border-zinc-700 rounded px-1">Statistical Summary</span>
                   </div>
                   <div className="space-y-3 text-[10px]">
                     {/* Engagement */}
                     <div className="rounded-lg border border-zinc-800/60 bg-zinc-800/20 p-3">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-zinc-400 font-medium">分析覆盖率</span>
+                        <span className="text-zinc-400 font-medium">{t.dashboard.coverageRate}</span>
                         <span className="font-mono text-emerald-400">{stats.engagementRate}%</span>
                       </div>
                       <div className="relative h-1.5 rounded-full bg-zinc-800">
@@ -802,13 +850,13 @@ export default function DashboardTab() {
                         </div>
                         <div className="absolute top-[-1px] w-0.5 h-2.5 rounded-sm bg-emerald-400 transition-all" style={{ left: `${stats.engagementRate}%`, transform: "translateX(-50%)" }} />
                       </div>
-                      <p className="text-[8px] text-zinc-600 mt-1">{stats.analyzedCount}/{stats.totalConversations} 段对话已分析</p>
+                      <p className="text-[8px] text-zinc-600 mt-1">{stats.analyzedCount}/{stats.totalConversations} {t.dashboard.convosAnalyzed}</p>
                     </div>
 
                     {/* Sentiment CI */}
                     {stats.sentimentDist.n > 1 && (
                       <div className="rounded-lg border border-zinc-800/60 bg-zinc-800/20 p-3">
-                        <p className="text-zinc-400 font-medium mb-1">情绪均值 95% CI</p>
+                        <p className="text-zinc-400 font-medium mb-1">{t.dashboard.sentimentCI}</p>
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-amber-400">{stats.sentimentDist.mean.toFixed(3)}</span>
                           <span className="text-zinc-600">±</span>
@@ -819,7 +867,7 @@ export default function DashboardTab() {
                           <span className="ml-1">| n={stats.sentimentDist.n}</span>
                         </p>
                         <p className="text-[8px] mt-1 italic" style={{ color: stats.sentimentDist.ci95[0] > 0 ? "#34d399" : stats.sentimentDist.ci95[1] < 0 ? "#f87171" : "#a1a1aa" }}>
-                          {stats.sentimentDist.ci95[0] > 0 ? "✓ 显著积极倾向 (CI > 0)" : stats.sentimentDist.ci95[1] < 0 ? "⚠ 显著消极倾向 (CI < 0)" : "○ 无显著倾向 (CI 跨越0)"}
+                          {stats.sentimentDist.ci95[0] > 0 ? t.dashboard.sigPositive : stats.sentimentDist.ci95[1] < 0 ? t.dashboard.sigNegative : t.dashboard.sigNeutral}
                         </p>
                       </div>
                     )}
@@ -832,22 +880,22 @@ export default function DashboardTab() {
                         {stats.latestMBTI && <p className="text-[7px] text-zinc-600">{stats.latestMBTI.mode} · {stats.latestMBTI.questionCount}题</p>}
                       </div>
                       <div className="rounded-lg border border-zinc-800/60 bg-zinc-800/20 p-3 text-center">
-                        <p className="text-[8px] text-zinc-600 mb-1">EQ均分</p>
+                        <p className="text-[8px] text-zinc-600 mb-1">{t.dashboard.eqAvg}</p>
                         <p className="text-lg font-bold text-emerald-400">{stats.avgEQ || "—"}</p>
-                        <p className="text-[7px] text-zinc-600">n={eqScores.length} 次评估</p>
+                        <p className="text-[7px] text-zinc-600">n={eqScores.length} {t.dashboard.assessments}</p>
                       </div>
                     </div>
 
                     {/* Key metrics table */}
                     <div className="rounded-lg border border-zinc-800/60 bg-zinc-800/20 p-3">
-                      <p className="text-zinc-400 font-medium mb-2">数据摘要</p>
+                      <p className="text-zinc-400 font-medium mb-2">{t.dashboard.dataSummary}</p>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[9px]">
-                        <div className="flex justify-between"><span className="text-zinc-600">关系网络</span><span className="text-zinc-400 font-mono">{stats.relationshipsCount}</span></div>
-                        <div className="flex justify-between"><span className="text-zinc-600">AI记忆</span><span className="text-zinc-400 font-mono">{stats.memoriesCount}</span></div>
-                        <div className="flex justify-between"><span className="text-zinc-600">数据跨度</span><span className="text-zinc-400 font-mono">{stats.daysSpan}天</span></div>
-                        <div className="flex justify-between"><span className="text-zinc-600">日均活动</span><span className="text-zinc-400 font-mono">{((stats.totalConversations + stats.divinationCount) / Math.max(1, stats.daysSpan)).toFixed(1)}</span></div>
+                        <div className="flex justify-between"><span className="text-zinc-600">{t.dashboard.relNetwork}</span><span className="text-zinc-400 font-mono">{stats.relationshipsCount}</span></div>
+                        <div className="flex justify-between"><span className="text-zinc-600">{t.dashboard.aiMemory}</span><span className="text-zinc-400 font-mono">{stats.memoriesCount}</span></div>
+                        <div className="flex justify-between"><span className="text-zinc-600">{t.dashboard.dataSpan}</span><span className="text-zinc-400 font-mono">{stats.daysSpan}{t.dashboard.dayUnit}</span></div>
+                        <div className="flex justify-between"><span className="text-zinc-600">{t.dashboard.dailyActivity}</span><span className="text-zinc-400 font-mono">{((stats.totalConversations + stats.divinationCount) / Math.max(1, stats.daysSpan)).toFixed(1)}</span></div>
                         {stats.divinationByCategory.length > 0 && (
-                          <div className="flex justify-between col-span-2"><span className="text-zinc-600">最常用玄学</span><span className="text-zinc-400 font-mono">{stats.divinationByCategory[0].name} ({stats.divinationByCategory[0].count})</span></div>
+                          <div className="flex justify-between col-span-2"><span className="text-zinc-600">{t.dashboard.topDivination}</span><span className="text-zinc-400 font-mono">{stats.divinationByCategory[0].name} ({stats.divinationByCategory[0].count})</span></div>
                         )}
                       </div>
                     </div>
@@ -861,7 +909,7 @@ export default function DashboardTab() {
                 <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <Users className="h-4 w-4 text-violet-400" />
-                    <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">最活跃人物</h3>
+                    <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{t.dashboard.topProfiles}</h3>
                     <span className="text-[8px] text-zinc-600 font-mono">Top {Math.min(5, stats.profileActivity.length)}</span>
                   </div>
                   {stats.profileActivity.length > 0 ? (
@@ -880,13 +928,13 @@ export default function DashboardTab() {
                                 <div className="w-2.5 h-2.5 rounded-full bg-violet-500 shadow-sm shadow-violet-500/30" />
                               </div>
                             </div>
-                            <span className="text-[9px] text-zinc-500 w-8 shrink-0 text-right font-mono">{p.count}次</span>
+                            <span className="text-[9px] text-zinc-500 w-8 shrink-0 text-right font-mono">{p.count}</span>
                           </div>
                         );
                       })}
                     </div>
                   ) : (
-                    <div className="flex items-center justify-center h-[100px] text-[10px] text-zinc-600">暂无画像</div>
+                    <div className="flex items-center justify-center h-[100px] text-[10px] text-zinc-600">{t.dashboard.noProfiles}</div>
                   )}
                 </div>
 
@@ -895,11 +943,11 @@ export default function DashboardTab() {
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-blue-400" />
-                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{stats.daysSpan <= 7 ? "近期活动折线" : "对话趋势折线"}</h3>
+                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{stats.daysSpan <= 7 ? t.dashboard.recentTrend : t.dashboard.convoTrend}</h3>
                     </div>
-                    <span className="text-[8px] text-zinc-600 font-mono">{stats.daysSpan <= 7 ? "日" : "周"}粒度</span>
+                    <span className="text-[8px] text-zinc-600 font-mono">{stats.daysSpan <= 7 ? t.dashboard.dayGranularity : t.dashboard.weekGranularity}</span>
                   </div>
-                  <p className="text-[8px] text-zinc-600 mb-3 italic">总对话 vs 已分析</p>
+                  <p className="text-[8px] text-zinc-600 mb-3 italic">{t.dashboard.totalVsAnalyzed}</p>
                   {stats.weeklyData.some((d) => d.count > 0) ? (
                     <ResponsiveContainer width="100%" height={150}>
                       <LineChart data={stats.weeklyData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
@@ -907,13 +955,13 @@ export default function DashboardTab() {
                         <XAxis dataKey="week" tick={{ fontSize: 9, fill: "#52525b" }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} />
                         <YAxis allowDecimals={false} tick={{ fontSize: 9, fill: "#52525b" }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} />
                         <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: "8px", fontSize: "10px" }} />
-                        <Line type="monotone" dataKey="count" name="总对话" stroke="#60a5fa" strokeWidth={2} dot={{ r: 3, fill: "#60a5fa" }} />
-                        <Line type="monotone" dataKey="analyzed" name="已分析" stroke="#8b5cf6" strokeWidth={1.5} strokeDasharray="4 4" dot={{ r: 2.5, fill: "#8b5cf6" }} />
+                        <Line type="monotone" dataKey="count" name={t.dashboard.totalConvos} stroke="#60a5fa" strokeWidth={2} dot={{ r: 3, fill: "#60a5fa" }} />
+                        <Line type="monotone" dataKey="analyzed" name={t.dashboard.analyzed} stroke="#8b5cf6" strokeWidth={1.5} strokeDasharray="4 4" dot={{ r: 2.5, fill: "#8b5cf6" }} />
                         <Legend iconType="circle" iconSize={6} wrapperStyle={{ fontSize: 9 }} />
                       </LineChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-[150px] text-[10px] text-zinc-600">暂无趋势数据</div>
+                    <div className="flex items-center justify-center h-[150px] text-[10px] text-zinc-600">{t.dashboard.noTrend}</div>
                   )}
                 </div>
               </div>
@@ -924,7 +972,7 @@ export default function DashboardTab() {
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Fingerprint className="h-4 w-4 text-amber-400" />
-                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">维度分布详情</h3>
+                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{t.dashboard.dimDetail}</h3>
                     </div>
                     <span className="text-[8px] text-zinc-600 font-mono">{stats.dimAverages.length} dimensions</span>
                   </div>
@@ -962,7 +1010,7 @@ export default function DashboardTab() {
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <CalendarDays className="h-4 w-4 text-emerald-400" />
-                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">活动热力图</h3>
+                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{t.dashboard.heatmap}</h3>
                     </div>
                     <div className="flex items-center gap-2 text-[8px] text-zinc-600">
                       <span className="font-mono">{stats.heatmap.filter(h => h.count > 0).length} active days</span>
@@ -970,7 +1018,7 @@ export default function DashboardTab() {
                       <span className="font-mono">max {stats.heatmapMax}/day</span>
                     </div>
                   </div>
-                  <p className="text-[8px] text-zinc-600 italic mb-2">近16周每日活动频次 (对话 + 玄学)</p>
+                  <p className="text-[8px] text-zinc-600 italic mb-2">{t.dashboard.heatmapHint}</p>
                   <div className="overflow-x-auto">
                     <div className="flex gap-[2px]" style={{ minWidth: "fit-content" }}>
                       {(() => {
@@ -978,7 +1026,7 @@ export default function DashboardTab() {
                         for (let i = 0; i < stats.heatmap.length; i += 7) {
                           weeks.push(stats.heatmap.slice(i, i + 7));
                         }
-                        const DAY_LABELS = ["日", "", "二", "", "四", "", "六"];
+                        const DAY_LABELS = t.dashboard.heatmapDayLabels;
                         return (
                           <>
                             <div className="flex flex-col gap-[2px] mr-1">
@@ -1000,7 +1048,7 @@ export default function DashboardTab() {
                                       key={di}
                                       className="w-[11px] h-[11px] rounded-[2px] transition-colors"
                                       style={{ backgroundColor: bg }}
-                                      title={`${day.iso}: ${day.count} 次活动`}
+                                      title={`${day.iso}: ${day.count} ${t.dashboard.activityCount}`}
                                     />
                                   );
                                 })}
@@ -1012,11 +1060,11 @@ export default function DashboardTab() {
                     </div>
                   </div>
                   <div className="flex items-center justify-end gap-1 mt-2 text-[7px] text-zinc-600">
-                    <span>少</span>
+                    <span>{t.dashboard.less}</span>
                     {[0, 0.25, 0.5, 0.75, 1].map((v, i) => (
                       <div key={i} className="w-[9px] h-[9px] rounded-[2px]" style={{ backgroundColor: v === 0 ? "#1c1c1e" : v <= 0.25 ? "#064e3b" : v <= 0.5 ? "#047857" : v <= 0.75 ? "#059669" : "#34d399" }} />
                     ))}
-                    <span>多</span>
+                    <span>{t.dashboard.more}</span>
                   </div>
                 </div>
               )}
@@ -1029,7 +1077,7 @@ export default function DashboardTab() {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-amber-400" />
-                    <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">AI 数据洞察</h3>
+                    <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{t.dashboard.aiInsightTitle}</h3>
                   </div>
                   <button
                     onClick={generateInsight}
@@ -1042,13 +1090,13 @@ export default function DashboardTab() {
                     )}
                   >
                     {insightLoading ? (
-                      <><Loader2 className="h-3 w-3 animate-spin" /> 分析中…</>
+                      <><Loader2 className="h-3 w-3 animate-spin" /> {t.dashboard.analyzing}</>
                     ) : (
-                      <><Sparkles className="h-3 w-3" /> 生成洞察报告</>
+                      <><Sparkles className="h-3 w-3" /> {t.dashboard.generateReport}</>
                     )}
                   </button>
                 </div>
-                <p className="text-[8px] text-zinc-600 italic mb-3">基于当前数据大盘统计快照，由LLM生成专业数据解读</p>
+                <p className="text-[8px] text-zinc-600 italic mb-3">{t.dashboard.aiInsightDesc}</p>
                 {aiInsight ? (
                   <div className="rounded-lg border border-zinc-800/60 bg-zinc-800/20 p-4">
                     <p className="text-[11px] text-zinc-300 leading-relaxed whitespace-pre-wrap">
@@ -1058,7 +1106,7 @@ export default function DashboardTab() {
                   </div>
                 ) : !insightLoading ? (
                   <div className="flex items-center justify-center h-[60px] text-[10px] text-zinc-600">
-                    点击「生成洞察报告」获取AI数据解读
+                    {t.dashboard.clickGenerate}
                   </div>
                 ) : null}
               </div>
@@ -1066,6 +1114,12 @@ export default function DashboardTab() {
           )}
         </div>
       </div>
+
+      <ShareCard
+        isOpen={showShareCard}
+        onClose={() => setShowShareCard(false)}
+        type="profile-summary"
+      />
     </div>
   );
 }

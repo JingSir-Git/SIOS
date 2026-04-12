@@ -35,6 +35,8 @@ import { ALL_MBTI_TYPES } from "@/lib/mbti-questions";
 import type { EmotionPoint, ChatMessage } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import StreamingIndicator from "./StreamingIndicator";
+import GroupAnalysisResults, { type GroupAnalysisResult } from "./GroupAnalysisResults";
+import ResponseFeedback from "./ResponseFeedback";
 import { extractMemoriesFromAnalysis, formatMemoriesForPrompt } from "@/lib/memory-utils";
 import { retrieveRAGContext } from "@/lib/rag-memory";
 import { apiFetch } from "@/lib/api-fetch";
@@ -147,6 +149,11 @@ export default function AnalyzeTab() {
   const [error, setError] = useState("");
   const [streamingText, setStreamingText] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+
+  // Group chat analysis state
+  const [isGroupChat, setIsGroupChat] = useState(false);
+  const [groupResult, setGroupResult] = useState<GroupAnalysisResult | null>(null);
+  const [groupParticipants, setGroupParticipants] = useState<string[]>([]);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     surfaceFeatures: true,
     discourseStructure: true,
@@ -309,13 +316,21 @@ export default function AnalyzeTab() {
       const formatted = formatMessagesForLLM(parseResult.messages);
       setFormattedConversation(formatted);
 
+      // Auto-detect group chat: >2 unique participants → team analysis
+      const selfNames = ["我", "自己", "me", "Me", "ME", "本人"];
+      if (parseResult.participants.length >= 3) {
+        setIsGroupChat(true);
+        runGroupAnalysis(formatted, parseResult.participants);
+        return;
+      }
+
       // Auto-detect target name from participants if not set
       if (!targetName.trim() && parseResult.participants.length > 0) {
-        const selfNames = ["我", "自己", "me", "Me", "ME", "本人"];
         const other = parseResult.participants.find((p) => !selfNames.includes(p));
         if (other) setTargetName(other);
       }
 
+      setIsGroupChat(false);
       runAnalysis(formatted);
     }
   };
@@ -345,15 +360,21 @@ export default function AnalyzeTab() {
       setTargetName(resolvedTargetName);
     }
 
-    // Multi-party context: inject group chat hint when >2 speakers
-    let multiPartyContext = "";
-    if (otherSpeakers.length > 1) {
-      const names = otherSpeakers.map((s) => s.name).join("、");
-      multiPartyContext = `【多方群聊模式】这是一个${otherSpeakers.length + 1}人群聊对话，参与者包括"我"和${names}。请分别分析每位参与者的沟通风格、立场和互动模式。在情绪曲线中，otherEmotion取所有对方参与者的平均情绪值。特别注意群体动力学：谁主导话题、谁附和、谁有独立见解。`;
-      setContext((prev) => prev ? `${prev}\n\n${multiPartyContext}` : multiPartyContext);
+    // Auto-detect group chat: >2 unique speakers → full team analysis
+    const allSpeakers = speakers.map((s) => s.name);
+    const selfSpeaker = speakers.find((s) => s.role === "self");
+    if (selfSpeaker) allSpeakers.push(selfSpeaker.name);
+    const uniqueNames = [...new Set(allSpeakers.filter(Boolean))];
+
+    if (otherSpeakers.length > 1 && uniqueNames.length >= 3) {
+      // Group chat detected → switch to team analysis
+      setIsGroupChat(true);
+      runGroupAnalysis(formatted, uniqueNames);
+      return;
     }
 
-    // Go directly to analysis (skip "input" stage to avoid flash)
+    // 1-on-1 conversation → individual analysis
+    setIsGroupChat(false);
     runAnalysis(formatted, resolvedTargetName);
   };
 
@@ -489,6 +510,112 @@ export default function AnalyzeTab() {
             type: "success",
             title: "对话分析完成",
             message: `与${overrideTargetName || targetName.trim() || "对方"}的对话已分析完毕`,
+            duration: 8000,
+            action: { label: "查看结果", tab: "analyze" },
+          });
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
+      setError(err instanceof Error ? err.message : "未知错误");
+    } finally {
+      setLoading(false);
+      abortRef.current = null;
+    }
+  };
+
+  // ---- Group Analysis (SSE streaming) ----
+  const runGroupAnalysis = async (convoText: string, participants: string[]) => {
+    setLoading(true);
+    setError("");
+    setResult(null);
+    setGroupResult(null);
+    setStreamingText("");
+    setStage("results");
+    setIsGroupChat(true);
+    setGroupParticipants(participants);
+
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const res = await apiFetch("/api/analyze-group?stream=true", {
+        method: "POST",
+        body: JSON.stringify({
+          conversation: convoText,
+          participants,
+          context: context.trim() || undefined,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        let errMsg = `团体分析请求失败 (${res.status})`;
+        try {
+          const errData = await res.json();
+          if (errData.error) errMsg = errData.error;
+        } catch { /* use default */ }
+        throw new Error(errMsg);
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("无法读取响应流");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let gotResult = false;
+      let streamError = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr) continue;
+          try {
+            const event = JSON.parse(jsonStr);
+            if (event.type === "progress" && event.text) {
+              setStreamingText((prev) => prev + event.text);
+            } else if (event.type === "result" && event.data) {
+              const data = event.data as { groupAnalysis: GroupAnalysisResult };
+              const ga = data.groupAnalysis;
+              if (ga && ga.summary) {
+                gotResult = true;
+                setGroupResult(ga);
+                // Auto-save to module history
+                addModuleHistory("analyze", {
+                  id: uuidv4(),
+                  title: `群聊分析：${participants.slice(0, 3).join("、")}${participants.length > 3 ? "等" : ""}`,
+                  createdAt: new Date().toISOString(),
+                  module: "analyze",
+                  data: { groupResult: ga, conversation: convoText, participants, context: context.trim(), isGroupChat: true },
+                  summary: ga.summary?.slice(0, 60) || "团体分析完成",
+                });
+              } else {
+                streamError = "团体分析结果不完整，请重试。";
+              }
+            } else if (event.type === "error") {
+              streamError = event.text || "分析过程出错";
+            }
+          } catch { /* skip malformed SSE line */ }
+        }
+      }
+
+      if (!gotResult) {
+        setError(streamError || "团体分析未返回结果，请重试");
+      } else {
+        const currentTab = useAppStore.getState().activeTab;
+        if (currentTab !== "analyze") {
+          addToast({
+            type: "success",
+            title: "群聊分析完成",
+            message: `${participants.length}人群聊分析已完成`,
             duration: 8000,
             action: { label: "查看结果", tab: "analyze" },
           });
@@ -710,10 +837,14 @@ export default function AnalyzeTab() {
   const resetToInput = () => {
     setStage("input");
     setResult(null);
+    setGroupResult(null);
+    setIsGroupChat(false);
+    setGroupParticipants([]);
     setError("");
     setSaved(false);
     setFormattedConversation("");
     setConversationDate("");
+    setStreamingText("");
   };
 
   const renderSection = (key: string, data: Record<string, unknown>) => {
@@ -1081,6 +1212,10 @@ export default function AnalyzeTab() {
 
               {/* Screenshot Upload for Chat OCR */}
               <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/30 p-3 space-y-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-medium text-zinc-400">聊天截图识别（可选）</span>
+                  <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 font-medium">Beta</span>
+                </div>
                 <ImageUpload
                   images={uploadedImages}
                   onChange={setUploadedImages}
@@ -1088,7 +1223,6 @@ export default function AnalyzeTab() {
                   onOCR={handleImageOCR}
                   compact
                   maxCount={6}
-                  label="聊天截图识别（可选）"
                   placeholder="上传聊天截图，AI自动识别文字"
                 />
                 {uploadedImages.length > 0 && uploadedImages.some((i) => i.base64 && !i.ocrText) && (
@@ -1216,7 +1350,7 @@ export default function AnalyzeTab() {
           {loading && (
             <StreamingIndicator
               text={streamingText}
-              label="AI 正在深度分析中"
+              label={isGroupChat ? "AI 正在进行团体动力学分析" : "AI 正在深度分析中"}
               onAbort={abortStreaming}
             />
           )}
@@ -1234,8 +1368,8 @@ export default function AnalyzeTab() {
             </div>
           )}
 
-          {/* ===== STAGE: RESULTS ===== */}
-          {result && (
+          {/* ===== STAGE: INDIVIDUAL RESULTS ===== */}
+          {result && !isGroupChat && (
             <div className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
               {/* Summary */}
               <div className="rounded-lg border border-violet-500/30 bg-gradient-to-br from-violet-500/5 to-blue-500/5 p-5">
@@ -1245,6 +1379,9 @@ export default function AnalyzeTab() {
                 <p className="text-sm text-zinc-300 leading-relaxed">
                   {result.summary}
                 </p>
+                <div className="flex justify-end mt-2 border-t border-violet-500/10 pt-1.5">
+                  <ResponseFeedback messageId={`analyze_${formattedConversation.slice(0, 20)}`} module="analyze" responseSnippet={result.summary} compact />
+                </div>
               </div>
 
               {/* Quality Score */}
@@ -1424,6 +1561,23 @@ export default function AnalyzeTab() {
                 >
                   <Save className="h-4 w-4" />
                   {saved ? "已保存至画像库" : "保存分析结果 & 生成画像"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ===== STAGE: GROUP RESULTS ===== */}
+          {isGroupChat && groupResult && !loading && (
+            <div className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
+              <GroupAnalysisResults result={groupResult} />
+
+              {/* Action buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={resetToInput}
+                  className="rounded-lg border border-zinc-700 px-4 py-2.5 text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
+                >
+                  分析新对话
                 </button>
               </div>
             </div>

@@ -33,9 +33,11 @@ import type { ChatSessionEntry } from "@/lib/types";
 import StreamingIndicator from "./StreamingIndicator";
 import MarkdownRenderer from "./MarkdownRenderer";
 import ImageUpload, { type UploadedImage } from "./ImageUpload";
+import ResponseFeedback from "./ResponseFeedback";
 import { CoinTossRitual, TarotDrawRitual, QimenRitual, FortuneStickRitual, CharacterWriteRitual } from "./DivinationRituals";
 import { isMuted, setMuted } from "@/lib/sound-effects";
 import { exportChatSessionReport } from "@/lib/export-report";
+import VoiceInputButton from "./VoiceInputButton";
 
 const DIVINATION_CATEGORIES = [
   {
@@ -153,6 +155,7 @@ type Category = (typeof DIVINATION_CATEGORIES)[number]["id"];
 interface Message {
   role: "user" | "assistant";
   content: string;
+  images?: string[]; // base64 data URLs for image attachments
 }
 
 // ---- Professional interactive option configs ----
@@ -262,7 +265,7 @@ function computeBazi(dateStr: string, timeStr: string) {
 }
 
 export default function DivinationTab() {
-  const { profiles, addDivinationRecord, divinationRecords, deleteDivinationRecord, addChatSession, appendChatMessage, updateChatSession } = useAppStore();
+  const { profiles, addDivinationRecord, divinationRecords, deleteDivinationRecord, addChatSession, appendChatMessage, updateChatSession, language } = useAppStore();
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -890,7 +893,16 @@ export default function DivinationTab() {
       content = `${ritualResult}\n\n我的问题是：${content}`;
     }
 
-    const userMessage: Message = { role: "user", content };
+    // Collect face/palm images for the first message in mianxiang category
+    const mianxiangImages = selectedCategory === "mianxiang" && faceImages.length > 0 && messages.length === 0
+      ? faceImages.filter((i) => i.base64).map((i) => i.base64!)
+      : undefined;
+
+    const userMessage: Message = {
+      role: "user",
+      content,
+      ...(mianxiangImages && mianxiangImages.length > 0 ? { images: mianxiangImages } : {}),
+    };
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput("");
@@ -906,6 +918,7 @@ export default function DivinationTab() {
     abortRef.current = controller;
 
     try {
+
       const res = await apiFetch("/api/divination?stream=true", {
         method: "POST",
         body: JSON.stringify({
@@ -914,6 +927,7 @@ export default function DivinationTab() {
             content: m.content,
           })),
           systemPrompt: getSystemPrompt(),
+          ...(mianxiangImages ? { images: mianxiangImages } : {}),
         }),
         signal: controller.signal,
       });
@@ -1270,7 +1284,7 @@ export default function DivinationTab() {
             {category && (
               <div className="text-center mb-2">
                 <category.icon className={cn("h-8 w-8 mx-auto mb-2", category.color)} />
-                <p className="text-xs text-zinc-400">请先完成以下设定，再描述你的问题</p>
+                <p className="text-xs text-zinc-400">{language === "en" ? "Complete the setup below, then describe your question" : "请先完成以下设定，再描述你的问题"}</p>
               </div>
             )}
 
@@ -1861,8 +1875,16 @@ export default function DivinationTab() {
             />
             {faceOcrResult && (
               <div className="rounded-lg border border-rose-500/10 bg-zinc-900/50 p-3">
-                <p className="text-[9px] text-rose-400 font-medium mb-1">AI 面容/掌纹描述:</p>
-                <p className="text-[10px] text-zinc-400 whitespace-pre-wrap leading-relaxed max-h-24 overflow-y-auto">{faceOcrResult}</p>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[9px] text-rose-400 font-medium">AI 面容/掌纹描述:</p>
+                  <span className="text-[8px] text-zinc-600 italic">可编辑修正</span>
+                </div>
+                <textarea
+                  value={faceOcrResult}
+                  onChange={(e) => setFaceOcrResult(e.target.value)}
+                  className="w-full text-[10px] text-zinc-400 leading-relaxed bg-transparent border border-zinc-800/50 rounded-md px-2 py-1.5 resize-y min-h-[48px] max-h-32 focus:border-rose-500/30 focus:outline-none transition-colors"
+                  rows={3}
+                />
               </div>
             )}
           </div>
@@ -1874,6 +1896,23 @@ export default function DivinationTab() {
             {msg.role === "user" ? (
               <div className="flex justify-end">
                 <div className="max-w-[80%] rounded-xl bg-violet-500/10 border border-violet-500/20 px-4 py-3">
+                  {msg.images && msg.images.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {msg.images.map((img, imgIdx) => (
+                        <div key={imgIdx} className="relative group/img">
+                          <img
+                            src={img}
+                            alt={`attachment ${imgIdx + 1}`}
+                            className="h-16 w-16 object-cover rounded-lg border border-violet-500/30 cursor-pointer hover:border-violet-400/60 transition-all"
+                            onClick={() => window.open(img, "_blank")}
+                          />
+                          <div className="absolute inset-0 rounded-lg bg-black/0 group-hover/img:bg-black/20 transition-all flex items-center justify-center">
+                            <Eye className="h-3 w-3 text-white opacity-0 group-hover/img:opacity-80 transition-opacity" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <p className="text-xs text-violet-200 leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                 </div>
               </div>
@@ -1885,6 +1924,9 @@ export default function DivinationTab() {
                 </div>
                 <div className="px-5 py-4">
                   <MarkdownRenderer content={msg.content} />
+                </div>
+                <div className="flex justify-end px-4 py-1.5 border-t border-zinc-700/30">
+                  <ResponseFeedback messageId={`div_${i}`} module="divination" responseSnippet={msg.content} compact />
                 </div>
               </div>
             )}
@@ -1906,7 +1948,7 @@ export default function DivinationTab() {
         )}
 
         {loading && !streamingText && (
-          <StreamingIndicator text="" label="正在推算中" onAbort={() => { abortRef.current?.abort(); setLoading(false); }} />
+          <StreamingIndicator text="" label={language === "en" ? "Computing..." : "正在推算中"} onAbort={() => { abortRef.current?.abort(); setLoading(false); }} />
         )}
         </div>
 
@@ -1929,13 +1971,18 @@ export default function DivinationTab() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-            placeholder={ritualCompleted && messages.length === 0 ? "请描述您想问的具体问题..." : "描述你的问题..."}
+            placeholder={ritualCompleted && messages.length === 0 ? (language === "en" ? "Describe your specific question..." : "请描述您想问的具体问题...") : (language === "en" ? "Describe your question..." : "描述你的问题...")}
             className={cn(
               "flex-1 rounded-lg border bg-zinc-800/80 px-3 py-2 text-sm text-zinc-300 placeholder:text-zinc-600 focus:outline-none transition-colors",
               ritualCompleted && messages.length === 0
                 ? "border-emerald-500/30 focus:border-emerald-500/50"
                 : "border-zinc-700 focus:border-violet-500/50"
             )}
+          />
+          <VoiceInputButton
+            onTranscript={(text) => setInput((prev) => prev + text)}
+            lang={language === "en" ? "en-US" : "zh-CN"}
+            compact
           />
           <button
             onClick={handleSend}

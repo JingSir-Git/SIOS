@@ -14,7 +14,7 @@ import {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, profilesSummary, selfDescription, conversationHistory, systemPromptOverride, rawTextMode } = body;
+    const { message, profilesSummary, selfDescription, conversationHistory, systemPromptOverride, rawTextMode, languageInstruction } = body;
 
     if (!message || typeof message !== "string") {
       return Response.json(
@@ -33,10 +33,11 @@ export async function POST(request: NextRequest) {
     const llmMessages = [{ role: "user" as const, content: userPrompt }];
     const isStream = request.nextUrl.searchParams.get("stream") === "true";
     const llmConfig = extractLLMConfig(request);
+    const systemPrompt = (systemPromptOverride || PSYCHOLOGY_SYSTEM_PROMPT) + (languageInstruction || "");
 
     if (isStream) {
       return createStreamingResponse({
-        system: systemPromptOverride || PSYCHOLOGY_SYSTEM_PROMPT,
+        system: systemPrompt,
         messages: llmMessages,
         maxTokens: 4000,
         config: llmConfig,
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     const raw = await callLLM({
-      system: systemPromptOverride || PSYCHOLOGY_SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: llmMessages,
       maxTokens: 4000,
       config: llmConfig,

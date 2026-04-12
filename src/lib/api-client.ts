@@ -50,6 +50,8 @@ export function extractLLMConfig(request: Request): LLMConfig {
 export interface LLMMessage {
   role: "user" | "assistant";
   content: string;
+  /** Optional rich content blocks (images + text) — overrides `content` when present */
+  richContent?: Anthropic.ContentBlockParam[];
 }
 
 export async function callLLM({
@@ -74,7 +76,7 @@ export async function callLLM({
     system,
     messages: messages.map((m) => ({
       role: m.role,
-      content: [{ type: "text" as const, text: m.content }],
+      content: m.richContent ?? [{ type: "text" as const, text: m.content }],
     })),
     ...(temperature !== undefined ? { temperature } : {}),
   });
@@ -110,7 +112,7 @@ export async function callLLMStreaming({
     system,
     messages: messages.map((m) => ({
       role: m.role,
-      content: [{ type: "text" as const, text: m.content }],
+      content: m.richContent ?? [{ type: "text" as const, text: m.content }],
     })),
   });
 

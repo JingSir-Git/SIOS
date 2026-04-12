@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
+import { useT } from "@/lib/i18n";
 
 interface GraphNode extends d3.SimulationNodeDatum {
   id: string;
@@ -45,6 +46,13 @@ const STATUS_COLORS: Record<string, string> = {
   unknown: "#71717a",
 };
 
+const STATUS_LABELS_EN: Record<string, string> = {
+  warming: "Warming",
+  stable: "Stable",
+  cooling: "Cooling",
+  unknown: "Unknown",
+};
+
 const STATUS_LABELS: Record<string, string> = {
   warming: "升温中",
   stable: "稳定",
@@ -56,7 +64,8 @@ export default function RelationshipGraph({ isOpen, onClose, onSelectProfile }: 
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
-  const { profiles, relationships, conversations } = useAppStore();
+  const { profiles, relationships, conversations, language } = useAppStore();
+  const t = useT();
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
 
@@ -68,7 +77,7 @@ export default function RelationshipGraph({ isOpen, onClose, onSelectProfile }: 
     // Add "self" center node
     const selfNode: GraphNode = {
       id: "__self__",
-      name: "我",
+      name: language === "en" ? "Me" : "我",
       conversationCount: conversations.length,
       healthScore: 100,
       status: "stable",
@@ -310,7 +319,7 @@ export default function RelationshipGraph({ isOpen, onClose, onSelectProfile }: 
       .attr("fill", "#a78bfa")
       .attr("font-size", "14px")
       .attr("font-weight", "700")
-      .text("我");
+      .text(language === "en" ? "Me" : "我");
 
     // Interaction count badge
     node.filter((d) => !d.isSelf && d.conversationCount > 0)
@@ -407,16 +416,16 @@ export default function RelationshipGraph({ isOpen, onClose, onSelectProfile }: 
       <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
         <div className="flex items-center gap-2">
           <Network className="h-4 w-4 text-violet-400" />
-          <h3 className="text-sm font-medium text-zinc-200">关系图谱</h3>
+          <h3 className="text-sm font-medium text-zinc-200">{language === "en" ? "Relationship Graph" : "关系图谱"}</h3>
           <span className="text-[10px] text-zinc-600">
-            {profiles.length} 人 · {relationships.length} 条关系
+            {profiles.length} {language === "en" ? "profiles" : "人"} · {relationships.length} {language === "en" ? "links" : "条关系"}
           </span>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={handleFitAll}
             className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-            title="适应画面"
+            title={language === "en" ? "Fit to view" : "适应画面"}
           >
             <Maximize2 className="h-3.5 w-3.5" />
           </button>
@@ -445,12 +454,12 @@ export default function RelationshipGraph({ isOpen, onClose, onSelectProfile }: 
               <p className="text-xs font-medium text-zinc-200">{hoveredNode.name}</p>
               <div className="flex items-center gap-3 mt-1 text-[10px] text-zinc-500">
                 <span>
-                  状态: <span style={{ color: STATUS_COLORS[hoveredNode.status] }}>
-                    {STATUS_LABELS[hoveredNode.status]}
+                  {language === "en" ? "Status" : "状态"}: <span style={{ color: STATUS_COLORS[hoveredNode.status] }}>
+                    {language === "en" ? STATUS_LABELS_EN[hoveredNode.status] : STATUS_LABELS[hoveredNode.status]}
                   </span>
                 </span>
-                <span>健康度: {hoveredNode.healthScore}%</span>
-                <span>对话: {hoveredNode.conversationCount} 次</span>
+                <span>{language === "en" ? "Health" : "健康度"}: {hoveredNode.healthScore}%</span>
+                <span>{language === "en" ? "Convos" : "对话"}: {hoveredNode.conversationCount}</span>
               </div>
               {hoveredNode.tags.length > 0 && (
                 <div className="flex gap-1 mt-1">
@@ -467,7 +476,7 @@ export default function RelationshipGraph({ isOpen, onClose, onSelectProfile }: 
           {/* Legend */}
           <div className="absolute bottom-3 right-3 rounded-lg bg-zinc-900/90 border border-zinc-800 px-3 py-2">
             <div className="flex items-center gap-3 text-[9px] flex-wrap">
-              {Object.entries(STATUS_LABELS).map(([key, label]) => (
+              {Object.entries(language === "en" ? STATUS_LABELS_EN : STATUS_LABELS).map(([key, label]) => (
                 <div key={key} className="flex items-center gap-1">
                   <div
                     className="w-2 h-2 rounded-full"
@@ -478,7 +487,7 @@ export default function RelationshipGraph({ isOpen, onClose, onSelectProfile }: 
               ))}
               <div className="flex items-center gap-1">
                 <div className="w-4 border-t border-dashed border-indigo-400" />
-                <span className="text-zinc-500">互联</span>
+                <span className="text-zinc-500">{language === "en" ? "Peer" : "互联"}</span>
               </div>
             </div>
           </div>
@@ -486,8 +495,8 @@ export default function RelationshipGraph({ isOpen, onClose, onSelectProfile }: 
       ) : (
         <div className="flex flex-col items-center justify-center py-16">
           <Users className="h-8 w-8 text-zinc-700 mb-2" />
-          <p className="text-xs text-zinc-500">暂无人物画像数据</p>
-          <p className="text-[10px] text-zinc-600 mt-1">分析对话后创建画像，即可生成关系图谱</p>
+          <p className="text-xs text-zinc-500">{language === "en" ? "No profile data yet" : "暂无人物画像数据"}</p>
+          <p className="text-[10px] text-zinc-600 mt-1">{language === "en" ? "Create profiles after analyzing conversations to generate the graph" : "分析对话后创建画像，即可生成关系图谱"}</p>
         </div>
       )}
     </div>

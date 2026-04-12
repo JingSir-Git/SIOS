@@ -694,6 +694,24 @@ export interface ChatSessionEntry {
   summary?: string;
 }
 
+// ============================================================
+// §  Response Quality Feedback
+// ============================================================
+
+export type FeedbackRating = "up" | "down";
+export type FeedbackModule = "analyze" | "psychology" | "legal" | "divination" | "coaching" | "simulation";
+
+export interface ResponseFeedbackEntry {
+  id: string;
+  module: FeedbackModule;
+  messageId: string;
+  rating: FeedbackRating;
+  comment?: string;
+  /** Truncated AI response for context */
+  responseSnippet?: string;
+  createdAt: string;
+}
+
 /** A single structured memory entry linked to a profile. */
 export interface ProfileMemoryEntry {
   id: string;

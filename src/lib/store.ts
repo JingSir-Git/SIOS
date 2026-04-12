@@ -24,9 +24,11 @@ import type {
   ChatSessionEntry,
   ChatSessionDomain,
   ChatSessionMessage,
+  ResponseFeedbackEntry,
 } from "./types";
 import type { LearningProfile, FeedbackEntry } from "./adaptive-learning";
 import { getDefaultLearningProfile, processFeedback } from "./adaptive-learning";
+import type { UnlockedAchievement } from "./achievements";
 
 // ---- Theme & Preferences Types ----
 export type ThemeKey = "dark" | "violet-dark" | "green-eye" | "sepia" | "blue-night";
@@ -80,6 +82,8 @@ export interface DataExport {
   playbookVersions?: PlaybookVersion[];
   profileMemories?: ProfileMemoryEntry[];
   divinationRecords?: DivinationRecord[];
+  chatSessions?: ChatSessionEntry[];
+  responseFeedback?: ResponseFeedbackEntry[];
 }
 
 interface AppState {
@@ -226,9 +230,25 @@ interface AppState {
   getChatSessionsByDomain: (domain: ChatSessionDomain) => ChatSessionEntry[];
   appendChatMessage: (sessionId: string, message: ChatSessionMessage) => void;
 
+  // ---- Response Quality Feedback (S12) ----
+  responseFeedback: ResponseFeedbackEntry[];
+  addResponseFeedback: (entry: ResponseFeedbackEntry) => void;
+  getResponseFeedback: (module?: string) => ResponseFeedbackEntry[];
+
   // ---- Language / i18n ----
   language: "zh" | "en";
   setLanguage: (lang: "zh" | "en") => void;
+
+  // ---- Achievements ----
+  achievements: UnlockedAchievement[];
+  setAchievements: (achievements: UnlockedAchievement[]) => void;
+  totalCharactersTyped: number;
+  addCharactersTyped: (count: number) => void;
+  consecutiveDays: number;
+  lastActiveDate: string; // YYYY-MM-DD
+  updateStreak: () => void;
+  hasUploadedImage: boolean;
+  setHasUploadedImage: () => void;
 
   // ---- Data Privacy (GDPR) ----
   privacySettings: {
@@ -580,6 +600,7 @@ export const useAppStore = create<AppState>()(
           profiles: [],
           conversations: [],
           relationships: [],
+          peerRelationships: [],
           coachingTips: [],
           liveChatMessages: [],
           mbtiResults: [],
@@ -588,10 +609,17 @@ export const useAppStore = create<AppState>()(
           playbookVersions: [],
           moduleHistory: {},
           divinationRecords: [],
+          userMemories: [],
+          chatSessions: [],
+          responseFeedback: [],
+          feedbackHistory: [],
+          learningProfile: getDefaultLearningProfile(),
           toasts: [],
           preSelectedProfileId: null,
           scenarioContext: null,
           scenarioGoal: null,
+          // Keep: achievements, totalCharactersTyped, consecutiveDays, lastActiveDate, hasUploadedImage
+          // Keep: apiSettings, privacySettings, language, theme, fontSize
         }),
 
       // ---- UI ----
@@ -830,9 +858,39 @@ export const useAppStore = create<AppState>()(
           ),
         })),
 
+      // ---- Response Quality Feedback (S12) ----
+      responseFeedback: [],
+      addResponseFeedback: (entry) =>
+        set((state) => ({
+          responseFeedback: [entry, ...state.responseFeedback].slice(0, 500),
+        })),
+      getResponseFeedback: (module) => {
+        const all = get().responseFeedback;
+        return module ? all.filter((f) => f.module === module) : all;
+      },
+
       // ---- Language / i18n ----
       language: "zh" as "zh" | "en",
       setLanguage: (lang) => set({ language: lang }),
+
+      // ---- Achievements ----
+      achievements: [] as UnlockedAchievement[],
+      setAchievements: (achievements) => set({ achievements }),
+      totalCharactersTyped: 0,
+      addCharactersTyped: (count) => set((s) => ({ totalCharactersTyped: s.totalCharactersTyped + count })),
+      consecutiveDays: 1,
+      lastActiveDate: "",
+      updateStreak: () => set((s) => {
+        const today = new Date().toISOString().slice(0, 10);
+        if (s.lastActiveDate === today) return {};
+        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        if (s.lastActiveDate === yesterday) {
+          return { consecutiveDays: s.consecutiveDays + 1, lastActiveDate: today };
+        }
+        return { consecutiveDays: 1, lastActiveDate: today };
+      }),
+      hasUploadedImage: false,
+      setHasUploadedImage: () => set({ hasUploadedImage: true }),
 
       // ---- Data Privacy (GDPR) ----
       privacySettings: {
@@ -849,6 +907,7 @@ export const useAppStore = create<AppState>()(
           profiles: [],
           conversations: [],
           relationships: [],
+          peerRelationships: [],
           coachingTips: [],
           liveChatMessages: [],
           mbtiResults: [],
@@ -858,6 +917,15 @@ export const useAppStore = create<AppState>()(
           playbookVersions: [],
           divinationRecords: [],
           userMemories: [],
+          chatSessions: [],
+          responseFeedback: [],
+          feedbackHistory: [],
+          learningProfile: getDefaultLearningProfile(),
+          // Keep achievements — user explicitly requested to preserve them
+          totalCharactersTyped: 0,
+          consecutiveDays: 1,
+          lastActiveDate: "",
+          hasUploadedImage: false,
         })),
       exportAnonymizedData: () => {
         const state = get();
@@ -897,6 +965,17 @@ export const useAppStore = create<AppState>()(
             answer: "[已脱敏]",
             linkedProfileName: r.linkedProfileName ? anonymize(r.linkedProfileName) : undefined,
           })),
+          chatSessions: state.chatSessions.map((s) => ({
+            ...s,
+            title: "[已脱敏]",
+            messages: s.messages.map((m) => ({ ...m, content: "[已脱敏]" })),
+            summary: "[已脱敏]",
+          })),
+          responseFeedback: state.responseFeedback.map((f) => ({
+            ...f,
+            comment: f.comment ? "[已脱敏]" : undefined,
+            responseSnippet: "[已脱敏]",
+          })),
         };
       },
     }),
@@ -932,6 +1011,12 @@ export const useAppStore = create<AppState>()(
         divinationRecords: state.divinationRecords,
         userMemories: state.userMemories,
         chatSessions: state.chatSessions,
+        responseFeedback: state.responseFeedback,
+        achievements: state.achievements,
+        totalCharactersTyped: state.totalCharactersTyped,
+        consecutiveDays: state.consecutiveDays,
+        lastActiveDate: state.lastActiveDate,
+        hasUploadedImage: state.hasUploadedImage,
       }),
       merge: (persistedState, currentState) => {
         const persisted = (persistedState ?? {}) as Partial<AppState>;
@@ -942,6 +1027,18 @@ export const useAppStore = create<AppState>()(
           apiSettings: { ...currentState.apiSettings, ...(persisted.apiSettings ?? {}) },
           privacySettings: { ...currentState.privacySettings, ...(persisted.privacySettings ?? {}) },
           learningProfile: { ...currentState.learningProfile, ...(persisted.learningProfile ?? {}) },
+          // Guarantee arrays are never undefined (old persisted state may lack them)
+          chatSessions: persisted.chatSessions ?? currentState.chatSessions ?? [],
+          responseFeedback: persisted.responseFeedback ?? currentState.responseFeedback ?? [],
+          achievements: persisted.achievements ?? currentState.achievements ?? [],
+          profiles: persisted.profiles ?? currentState.profiles ?? [],
+          conversations: persisted.conversations ?? currentState.conversations ?? [],
+          eqScores: persisted.eqScores ?? currentState.eqScores ?? [],
+          divinationRecords: persisted.divinationRecords ?? currentState.divinationRecords ?? [],
+          profileMemories: persisted.profileMemories ?? currentState.profileMemories ?? [],
+          relationships: persisted.relationships ?? currentState.relationships ?? [],
+          userMemories: persisted.userMemories ?? currentState.userMemories ?? [],
+          moduleHistory: persisted.moduleHistory ?? currentState.moduleHistory ?? {},
         };
       },
     }

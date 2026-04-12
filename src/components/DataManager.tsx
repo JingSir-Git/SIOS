@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore, type DataExport } from "@/lib/store";
+import { useT } from "@/lib/i18n";
 
 export default function DataManager() {
   const {
@@ -25,10 +26,16 @@ export default function DataManager() {
     mbtiResults,
     eqScores,
     playbookVersions,
+    divinationRecords,
+    chatSessions,
+    userMemories,
+    responseFeedback,
     exportAllData,
     importData,
     clearAllData,
+    language,
   } = useAppStore();
+  const isEn = language === "en";
 
   const [importResult, setImportResult] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -123,11 +130,11 @@ export default function DataManager() {
   const handleClearAll = () => {
     clearAllData();
     setShowClearConfirm(false);
-    setImportResult("所有数据已清除");
+    setImportResult(isEn ? "All data cleared (achievements preserved)" : "所有数据已清除（成就已保留）");
     setTimeout(() => setImportResult(null), 3000);
   };
 
-  const totalItems = profiles.length + conversations.length + relationships.length + mbtiResults.length + eqScores.length + playbookVersions.length + profileMemories.length;
+  const totalItems = profiles.length + conversations.length + relationships.length + mbtiResults.length + eqScores.length + playbookVersions.length + profileMemories.length + divinationRecords.length + chatSessions.length + userMemories.length + responseFeedback.length;
   const storageSize = getStorageSize();
 
   return (
@@ -136,46 +143,46 @@ export default function DataManager() {
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
         <div className="flex items-center gap-2 mb-4">
           <HardDrive className="h-4 w-4 text-violet-400" />
-          <h3 className="text-sm font-medium text-zinc-200">数据概览</h3>
+          <h3 className="text-sm font-medium text-zinc-200">{isEn ? "Data Overview" : "数据概览"}</h3>
         </div>
         <div className="grid grid-cols-4 gap-3">
           <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 p-3 text-center">
             <p className="text-2xl font-semibold text-violet-400">{profiles.length}</p>
-            <p className="text-[10px] text-zinc-500 mt-1">人物画像</p>
+            <p className="text-[10px] text-zinc-500 mt-1">{isEn ? "Profiles" : "人物画像"}</p>
           </div>
           <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 p-3 text-center">
             <p className="text-2xl font-semibold text-blue-400">{conversations.length}</p>
-            <p className="text-[10px] text-zinc-500 mt-1">对话记录</p>
+            <p className="text-[10px] text-zinc-500 mt-1">{isEn ? "Conversations" : "对话记录"}</p>
           </div>
           <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 p-3 text-center">
-            <p className="text-2xl font-semibold text-cyan-400">{relationships.length}</p>
-            <p className="text-[10px] text-zinc-500 mt-1">关系图谱</p>
+            <p className="text-2xl font-semibold text-cyan-400">{chatSessions.length}</p>
+            <p className="text-[10px] text-zinc-500 mt-1">{isEn ? "Chat Sessions" : "聊天会话"}</p>
           </div>
           <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 p-3 text-center">
-            <p className="text-2xl font-semibold text-pink-400">{mbtiResults.length}</p>
-            <p className="text-[10px] text-zinc-500 mt-1">MBTI记录</p>
+            <p className="text-2xl font-semibold text-pink-400">{divinationRecords.length}</p>
+            <p className="text-[10px] text-zinc-500 mt-1">{isEn ? "Divinations" : "玄学记录"}</p>
           </div>
           <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 p-3 text-center">
             <p className="text-2xl font-semibold text-amber-400">{profileMemories.length}</p>
-            <p className="text-[10px] text-zinc-500 mt-1">AI记忆</p>
+            <p className="text-[10px] text-zinc-500 mt-1">{isEn ? "AI Memories" : "AI记忆"}</p>
           </div>
           <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 p-3 text-center">
-            <p className="text-2xl font-semibold text-teal-400">{playbookVersions.length}</p>
-            <p className="text-[10px] text-zinc-500 mt-1">策略版本</p>
+            <p className="text-2xl font-semibold text-teal-400">{userMemories.length}</p>
+            <p className="text-[10px] text-zinc-500 mt-1">{isEn ? "User Memories" : "用户记忆"}</p>
           </div>
           <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 p-3 text-center">
-            <p className="text-2xl font-semibold text-orange-400">{eqScores.length}</p>
-            <p className="text-[10px] text-zinc-500 mt-1">EQ评分</p>
+            <p className="text-2xl font-semibold text-orange-400">{eqScores.length + mbtiResults.length}</p>
+            <p className="text-[10px] text-zinc-500 mt-1">{isEn ? "EQ/MBTI" : "EQ/MBTI记录"}</p>
           </div>
           <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 p-3 text-center">
             <p className="text-2xl font-semibold text-emerald-400">{formatBytes(storageSize)}</p>
-            <p className="text-[10px] text-zinc-500 mt-1">存储占用</p>
+            <p className="text-[10px] text-zinc-500 mt-1">{isEn ? "Storage" : "存储占用"}</p>
           </div>
         </div>
         <div className="mt-3 flex items-center gap-1.5">
           <Shield className="h-3 w-3 text-emerald-500" />
           <p className="text-[10px] text-zinc-600">
-            所有数据仅存储在你的本地浏览器中，不会上传到任何服务器
+            {isEn ? "All data is stored locally in your browser and never uploaded to any server" : "所有数据仅存储在你的本地浏览器中，不会上传到任何服务器"}
           </p>
         </div>
       </div>
@@ -184,10 +191,10 @@ export default function DataManager() {
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
         <div className="flex items-center gap-2 mb-2">
           <Download className="h-4 w-4 text-emerald-400" />
-          <h3 className="text-sm font-medium text-zinc-200">导出数据</h3>
+          <h3 className="text-sm font-medium text-zinc-200">{isEn ? "Export Data" : "导出数据"}</h3>
         </div>
         <p className="text-[11px] text-zinc-500 mb-4">
-          将所有画像、对话记录和关系图谱导出为 JSON 文件。可用于备份或迁移到其他设备。
+          {isEn ? "Export all profiles, conversations, and relationships as a JSON file for backup or migration." : "将所有画像、对话记录和关系图谱导出为 JSON 文件。可用于备份或迁移到其他设备。"}
         </p>
         <div className="flex gap-2">
           <button
@@ -201,7 +208,7 @@ export default function DataManager() {
             )}
           >
             <FileJson className="h-4 w-4" />
-            导出全部数据（{totalItems} 条记录）
+            {isEn ? `Export All (${totalItems} items)` : `导出全部数据（${totalItems} 条记录）`}
           </button>
           <button
             onClick={handleCopyJSON}
@@ -214,7 +221,7 @@ export default function DataManager() {
             )}
           >
             {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
-            {copied ? "已复制" : "复制"}
+            {copied ? (isEn ? "Copied" : "已复制") : (isEn ? "Copy" : "复制")}
           </button>
         </div>
       </div>
@@ -223,14 +230,14 @@ export default function DataManager() {
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
         <div className="flex items-center gap-2 mb-2">
           <Upload className="h-4 w-4 text-blue-400" />
-          <h3 className="text-sm font-medium text-zinc-200">导入数据</h3>
+          <h3 className="text-sm font-medium text-zinc-200">{isEn ? "Import Data" : "导入数据"}</h3>
         </div>
         <p className="text-[11px] text-zinc-500 mb-3">
-          从之前导出的 JSON 备份文件中恢复数据。
+          {isEn ? "Restore data from a previously exported JSON backup file." : "从之前导出的 JSON 备份文件中恢复数据。"}
         </p>
 
         <div className="flex items-center gap-3 mb-4">
-          <span className="text-[10px] text-zinc-500">导入模式：</span>
+          <span className="text-[10px] text-zinc-500">{isEn ? "Import mode:" : "导入模式："}</span>
           <button
             onClick={() => setImportMode("merge")}
             className={cn(
@@ -240,7 +247,7 @@ export default function DataManager() {
                 : "bg-zinc-800 text-zinc-500 border-zinc-700 hover:text-zinc-300"
             )}
           >
-            合并（保留现有数据，仅添加新数据）
+            {isEn ? "Merge (keep existing, add new)" : "合并（保留现有数据，仅添加新数据）"}
           </button>
           <button
             onClick={() => setImportMode("replace")}
@@ -251,7 +258,7 @@ export default function DataManager() {
                 : "bg-zinc-800 text-zinc-500 border-zinc-700 hover:text-zinc-300"
             )}
           >
-            替换（清除现有数据，完全覆盖）
+            {isEn ? "Replace (clear existing, overwrite)" : "替换（清除现有数据，完全覆盖）"}
           </button>
         </div>
 
@@ -267,7 +274,7 @@ export default function DataManager() {
           className="flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all w-full bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/30 hover:border-blue-500/50"
         >
           <Upload className="h-4 w-4" />
-          选择 JSON 文件导入
+          {isEn ? "Select JSON file to import" : "选择 JSON 文件导入"}
         </button>
       </div>
 
@@ -275,10 +282,10 @@ export default function DataManager() {
       <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-5">
         <div className="flex items-center gap-2 mb-2">
           <Trash2 className="h-4 w-4 text-red-400" />
-          <h3 className="text-sm font-medium text-red-300">清除所有数据</h3>
+          <h3 className="text-sm font-medium text-red-300">{isEn ? "Clear All Data" : "清除所有数据"}</h3>
         </div>
         <p className="text-[11px] text-zinc-500 mb-4">
-          永久删除所有画像、对话记录和关系图谱。此操作不可恢复，建议先导出备份。
+          {isEn ? "Permanently delete all profiles, conversations, histories, and memories. Achievements are preserved. This cannot be undone — export a backup first." : "永久删除所有画像、对话记录、历史会话和记忆等全部数据（成就保留）。此操作不可恢复，建议先导出备份。"}
         </p>
 
         {!showClearConfirm ? (
@@ -293,14 +300,16 @@ export default function DataManager() {
             )}
           >
             <Trash2 className="h-4 w-4" />
-            清除全部数据
+            {isEn ? "Clear All Data" : "清除全部数据"}
           </button>
         ) : (
           <div className="space-y-3">
             <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2">
               <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
               <p className="text-[11px] text-red-300">
-                确定要删除所有数据吗？包括 {profiles.length} 个画像、{conversations.length} 条对话、{profileMemories.length} 条AI记忆、{mbtiResults.length} 条MBTI记录等共 {totalItems} 项。此操作无法撤销！
+                {isEn
+                  ? `Delete all data? ${totalItems} items including ${profiles.length} profiles, ${conversations.length} conversations, ${chatSessions.length} chat sessions, ${profileMemories.length} AI memories, etc. Achievements will be preserved. This cannot be undone!`
+                  : `确定要删除所有数据吗？共 ${totalItems} 项，包括 ${profiles.length} 个画像、${conversations.length} 条对话、${chatSessions.length} 个会话、${profileMemories.length} 条AI记忆等。成就将保留。此操作无法撤销！`}
               </p>
             </div>
             <div className="flex gap-2">
@@ -308,13 +317,13 @@ export default function DataManager() {
                 onClick={() => setShowClearConfirm(false)}
                 className="flex-1 rounded-lg px-4 py-2 text-sm bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors"
               >
-                取消
+                {isEn ? "Cancel" : "取消"}
               </button>
               <button
                 onClick={handleClearAll}
                 className="flex-1 rounded-lg px-4 py-2 text-sm bg-red-600 text-white hover:bg-red-500 transition-colors font-medium"
               >
-                确认清除
+                {isEn ? "Confirm Delete" : "确认清除"}
               </button>
             </div>
           </div>
