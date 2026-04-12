@@ -47,6 +47,7 @@ import {
   Legend,
 } from "recharts";
 import { cn } from "@/lib/utils";
+import DimensionCorrelation from "./DimensionCorrelation";
 import { useAppStore } from "@/lib/store";
 import type { DimensionKey } from "@/lib/types";
 import { DIMENSION_LABELS, DIMENSION_KEYS } from "@/lib/types";
@@ -431,11 +432,13 @@ export default function DashboardTab() {
     <div className="flex flex-col h-full">
       <div className="border-b border-zinc-800 px-6 py-4 shrink-0">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-violet-400" />
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-violet-500/10 border border-violet-500/20 shadow-lg shadow-violet-500/10">
+              <BarChart3 className="h-5 w-5 text-violet-400" />
+            </div>
             <div>
               <h1 className="text-lg font-semibold text-zinc-100">数据大盘</h1>
-              <p className="text-xs text-zinc-500">全局数据概览与趋势分析</p>
+              <p className="text-[10px] text-zinc-500">全局数据概览 · 趋势分析 · AI洞察</p>
             </div>
           </div>
           {!isEmpty && (
@@ -1018,7 +1021,10 @@ export default function DashboardTab() {
                 </div>
               )}
 
-              {/* ─── Row 7: AI Data Insight ─── */}
+              {/* ─── Row 7: Dimension Correlation Matrix (N2) ─── */}
+              <DimensionCorrelation />
+
+              {/* ─── Row 8: AI Data Insight ─── */}
               <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">

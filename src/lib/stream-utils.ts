@@ -36,12 +36,15 @@ export function createStreamingResponse({
   maxTokens = 8000,
   postProcess,
   config,
+  rawTextMode = false,
 }: {
   system: string;
   messages: LLMMessage[];
   maxTokens?: number;
   postProcess?: (parsed: Record<string, unknown>) => Record<string, unknown>;
   config?: LLMConfig;
+  /** When true, skip JSON parsing — send raw accumulated text as the result */
+  rawTextMode?: boolean;
 }): Response {
   const encoder = new TextEncoder();
   let cancelled = false;
@@ -72,55 +75,63 @@ export function createStreamingResponse({
           config,
         });
 
-        // Parse the complete response
-        let { data: parsed, error: parseError } = extractJSON(raw);
-
-        // Retry: if initial parse fails, attempt a second LLM call to repair the JSON
-        if (!parsed && parseError && raw.length > 200) {
-          console.warn(
-            "[stream-utils] Initial parse failed, attempting LLM-assisted repair...",
-            parseError
-          );
-          try {
-            const repairRaw = await callLLMStreaming({
-              system: "你是一个JSON修复工具。用户会提供一段格式有问题的JSON文本。你需要修复它并直接输出修复后的合法JSON。只输出JSON，不要任何解释。",
-              messages: [{
-                role: "user",
-                content: `以下JSON文本解析出错（${parseError}），请修复后直接输出完整的合法JSON：\n\n${raw.substring(0, 12000)}`,
-              }],
-              maxTokens: Math.min(maxTokens, 16000),
-              onChunk: () => {},
-              config,
-            });
-            const repairResult = extractJSON(repairRaw);
-            if (repairResult.data) {
-              parsed = repairResult.data;
-              parseError = null;
-              console.info("[stream-utils] LLM-assisted JSON repair succeeded");
-            }
-          } catch (repairErr) {
-            console.warn("[stream-utils] LLM-assisted repair failed:", repairErr);
-          }
-        }
-
-        if (!parsed || parseError) {
-          console.error(
-            "[stream-utils] JSON parse failed:",
-            parseError,
-            `\nResponse length: ${raw.length} chars, ${chunkCount} chunks`,
-            "\nRaw head:", raw.substring(0, 300),
-            "\nRaw tail:", raw.substring(Math.max(0, raw.length - 500))
-          );
-          enqueue({
-            type: "error",
-            text: `解析失败: ${parseError}`,
-            data: { raw: raw.substring(0, 500) },
-          });
+        if (rawTextMode) {
+          // Raw text mode: skip JSON parsing, send accumulated text as result
+          // Strip <think> reasoning blocks from MiniMax models
+          const cleanRaw = raw.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+          enqueue({ type: "result", data: { text: cleanRaw } });
         } else {
-          const result = postProcess
-            ? postProcess(parsed as Record<string, unknown>)
-            : parsed;
-          enqueue({ type: "result", data: result });
+          // Parse the complete response (strip <think> blocks first)
+          const cleanForParse = raw.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+          let { data: parsed, error: parseError } = extractJSON(cleanForParse);
+
+          // Retry: if initial parse fails, attempt a second LLM call to repair the JSON
+          if (!parsed && parseError && raw.length > 200) {
+            console.warn(
+              "[stream-utils] Initial parse failed, attempting LLM-assisted repair...",
+              parseError
+            );
+            try {
+              const repairRaw = await callLLMStreaming({
+                system: "你是一个JSON修复工具。用户会提供一段格式有问题的JSON文本。你需要修复它并直接输出修复后的合法JSON。只输出JSON，不要任何解释。",
+                messages: [{
+                  role: "user",
+                  content: `以下JSON文本解析出错（${parseError}），请修复后直接输出完整的合法JSON：\n\n${raw.substring(0, 12000)}`,
+                }],
+                maxTokens: Math.min(maxTokens, 16000),
+                onChunk: () => {},
+                config,
+              });
+              const repairResult = extractJSON(repairRaw);
+              if (repairResult.data) {
+                parsed = repairResult.data;
+                parseError = null;
+                console.info("[stream-utils] LLM-assisted JSON repair succeeded");
+              }
+            } catch (repairErr) {
+              console.warn("[stream-utils] LLM-assisted repair failed:", repairErr);
+            }
+          }
+
+          if (!parsed || parseError) {
+            console.error(
+              "[stream-utils] JSON parse failed:",
+              parseError,
+              `\nResponse length: ${raw.length} chars, ${chunkCount} chunks`,
+              "\nRaw head:", raw.substring(0, 300),
+              "\nRaw tail:", raw.substring(Math.max(0, raw.length - 500))
+            );
+            enqueue({
+              type: "error",
+              text: `解析失败: ${parseError}`,
+              data: { raw: raw.substring(0, 500) },
+            });
+          } else {
+            const result = postProcess
+              ? postProcess(parsed as Record<string, unknown>)
+              : parsed;
+            enqueue({ type: "result", data: result });
+          }
         }
 
         enqueue({ type: "done" });

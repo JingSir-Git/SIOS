@@ -193,11 +193,16 @@ export default function ProfilesTab() {
     <div className="flex flex-col h-full">
       <div className="border-b border-zinc-800 px-6 py-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-lg font-semibold text-zinc-100">人物画像库</h1>
-            <p className="text-xs text-zinc-500 mt-1 hidden md:block">
-              基于真实对话数据构建的动态心理画像，越用越精准
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-violet-500/10 border border-violet-500/20 shadow-lg shadow-violet-500/10">
+              <Users className="h-5 w-5 text-violet-400" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-zinc-100">人物画像库</h1>
+              <p className="text-[10px] text-zinc-500 hidden md:block">
+                真实对话 · 动态心理画像 · 越用越精准
+              </p>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button

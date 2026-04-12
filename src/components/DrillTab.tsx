@@ -22,9 +22,14 @@ export default function DrillTab() {
     <div className="flex flex-col h-full">
       {/* Sub-tab header */}
       <div className="border-b border-zinc-800 px-4 py-3 shrink-0">
-        <div className="flex items-center gap-2 mb-2">
-          <Swords className="h-5 w-5 text-violet-400" />
-          <h1 className="text-lg font-semibold text-zinc-100">模拟演练</h1>
+        <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-violet-500/10 border border-violet-500/20 shadow-lg shadow-violet-500/10">
+            <Swords className="h-5 w-5 text-violet-400" />
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold text-zinc-100">模拟演练</h1>
+            <p className="text-[10px] text-zinc-500">情景模拟 · 教练指导 · 策略训练</p>
+          </div>
         </div>
         <div className="flex items-center gap-1">
           {SUB_TABS.map((tab) => {

@@ -21,6 +21,7 @@ import {
   Briefcase,
   Eye,
   Flame,
+  Fingerprint,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MBTITestResult } from "@/lib/types";
@@ -134,8 +135,15 @@ export default function MBTITab() {
     return (
       <div className="flex flex-col h-full">
         <div className="border-b border-zinc-800 px-6 py-4">
-          <h1 className="text-lg font-semibold text-zinc-100">MBTI 人格检测</h1>
-          <p className="text-xs text-zinc-500 mt-1">选择测试模式，了解你的认知功能偏好</p>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-pink-500/10 border border-pink-500/20 shadow-lg shadow-pink-500/10">
+              <Fingerprint className="h-5 w-5 text-pink-400" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-zinc-100">MBTI 人格检测</h1>
+              <p className="text-[10px] text-zinc-500">认知功能偏好 · 多模式测试 · 详细报告</p>
+            </div>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-xl mx-auto px-6 py-10 space-y-6">
@@ -593,11 +601,16 @@ export default function MBTITab() {
   return (
     <div className="flex flex-col h-full">
       <div className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-zinc-100">MBTI 人格检测</h1>
-          <p className="text-xs text-zinc-500 mt-1">
-            {modeInfo?.label} · {totalQuestions}道题 · 约{modeInfo?.timeEstimate}
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-pink-500/10 border border-pink-500/20 shadow-lg shadow-pink-500/10">
+            <Fingerprint className="h-5 w-5 text-pink-400" />
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold text-zinc-100">MBTI 人格检测</h1>
+            <p className="text-[10px] text-zinc-500">
+              {modeInfo?.label} · {totalQuestions}道题 · 约{modeInfo?.timeEstimate}
+            </p>
+          </div>
         </div>
         <button
           onClick={handleReset}

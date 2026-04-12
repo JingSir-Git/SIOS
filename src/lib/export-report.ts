@@ -298,3 +298,102 @@ export function exportDashboardReport(
 
   openPrintWindow("SIOS — 数据大盘报告", body);
 }
+
+// ---- Chat Session Report (Legal / Psychology / Divination) ----
+
+interface ChatExportMessage {
+  role: "user" | "advisor" | "counselor" | "assistant";
+  content: string;
+}
+
+const CHAT_CSS = `
+  .msg { margin-bottom: 12px; }
+  .msg-user { margin-left: 20%; }
+  .msg-user .bubble { background: #f3f0ff; border: 1px solid #e9e3ff; border-radius: 12px 12px 4px 12px; padding: 10px 14px; }
+  .msg-ai .bubble { background: #f8f9fa; border: 1px solid #e5e5e5; border-radius: 12px 12px 12px 4px; padding: 10px 14px; }
+  .msg .role { font-size: 9px; color: #888; margin-bottom: 2px; }
+  .msg .text { font-size: 11px; color: #333; line-height: 1.7; white-space: pre-wrap; }
+  .disclaimer { background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 8px 12px; font-size: 10px; color: #856404; margin-bottom: 16px; }
+`;
+
+export function exportChatSessionReport({
+  title,
+  subtitle,
+  messages,
+  disclaimer,
+  metadata,
+}: {
+  title: string;
+  subtitle: string;
+  messages: ChatExportMessage[];
+  disclaimer?: string;
+  metadata?: Record<string, string>;
+}) {
+  const metaHtml = metadata
+    ? `<div class="section"><table>${Object.entries(metadata).map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("")}</table></div>`
+    : "";
+
+  const disclaimerHtml = disclaimer
+    ? `<div class="disclaimer">⚠️ ${disclaimer}</div>`
+    : "";
+
+  const messagesHtml = messages.map((m) => {
+    const isUser = m.role === "user";
+    return `
+      <div class="msg ${isUser ? "msg-user" : "msg-ai"}">
+        <div class="role">${isUser ? "用户" : title.includes("法律") ? "法律顾问" : title.includes("心理") ? "心理顾问" : "AI"}</div>
+        <div class="bubble"><div class="text">${escapeHtml(m.content)}</div></div>
+      </div>
+    `;
+  }).join("");
+
+  const body = `
+    <style>${CHAT_CSS}</style>
+    <div class="header">
+      <div class="brand">SIOS · SOCIAL INTELLIGENCE OS</div>
+      <h1>${title}</h1>
+      <div class="subtitle">${subtitle}</div>
+    </div>
+    ${disclaimerHtml}
+    ${metaHtml}
+    <div class="section">
+      <h2>对话记录</h2>
+      ${messagesHtml}
+    </div>
+  `;
+
+  openPrintWindow(`SIOS — ${title}`, body);
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
+}
+
+// ---- Divination Record Report ----
+
+export function exportDivinationReport(records: { category: string; categoryLabel: string; question: string; answer: string; ritualResult?: string; createdAt: string }[]) {
+  const recordsHtml = records.map((r) => `
+    <div class="section" style="page-break-inside: avoid;">
+      <h3>${r.categoryLabel} · ${new Date(r.createdAt).toLocaleDateString("zh-CN")}</h3>
+      ${r.ritualResult ? `<p style="font-size: 10px; color: #7c3aed; margin-bottom: 4px;">🎯 ${escapeHtml(r.ritualResult)}</p>` : ""}
+      <p style="font-size: 11px; color: #333; margin-bottom: 6px;"><strong>问:</strong> ${escapeHtml(r.question)}</p>
+      <div style="font-size: 11px; color: #555; line-height: 1.7; white-space: pre-wrap; border-left: 3px solid #e9e3ff; padding-left: 12px;">${escapeHtml(r.answer)}</div>
+    </div>
+  `).join('<hr style="border: none; border-top: 1px solid #eee; margin: 12px 0;">');
+
+  const body = `
+    <div class="header">
+      <div class="brand">SIOS · SOCIAL INTELLIGENCE OS</div>
+      <h1>风水玄学 — 占卜记录报告</h1>
+      <div class="subtitle">共 ${records.length} 条记录 · 导出于 ${new Date().toLocaleDateString("zh-CN")}</div>
+    </div>
+    <div class="disclaimer">⚠️ 占卜结果仅供参考，不构成任何决策依据。</div>
+    ${recordsHtml}
+  `;
+
+  openPrintWindow("SIOS — 占卜记录报告", body);
+}

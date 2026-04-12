@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
+import { useT } from "@/lib/i18n";
 import {
   Brain,
   MessageSquareText,
@@ -20,70 +21,61 @@ import {
   X,
   Zap,
   Compass,
+  Scale,
 } from "lucide-react";
 
-export const NAV_ITEMS = [
-  {
-    id: "dashboard",
-    label: "数据大盘",
-    sublabel: "Analytics Dashboard",
-    icon: BarChart3,
-  },
-  {
-    id: "analyze",
-    label: "对话分析",
-    sublabel: "Conversation Analysis",
-    icon: MessageSquareText,
-  },
-  {
-    id: "profiles",
-    label: "人物画像",
-    sublabel: "Person Profiles",
-    icon: Users,
-  },
-  {
-    id: "drill",
-    label: "模拟演练",
-    sublabel: "Simulation & Coaching",
-    icon: Swords,
-  },
-  {
-    id: "psychology",
-    label: "心理顾问",
-    sublabel: "Psychology Counselor",
-    icon: HeartHandshake,
-  },
-  {
-    id: "planning",
-    label: "规划制定",
-    sublabel: "Life & Work Planner",
-    icon: CalendarClock,
-  },
-  {
-    id: "divination",
-    label: "风水玄学",
-    sublabel: "Metaphysics & Divination",
-    icon: Compass,
-  },
-  {
-    id: "realtime",
-    label: "实时助手",
-    sublabel: "Realtime Assistant",
-    icon: Zap,
-  },
-  {
-    id: "mbti",
-    label: "MBTI 检测",
-    sublabel: "Personality Quick Test",
-    icon: Fingerprint,
-  },
-  {
-    id: "settings",
-    label: "数据管理",
-    sublabel: "Data & Settings",
-    icon: Settings,
-  },
+/** Nav key mapping to i18n translation keys */
+type NavKey = "dashboard" | "analyze" | "profiles" | "drill" | "psychology" | "legal" | "planning" | "divination" | "mbti" | "settings";
+
+const NAV_ITEMS_DEF: { id: NavKey; icon: typeof BarChart3 }[] = [
+  { id: "dashboard", icon: BarChart3 },
+  { id: "analyze", icon: MessageSquareText },
+  { id: "profiles", icon: Users },
+  { id: "drill", icon: Swords },
+  { id: "psychology", icon: HeartHandshake },
+  { id: "legal", icon: Scale },
+  { id: "planning", icon: CalendarClock },
+  { id: "divination", icon: Compass },
+  { id: "mbti", icon: Fingerprint },
+  { id: "settings", icon: Settings },
 ];
+
+/** Build NAV_ITEMS with i18n labels. Use the hook version in components. */
+function buildNavItems(t: ReturnType<typeof useT>) {
+  const labelMap: Record<NavKey, { label: string; sublabel: string }> = {
+    dashboard:  { label: t.nav.dashboard,  sublabel: t.nav.dashboardSub },
+    analyze:    { label: t.nav.analyze,    sublabel: t.nav.analyzeSub },
+    profiles:   { label: t.nav.profiles,   sublabel: t.nav.profilesSub },
+    drill:      { label: t.nav.drill,      sublabel: t.nav.drillSub },
+    psychology: { label: t.nav.psychology,  sublabel: t.nav.psychologySub },
+    legal:      { label: t.nav.legal,      sublabel: t.nav.legalSub },
+    planning:   { label: t.nav.planning,   sublabel: t.nav.planningSub },
+    divination: { label: t.nav.divination,  sublabel: t.nav.divinationSub },
+    mbti:       { label: t.nav.mbti,       sublabel: t.nav.mbtiSub },
+    settings:   { label: t.nav.settings,   sublabel: t.nav.settingsSub },
+  };
+  return NAV_ITEMS_DEF.map((item) => ({
+    ...item,
+    ...labelMap[item.id],
+  }));
+}
+
+/** Static fallback for non-hook contexts (e.g. KeyboardShortcuts) */
+export const NAV_ITEMS = NAV_ITEMS_DEF.map((item) => {
+  const zhLabels: Record<NavKey, { label: string; sublabel: string }> = {
+    dashboard: { label: "数据大盘", sublabel: "Analytics Dashboard" },
+    analyze: { label: "对话分析", sublabel: "Conversation Analysis" },
+    profiles: { label: "人物画像", sublabel: "Person Profiles" },
+    drill: { label: "模拟演练", sublabel: "Simulation & Coaching" },
+    psychology: { label: "心理顾问", sublabel: "Psychology Counselor" },
+    legal: { label: "法律顾问", sublabel: "Legal Advisor" },
+    planning: { label: "规划制定", sublabel: "Life & Work Planner" },
+    divination: { label: "风水玄学", sublabel: "Metaphysics & Divination" },
+    mbti: { label: "MBTI 检测", sublabel: "Personality Quick Test" },
+    settings: { label: "数据管理", sublabel: "Data & Settings" },
+  };
+  return { ...item, ...zhLabels[item.id] };
+});
 
 // ---- Mobile top header bar ----
 
@@ -149,6 +141,8 @@ export function MobileBottomBar() {
 
 export default function Sidebar() {
   const { sidebarOpen, toggleSidebar, activeTab, setActiveTab, mobileDrawerOpen, setMobileDrawerOpen } = useAppStore();
+  const t = useT();
+  const navItems = buildNavItems(t);
 
   // Close drawer on route change
   useEffect(() => {
@@ -196,7 +190,7 @@ export default function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto space-y-1 p-2 pt-4">
-          {NAV_ITEMS.map((item, idx) => {
+          {navItems.map((item, idx) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             const shortcutKey = idx < 9 ? idx + 1 : 0;
@@ -275,7 +269,7 @@ export default function Sidebar() {
               </button>
             </div>
             <nav className="flex-1 overflow-y-auto space-y-1 p-2 pt-3">
-              {NAV_ITEMS.map((item) => {
+              {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 return (

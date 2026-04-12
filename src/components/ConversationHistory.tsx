@@ -17,6 +17,7 @@ import {
 import { cn, formatDate } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import ConversationReplay from "./ConversationReplay";
+import { autoTagConversation, getTagColor } from "@/lib/auto-tag";
 
 interface ConversationHistoryProps {
   onClose: () => void;
@@ -152,6 +153,16 @@ export default function ConversationHistory({
                           </span>
                         )}
                       </div>
+                      {(() => {
+                        const tags = convo.tags || autoTagConversation(convo);
+                        return tags.length > 0 ? (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {tags.slice(0, 5).map((tag) => (
+                              <span key={tag} className={cn("text-[8px] px-1.5 py-0 rounded-full border", getTagColor(tag))}>{tag}</span>
+                            ))}
+                          </div>
+                        ) : null;
+                      })()}
                     </div>
                     <div className="flex items-center gap-0.5 shrink-0">
                       {convo.rawText && (

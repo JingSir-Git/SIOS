@@ -20,14 +20,22 @@ import {
   ChevronUp,
   Volume2,
   VolumeX,
+  Eye,
+  CloudMoon,
+  FileDown,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-fetch";
 import { useAppStore } from "@/lib/store";
+import ChatHistoryPanel from "./ChatHistoryPanel";
+import type { ChatSessionEntry } from "@/lib/types";
 import StreamingIndicator from "./StreamingIndicator";
 import MarkdownRenderer from "./MarkdownRenderer";
-import { CoinTossRitual, TarotDrawRitual, QimenRitual } from "./DivinationRituals";
+import ImageUpload, { type UploadedImage } from "./ImageUpload";
+import { CoinTossRitual, TarotDrawRitual, QimenRitual, FortuneStickRitual, CharacterWriteRitual } from "./DivinationRituals";
 import { isMuted, setMuted } from "@/lib/sound-effects";
+import { exportChatSessionReport } from "@/lib/export-report";
 
 const DIVINATION_CATEGORIES = [
   {
@@ -37,6 +45,7 @@ const DIVINATION_CATEGORIES = [
     description: "梅花易数 · 六十四卦 · 卦象断事",
     color: "text-amber-400",
     bg: "bg-amber-500/10 border-amber-500/20",
+    glow: "shadow-amber-500/20 hover:shadow-amber-500/40",
   },
   {
     id: "bazi",
@@ -45,6 +54,7 @@ const DIVINATION_CATEGORIES = [
     description: "四柱干支 · 十神格局 · 终身运势",
     color: "text-red-400",
     bg: "bg-red-500/10 border-red-500/20",
+    glow: "shadow-red-500/20 hover:shadow-red-500/40",
   },
   {
     id: "fengshui",
@@ -53,6 +63,7 @@ const DIVINATION_CATEGORIES = [
     description: "玄空飞星 · 八宅方位 · 形煞化解",
     color: "text-emerald-400",
     bg: "bg-emerald-500/10 border-emerald-500/20",
+    glow: "shadow-emerald-500/20 hover:shadow-emerald-500/40",
   },
   {
     id: "ziwei",
@@ -61,6 +72,7 @@ const DIVINATION_CATEGORIES = [
     description: "十四主星 · 十二宫位 · 四化飞星",
     color: "text-violet-400",
     bg: "bg-violet-500/10 border-violet-500/20",
+    glow: "shadow-violet-500/20 hover:shadow-violet-500/40",
   },
   {
     id: "tarot",
@@ -69,6 +81,7 @@ const DIVINATION_CATEGORIES = [
     description: "韦特体系 · 牌阵占卜 · 灵性引导",
     color: "text-pink-400",
     bg: "bg-pink-500/10 border-pink-500/20",
+    glow: "shadow-pink-500/20 hover:shadow-pink-500/40",
   },
   {
     id: "qimen",
@@ -77,6 +90,7 @@ const DIVINATION_CATEGORIES = [
     description: "三奇六仪 · 八门九星 · 择时选方",
     color: "text-cyan-400",
     bg: "bg-cyan-500/10 border-cyan-500/20",
+    glow: "shadow-cyan-500/20 hover:shadow-cyan-500/40",
   },
   {
     id: "liuyao",
@@ -85,6 +99,7 @@ const DIVINATION_CATEGORIES = [
     description: "铜钱摇卦 · 六亲世应 · 吉凶占断",
     color: "text-orange-400",
     bg: "bg-orange-500/10 border-orange-500/20",
+    glow: "shadow-orange-500/20 hover:shadow-orange-500/40",
   },
   {
     id: "name",
@@ -93,6 +108,43 @@ const DIVINATION_CATEGORIES = [
     description: "五格剖象 · 三才配置 · 数理吉凶",
     color: "text-teal-400",
     bg: "bg-teal-500/10 border-teal-500/20",
+    glow: "shadow-teal-500/20 hover:shadow-teal-500/40",
+  },
+  {
+    id: "qiuqian",
+    label: "求签解签",
+    icon: Star,
+    description: "观音灵签 · 摇签问卦 · 签文解读",
+    color: "text-yellow-400",
+    bg: "bg-yellow-500/10 border-yellow-500/20",
+    glow: "shadow-yellow-500/20 hover:shadow-yellow-500/40",
+  },
+  {
+    id: "cezi",
+    label: "测字解字",
+    icon: Type,
+    description: "拆字会意 · 字形推演 · 测字断事",
+    color: "text-sky-400",
+    bg: "bg-sky-500/10 border-sky-500/20",
+    glow: "shadow-sky-500/20 hover:shadow-sky-500/40",
+  },
+  {
+    id: "mianxiang",
+    label: "面相手相",
+    icon: Eye,
+    description: "五官定格 · 掌纹推命 · 体态相法",
+    color: "text-rose-400",
+    bg: "bg-rose-500/10 border-rose-500/20",
+    glow: "shadow-rose-500/20 hover:shadow-rose-500/40",
+  },
+  {
+    id: "dream",
+    label: "解梦析梦",
+    icon: CloudMoon,
+    description: "周公解梦 · 梦境意象 · 潜意识解读",
+    color: "text-indigo-400",
+    bg: "bg-indigo-500/10 border-indigo-500/20",
+    glow: "shadow-indigo-500/20 hover:shadow-indigo-500/40",
   },
 ] as const;
 
@@ -167,15 +219,98 @@ const FLOOR_RANGES = [
   { id: "high", label: "高层 (16+)" },
 ];
 
+// ---- Simplified Bazi (四柱) calculator ----
+const STEMS = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"];
+const BRANCHES = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
+const BRANCH_HOUR_MAP: Record<string, number> = {
+  "子时(23-01)": 0, "丑时(01-03)": 1, "寅时(03-05)": 2, "卯时(05-07)": 3,
+  "辰时(07-09)": 4, "巳时(09-11)": 5, "午时(11-13)": 6, "未时(13-15)": 7,
+  "申时(15-17)": 8, "酉时(17-19)": 9, "戌时(19-21)": 10, "亥时(21-23)": 11,
+};
+
+function computeBazi(dateStr: string, timeStr: string) {
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    const y = d.getFullYear(), m = d.getMonth() + 1, day = d.getDate();
+
+    // Year pillar (立春 ~Feb 4 as new year boundary, simplified)
+    const adjYear = (m < 2 || (m === 2 && day < 4)) ? y - 1 : y;
+    const yearStemIdx = (adjYear - 4) % 10;
+    const yearBranchIdx = (adjYear - 4) % 12;
+
+    // Month pillar (simplified: month branch fixed by solar month)
+    const monthBranchIdx = (m + 1) % 12; // 寅月=正月
+    const monthStemIdx = (yearStemIdx % 5 * 2 + (m + 1)) % 10;
+
+    // Day pillar (simplified algorithm using Julian day number offset)
+    const jdn = Math.floor(367 * y - Math.floor(7 * (y + Math.floor((m + 9) / 12)) / 4) + Math.floor(275 * m / 9) + day + 1721013.5);
+    const dayStemIdx = ((jdn + 9) % 10 + 10) % 10;
+    const dayBranchIdx = ((jdn + 1) % 12 + 12) % 12;
+
+    // Hour pillar
+    const hourBranchIdx = BRANCH_HOUR_MAP[timeStr] ?? 0;
+    const hourStemIdx = (dayStemIdx % 5 * 2 + hourBranchIdx) % 10;
+
+    return {
+      year: { stem: STEMS[yearStemIdx], branch: BRANCHES[yearBranchIdx] },
+      month: { stem: STEMS[monthStemIdx], branch: BRANCHES[monthBranchIdx] },
+      day: { stem: STEMS[dayStemIdx], branch: BRANCHES[dayBranchIdx] },
+      hour: { stem: STEMS[hourStemIdx], branch: BRANCHES[hourBranchIdx] },
+    };
+  } catch { return null; }
+}
+
 export default function DivinationTab() {
-  const { profiles, addDivinationRecord, divinationRecords, deleteDivinationRecord } = useAppStore();
+  const { profiles, addDivinationRecord, divinationRecords, deleteDivinationRecord, addChatSession, appendChatMessage, updateChatSession } = useAppStore();
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const ensureSession = useCallback((): string => {
+    if (activeSessionId) return activeSessionId;
+    const cat = DIVINATION_CATEGORIES.find(c => c.id === selectedCategory);
+    const id = `div_${Date.now()}`;
+    const now = new Date().toISOString();
+    addChatSession({
+      id,
+      domain: "divination",
+      title: cat ? cat.label : "占卜咨询",
+      messages: [],
+      createdAt: now,
+      updatedAt: now,
+      archived: false,
+      divinationCategory: selectedCategory || undefined,
+    });
+    setActiveSessionId(id);
+    return id;
+  }, [activeSessionId, addChatSession, selectedCategory]);
+
+  const handleSelectSession = useCallback((session: ChatSessionEntry) => {
+    setActiveSessionId(session.id);
+    setMessages(session.messages.map(m => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    })));
+    if (session.divinationCategory) {
+      setSelectedCategory(session.divinationCategory as Category);
+    }
+    setShowHistory(false);
+  }, []);
+
+  const handleNewSession = useCallback(() => {
+    setActiveSessionId(null);
+    setMessages([]);
+    setInput("");
+    setStreamingText("");
+    setShowHistory(false);
+  }, []);
 
   // Birth info for bazi/ziwei
   const [birthDate, setBirthDate] = useState("");
@@ -206,6 +341,17 @@ export default function DivinationTab() {
 
   // Sound
   const [soundMuted, setSoundMuted] = useState(() => isMuted());
+
+  // Mianxiang photo upload + interactive params
+  const [faceImages, setFaceImages] = useState<UploadedImage[]>([]);
+  const [faceOcrResult, setFaceOcrResult] = useState("");
+  const [faceReadingType, setFaceReadingType] = useState("");   // face / palm / both
+  const [faceAnalysisFocus, setFaceAnalysisFocus] = useState(""); // career / love / wealth / health
+
+  // Dream interpretation params
+  const [dreamType, setDreamType] = useState("");       // nightmare / lucid / recurring / normal
+  const [dreamEmotion, setDreamEmotion] = useState(""); // fear / joy / confusion / sadness / neutral
+  const [dreamFrequency, setDreamFrequency] = useState(""); // once / recurring / series
 
   const category = DIVINATION_CATEGORIES.find((c) => c.id === selectedCategory);
 
@@ -244,8 +390,30 @@ export default function DivinationTab() {
       const d = DIRECTIONS.find((dir) => dir.id === facingDirection);
       if (d) parts.push(`房屋朝向：${d.label}`);
     }
+    // Mianxiang
+    if (faceReadingType) {
+      const labels: Record<string, string> = { face: "面相", palm: "手相", both: "面相+手相" };
+      parts.push(`看相类型：${labels[faceReadingType] || faceReadingType}`);
+    }
+    if (faceAnalysisFocus) {
+      const labels: Record<string, string> = { career: "事业运", love: "感情运", wealth: "财运", health: "健康运", general: "综合运势" };
+      parts.push(`重点关注：${labels[faceAnalysisFocus] || faceAnalysisFocus}`);
+    }
+    // Dream
+    if (dreamType) {
+      const labels: Record<string, string> = { nightmare: "噩梦", lucid: "清醒梦", recurring: "反复出现的梦", normal: "普通梦境", prophetic: "预感/预知梦" };
+      parts.push(`梦境类型：${labels[dreamType] || dreamType}`);
+    }
+    if (dreamEmotion) {
+      const labels: Record<string, string> = { fear: "恐惧不安", joy: "喜悦兴奋", confusion: "困惑迷茫", sadness: "伤感失落", neutral: "平静无感", anxiety: "焦虑紧张" };
+      parts.push(`梦中情绪：${labels[dreamEmotion] || dreamEmotion}`);
+    }
+    if (dreamFrequency) {
+      const labels: Record<string, string> = { once: "仅此一次", recurring: "反复做此梦", series: "系列连续梦" };
+      parts.push(`梦境频率：${labels[dreamFrequency] || dreamFrequency}`);
+    }
     return parts.join("；");
-  }, [questionDomain, selectedElement, selectedDirection, selectedTrigram, selectedSpread, houseType, floorRange, facingDirection]);
+  }, [questionDomain, selectedElement, selectedDirection, selectedTrigram, selectedSpread, houseType, floorRange, facingDirection, faceReadingType, faceAnalysisFocus, dreamType, dreamEmotion, dreamFrequency]);
 
   const getSystemPrompt = () => {
     const interactiveCtx = buildInteractiveContext();
@@ -585,6 +753,115 @@ export default function DivinationTab() {
         "【格式要求】五格数理必须以 Markdown 表格形式展示。康熙笔画必须准确。评分要客观有据。",
         interactiveCtx ? `\n【用户补充信息】${interactiveCtx}` : "",
       ].filter(Boolean).join("\n"),
+
+      qiuqian: [
+        "你是一位资深的观音灵签解签师，精通观音灵签一百签的签文、典故和解读方法，同时也熟悉关帝灵签、黄大仙灵签等签系。",
+        "你的风格是慈悲温暖、语言优美，善于用佛理和故事来启迪人心。如同一位庙中的慈祥老僧在为香客解签。",
+        disclaimer,
+        "",
+        "【回复结构要求】",
+        "一、签号与签名：明确第几签，签名是什么",
+        "二、签诗原文：完整列出四句签诗(七言绝句)，并逐句翻译为白话",
+        "三、典故出处：这支签引用的历史典故或神话传说，详细讲述故事",
+        "四、签意总论：这支签的总体吉凶等级(上上签/上吉签/中吉签/中平签/下下签等)，整体运势方向",
+        "五、分项解读：",
+        "   - 事业运：具体建议",
+        "   - 感情运：具体建议",
+        "   - 财运：具体建议",
+        "   - 健康：注意事项",
+        "   - 出行/考试/诉讼等(根据问题)",
+        "六、行动指引：基于签意给出具体可行的行动建议",
+        "七、化解之道：如签意不佳，给出念经、行善等化解方法",
+        "",
+        "【格式要求】签诗用引用块展示。典故要讲得生动有趣。语言要有禅意和温度。",
+        interactiveCtx ? `\n【用户信息】${interactiveCtx}` : "",
+      ].filter(Boolean).join("\n"),
+
+      cezi: [
+        "你是一位精通测字术的传统文化研究者，深谙拆字、增损、对关、象形、会意等测字技法，融合易理、五行、数理等多种分析维度。",
+        "你的风格是机敏灵动，善于从一个字中推演出丰富的信息。如同一位街头的测字先生，看似随意却字字珠玑。",
+        disclaimer,
+        "",
+        "【核心知识体系】",
+        "- 六大测字技法：拆字法(将字拆分为部件)、增损法(增减笔画)、对关法(字的对称关联)、象形法(字形联想)、会意法(字义综合)、谐声法(音韵关联)",
+        "- 五行属性：根据字的偏旁、结构、笔画判断五行归属",
+        "- 数理分析：字的笔画数对应的数理吉凶",
+        "- 易理关联：字形与卦象的对应关系",
+        "",
+        "【回复结构要求】",
+        "一、原字分析：字的基本信息(笔画数、偏旁部首、五行属性)",
+        "二、拆字解读：将字拆分为各部件，逐一分析含义",
+        "三、增损推演：加减笔画可变成什么字，暗示什么",
+        "四、象形会意：字形联想到什么意象，与所问之事有何关联",
+        "五、五行分析：此字五行属性对问事的影响",
+        "六、综合断语：明确的吉凶判断和方向指引",
+        "七、行动建议：具体可行的建议",
+        "",
+        "【格式要求】使用 Markdown 排版。拆字过程要图文并茂(用文字描述字的结构)。分析要有理有据，每个推断都要说明依据。",
+        interactiveCtx ? `\n【用户信息】${interactiveCtx}` : "",
+      ].filter(Boolean).join("\n"),
+
+      mianxiang: [
+        "你是一位精研面相手相数十年的相学大师，精通麻衣神相、柳庄相法、神相全编等经典相书，同时也熟悉现代心理面容学。",
+        "你的风格是细致入微，善于观察。如同一位法眼如炬的老相师，一眼便能洞察面容与掌纹中暗藏的命运信息。",
+        disclaimer,
+        "",
+        "【核心知识体系】",
+        "- 面相五官：额(天庭)主早运、眉(保寿官)主兄弟、眼(监察官)主心性、鼻(审辨官)主财禄、口(出纳官)主晚运",
+        "- 面相十二宫：命宫、财帛宫、兄弟宫、田宅宫、子女宫、奴仆宫、夫妻宫、疾厄宫、迁移宫、官禄宫、福德宫、父母宫",
+        "- 三停：上停(发际到眉) 中停(眉到鼻尖) 下停(鼻尖到下巴)，判断一生运势分段",
+        "- 手相三大线：生命线(体力/健康)、智慧线(思维/性格)、感情线(情感/婚姻)",
+        "- 手相辅助线：事业线、太阳线、健康线、婚姻线、财运线",
+        "- 掌丘分析：金星丘、木星丘、土星丘、太阳丘、水星丘、月丘、火星丘",
+        "- 骨相：颧骨、下颌骨、眉骨等的形态与命运关联",
+        "",
+        "【回复结构要求】",
+        "一、总体印象：面型归类(甲字面/圆面/方面/由字面等)，整体气质判断",
+        "二、五官逐一分析(根据用户描述或照片描述)：",
+        "   - 额头：天庭饱满程度，发际线形态",
+        "   - 眉眼：眉型(剑眉/柳叶眉等)，眼型(丹凤/桃花等)，神采",
+        "   - 鼻相：山根高低，鼻翼大小，准头形态",
+        "   - 口相：唇型，牙齿，法令纹",
+        "   - 耳相：耳廓形态，耳垂大小",
+        "三、十二宫位重点分析(重点2-3个宫位)",
+        "四、手相分析(如用户提供)：三大主线+辅助线解读",
+        "五、综合命运判断：事业/财运/感情/健康各方面",
+        "六、注意事项与建议",
+        "",
+        gender ? `用户性别: ${gender === "male" ? "男" : "女"}` : "",
+        birthDate ? `用户出生日期: ${birthDate}` : "",
+        "【格式要求】用 Markdown 排版。分析要有据有理。如用户提供照片描述，要针对性分析。",
+        interactiveCtx ? `\n【用户信息】${interactiveCtx}` : "",
+      ].filter(Boolean).join("\n"),
+
+      dream: [
+        "你是一位融贯中西的解梦大师，精通周公解梦、弗洛伊德精神分析、荣格原型理论，同时熟悉佛教梦占、道教梦兆等传统解梦体系。",
+        "你的风格是温和而有深度，善于引导来访者探索梦境中隐含的心理信息。如同一位经验丰富的心理分析师在帮助来访者理解潜意识的语言。",
+        disclaimer,
+        "",
+        "【核心知识体系】",
+        "- 周公解梦：中国传统梦兆体系，涵盖天象、地理、人物、动物、植物、器物等梦象分类",
+        "- 弗洛伊德：梦是愿望的达成，显梦/隐梦，凝缩/移置/象征化等梦的工作机制",
+        "- 荣格原型：阴影(Shadow)、阿尼玛/阿尼姆斯(Anima/Animus)、自性(Self)、智慧老人、大母神等",
+        "- 常见梦象象征：水=情感/潜意识、飞行=自由/超越、坠落=失控/焦虑、追赶=逃避/压力、牙齿脱落=变化/不安",
+        "- 佛教梦占：善梦/恶梦/无记梦的分类",
+        "",
+        "【回复结构要求】",
+        "一、梦境还原：复述梦境要素(人物/场景/事件/情绪/色彩)",
+        "二、传统解梦(周公解梦)：",
+        "   - 关键梦象的传统寓意",
+        "   - 吉凶判断",
+        "三、心理学解读(弗洛伊德/荣格)：",
+        "   - 梦象的心理象征意义",
+        "   - 可能反映的潜意识需求或冲突",
+        "   - 涉及的原型意象",
+        "四、情境关联：结合做梦者当前的生活状况分析梦境的触发因素",
+        "五、综合解读：整合中西方视角，给出完整的梦境解读",
+        "六、启示与建议：梦境给做梦者的启示和行动建议",
+        "",
+        "【格式要求】使用 Markdown 排版。解读要兼顾理性分析和感性共鸣。语言要有温度。",
+        interactiveCtx ? `\n【用户信息】${interactiveCtx}` : "",
+      ].filter(Boolean).join("\n"),
     };
 
     const fallbackPrompt = "你是一位学养深厚的玄学研究者，精通中国传统数术文化与西方神秘学体系。请以专业、严谨的态度进行解读，所有解读仅供参考。";
@@ -619,6 +896,10 @@ export default function DivinationTab() {
     setInput("");
     setLoading(true);
     setStreamingText("");
+
+    // Persist user message to session
+    const sessionId = ensureSession();
+    appendChatMessage(sessionId, { id: `u_${Date.now()}`, role: "user", content, timestamp: new Date().toISOString() });
 
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
@@ -660,7 +941,8 @@ export default function DivinationTab() {
               const parsed = JSON.parse(data);
               if (parsed.text) {
                 fullText += parsed.text;
-                setStreamingText(fullText);
+                const display = fullText.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<think>[\s\S]*$/g, "").trim();
+                setStreamingText(display);
                 messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
               }
             } catch {
@@ -675,7 +957,10 @@ export default function DivinationTab() {
       }
 
       if (fullText) {
-        setMessages([...newMessages, { role: "assistant", content: fullText }]);
+        const cleanText = fullText.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+        setMessages([...newMessages, { role: "assistant", content: cleanText }]);
+        // Persist assistant message to session
+        appendChatMessage(sessionId, { id: `a_${Date.now()}`, role: "assistant", content: cleanText, timestamp: new Date().toISOString() });
         // Save to divination history
         const firstUserMsg = newMessages.find((m) => m.role === "user");
         if (firstUserMsg && selectedCategory) {
@@ -684,7 +969,7 @@ export default function DivinationTab() {
             category: selectedCategory,
             categoryLabel: category?.label || selectedCategory,
             question: firstUserMsg.content,
-            answer: fullText,
+            answer: cleanText,
             ritualResult: ritualResult || undefined,
             linkedProfileId: linkedProfileId || undefined,
             linkedProfileName: profiles.find((p) => p.id === linkedProfileId)?.name,
@@ -705,12 +990,15 @@ export default function DivinationTab() {
   };
 
   const handleReset = () => {
+    setActiveSessionId(null);
     setMessages([]);
     setStreamingText("");
     setInput("");
     setRitualResult("");
     setRitualCompleted(false);
     setRitualKey((k) => k + 1);
+    setFaceImages([]);
+    setFaceOcrResult("");
     if (abortRef.current) {
       abortRef.current.abort();
       abortRef.current = null;
@@ -718,22 +1006,60 @@ export default function DivinationTab() {
     setLoading(false);
   };
 
+  // Face/Palm photo OCR handler
+  const handleFaceOCR = useCallback(async (imageId: string) => {
+    const img = faceImages.find((i) => i.id === imageId);
+    if (!img || !img.base64 || img.ocrLoading) return;
+
+    setFaceImages((prev) => prev.map((i) => i.id === imageId ? { ...i, ocrLoading: true } : i));
+
+    try {
+      const mode = faceReadingType === "palm" ? "palm" : "face";
+      const res = await apiFetch("/api/ocr", {
+        method: "POST",
+        body: JSON.stringify({ image: img.base64, mode }),
+      });
+
+      if (!res.ok) throw new Error("图片分析失败");
+
+      const data = await res.json();
+      const ocrText = data.text || "";
+
+      setFaceImages((prev) => prev.map((i) => i.id === imageId ? { ...i, ocrText, ocrLoading: false } : i));
+
+      if (ocrText) {
+        setFaceOcrResult((prev) => prev ? prev + "\n\n" + ocrText : ocrText);
+        // Auto-fill input with face description
+        setInput((prev) => {
+          if (prev.trim()) return prev;
+          return `【照片分析描述】\n${ocrText}\n\n请根据以上面部/手掌特征进行详细分析。`;
+        });
+      }
+    } catch {
+      setFaceImages((prev) => prev.map((i) => i.id === imageId ? { ...i, ocrLoading: false } : i));
+    }
+  }, [faceImages, faceReadingType]);
+
   // Category selection screen
   if (!selectedCategory) {
     return (
       <div className="flex flex-col h-full">
         <div className="border-b border-zinc-800 px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Compass className="h-5 w-5 text-violet-400" />
-            <h1 className="text-lg font-semibold text-zinc-100">风水玄学</h1>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-violet-500/10 border border-violet-500/20 shadow-lg shadow-violet-500/10">
+              <Compass className="h-5 w-5 text-violet-400" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-zinc-100">风水玄学</h1>
+              <p className="text-[10px] text-zinc-500">
+                传统数术 · 经典义理 · 十二大术数体系 · 仅供参考
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-zinc-500 mt-1">
-            传统数术 · 经典义理 · 仅供参考
-          </p>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {DIVINATION_CATEGORIES.map((cat) => {
               const Icon = cat.icon;
               return (
@@ -741,23 +1067,29 @@ export default function DivinationTab() {
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
                   className={cn(
-                    "flex items-start gap-3 rounded-xl border p-4 text-left transition-all hover:scale-[1.02]",
-                    cat.bg
+                    "group relative flex items-start gap-3 rounded-xl border p-4 text-left transition-all duration-300 hover:scale-[1.03] shadow-md",
+                    cat.bg,
+                    cat.glow
                   )}
                 >
-                  <Icon className={cn("h-6 w-6 mt-0.5 shrink-0", cat.color)} />
-                  <div>
-                    <h3 className="text-sm font-semibold text-zinc-200">{cat.label}</h3>
-                    <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
-                      {cat.description}
-                    </p>
+                  <div className={cn("absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none", cat.bg)} style={{ filter: "blur(8px)" }} />
+                  <div className="relative flex items-start gap-3 z-10">
+                    <div className={cn("flex items-center justify-center w-10 h-10 rounded-lg border border-current/10 bg-current/5 shrink-0", cat.color)}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-zinc-200 group-hover:text-white transition-colors">{cat.label}</h3>
+                      <p className="text-[10px] text-zinc-500 mt-0.5 leading-relaxed group-hover:text-zinc-400 transition-colors">
+                        {cat.description}
+                      </p>
+                    </div>
                   </div>
                 </button>
               );
             })}
           </div>
 
-          <div className="max-w-2xl mx-auto mt-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+          <div className="max-w-3xl mx-auto mt-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
             <p className="text-[10px] text-zinc-500 leading-relaxed text-center">
               本模块基于中国传统数术文化体系与西方经典神秘学理论，所有解读仅供参考。重大人生决策建议综合多方信息、咨询相关专业人士后审慎判断。
             </p>
@@ -765,7 +1097,7 @@ export default function DivinationTab() {
 
           {/* Divination History */}
           {divinationRecords.length > 0 && (
-            <div className="max-w-2xl mx-auto mt-4">
+            <div className="max-w-3xl mx-auto mt-4">
               <button
                 onClick={() => setHistoryOpen(!historyOpen)}
                 className="w-full flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
@@ -826,22 +1158,52 @@ export default function DivinationTab() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full">
+      {/* History sidebar */}
+      {showHistory && (
+        <div className="w-64 border-r border-zinc-800 bg-zinc-950 shrink-0">
+          <ChatHistoryPanel
+            domain="divination"
+            activeSessionId={activeSessionId}
+            onSelectSession={handleSelectSession}
+            onNewSession={handleNewSession}
+            divinationCategory={selectedCategory || undefined}
+          />
+        </div>
+      )}
+      <div className="flex flex-col flex-1 min-w-0 h-full">
       {/* Header */}
       <div className="border-b border-zinc-800 px-4 py-3 shrink-0">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className={cn(
+                "flex items-center justify-center w-7 h-7 rounded-lg border transition-colors",
+                showHistory
+                  ? "bg-violet-500/20 border-violet-500/30 text-violet-400"
+                  : "bg-violet-500/10 border-violet-500/20 text-violet-400/60 hover:text-violet-400"
+              )}
+              title="历史会话"
+            >
+              <History className="h-3.5 w-3.5" />
+            </button>
             <button
               onClick={() => { setSelectedCategory(null); handleReset(); }}
-              className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs"
+              className="flex items-center gap-1 text-zinc-500 hover:text-zinc-300 transition-colors text-[11px] px-2 py-1 rounded-lg hover:bg-zinc-800"
             >
               ← 返回
             </button>
             {category && (
-              <>
-                <category.icon className={cn("h-4 w-4", category.color)} />
-                <h2 className="text-sm font-semibold text-zinc-200">{category.label}</h2>
-              </>
+              <div className="flex items-center gap-2">
+                <div className={cn("flex items-center justify-center w-7 h-7 rounded-lg border border-current/10 bg-current/5", category.color)}>
+                  <category.icon className="h-3.5 w-3.5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold text-zinc-200">{category.label}</h2>
+                  <p className="text-[9px] text-zinc-600">{category.description}</p>
+                </div>
+              </div>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -864,6 +1226,23 @@ export default function DivinationTab() {
                 ))}
               </select>
             )}
+            {messages.length > 0 && (
+              <button
+                onClick={() => {
+                  const catLabel = DIVINATION_CATEGORIES.find(c => c.id === selectedCategory)?.label || "占卜";
+                  exportChatSessionReport({
+                    title: `${catLabel}记录`,
+                    subtitle: `${messages.length} 条对话 · ${new Date().toLocaleDateString("zh-CN")}`,
+                    messages: messages.map(m => ({ role: m.role === "user" ? "user" as const : "assistant" as const, content: m.content })),
+                    disclaimer: "占卜结果仅供参考，不构成任何决策依据。",
+                    metadata: { "占卜类型": catLabel },
+                  });
+                }}
+                className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300"
+              >
+                <FileDown className="h-3 w-3" /> 导出
+              </button>
+            )}
             <button
               onClick={handleReset}
               className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300"
@@ -873,44 +1252,13 @@ export default function DivinationTab() {
           </div>
         </div>
 
-        {/* Birth info for bazi/ziwei */}
-        {(selectedCategory === "bazi" || selectedCategory === "ziwei") && (
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            <input
-              type="date"
-              value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
-              className="text-[10px] rounded border border-zinc-700 bg-zinc-800 text-zinc-300 px-2 py-1"
-              placeholder="出生日期"
-            />
-            <select
-              value={birthTime}
-              onChange={(e) => setBirthTime(e.target.value)}
-              className="text-[10px] rounded border border-zinc-700 bg-zinc-800 text-zinc-300 px-2 py-1"
-            >
-              <option value="">选择时辰</option>
-              <option value="子时(23-01)">子时 (23:00-01:00)</option>
-              <option value="丑时(01-03)">丑时 (01:00-03:00)</option>
-              <option value="寅时(03-05)">寅时 (03:00-05:00)</option>
-              <option value="卯时(05-07)">卯时 (05:00-07:00)</option>
-              <option value="辰时(07-09)">辰时 (07:00-09:00)</option>
-              <option value="巳时(09-11)">巳时 (09:00-11:00)</option>
-              <option value="午时(11-13)">午时 (11:00-13:00)</option>
-              <option value="未时(13-15)">未时 (13:00-15:00)</option>
-              <option value="申时(15-17)">申时 (15:00-17:00)</option>
-              <option value="酉时(17-19)">酉时 (17:00-19:00)</option>
-              <option value="戌时(19-21)">戌时 (19:00-21:00)</option>
-              <option value="亥时(21-23)">亥时 (21:00-23:00)</option>
-            </select>
-            <select
-              value={gender}
-              onChange={(e) => setGender(e.target.value as "male" | "female" | "")}
-              className="text-[10px] rounded border border-zinc-700 bg-zinc-800 text-zinc-300 px-2 py-1"
-            >
-              <option value="">性别</option>
-              <option value="male">男</option>
-              <option value="female">女</option>
-            </select>
+          {/* Birth info badge (compact, shown when already set) */}
+        {(selectedCategory === "bazi" || selectedCategory === "ziwei") && birthDate && (
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-[9px] text-amber-400/70 bg-amber-500/10 border border-amber-500/20 rounded px-2 py-0.5">
+              {gender === "male" ? "♂" : gender === "female" ? "♀" : ""}
+              {" "}{birthDate} {birthTime || ""}
+            </span>
           </div>
         )}
       </div>
@@ -926,65 +1274,169 @@ export default function DivinationTab() {
               </div>
             )}
 
-            {/* Yijing: proper Bagua octagonal layout */}
+            {/* Yijing: enhanced Bagua octagonal layout with SVG */}
             {selectedCategory === "yijing" && (
               <InteractiveSection title="心选卦象（凭直觉选一个）" step={1}>
-                <div className="relative w-36 h-36 sm:w-44 sm:h-44 mx-auto">
+                <div className="relative w-56 h-56 sm:w-64 sm:h-64 mx-auto">
+                  {/* SVG decorative ring */}
+                  <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 200 200">
+                    <circle cx="100" cy="100" r="88" fill="none" stroke="#3f3f46" strokeWidth="0.5" strokeDasharray="4 3" opacity="0.5" />
+                    <circle cx="100" cy="100" r="55" fill="none" stroke="#3f3f46" strokeWidth="0.5" strokeDasharray="2 3" opacity="0.3" />
+                    {/* Direction labels */}
+                    <text x="100" y="10" textAnchor="middle" fill="#71717a" fontSize="7" fontFamily="serif">南</text>
+                    <text x="100" y="198" textAnchor="middle" fill="#71717a" fontSize="7" fontFamily="serif">北</text>
+                    <text x="194" y="103" textAnchor="end" fill="#71717a" fontSize="7" fontFamily="serif">东</text>
+                    <text x="8" y="103" textAnchor="start" fill="#71717a" fontSize="7" fontFamily="serif">西</text>
+                  </svg>
                   {/* Center Taiji symbol */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-8 h-8 rounded-full border border-zinc-700/40 bg-zinc-800/30 flex items-center justify-center text-xs text-zinc-600">☯</div>
+                    <div className="w-14 h-14 rounded-full border border-zinc-700/30 bg-gradient-to-b from-zinc-800/60 to-zinc-900/60 flex items-center justify-center text-2xl text-zinc-500 shadow-inner select-none" style={{ textShadow: "0 0 8px rgba(245,158,11,0.15)" }}>
+                      ☯
+                    </div>
                   </div>
-                  {/* 后天八卦 positions: S top, N bottom — tighter radius */}
+                  {/* 后天八卦 positions */}
                   {[
-                    { ...TRIGRAMS[5], x: 50, y: 4 },   /* 离-南 top */
-                    { ...TRIGRAMS[3], x: 83, y: 17 },   /* 巽-东南 */
-                    { ...TRIGRAMS[2], x: 96, y: 50 },   /* 震-东 right */
-                    { ...TRIGRAMS[6], x: 83, y: 83 },   /* 艮-东北 */
-                    { ...TRIGRAMS[4], x: 50, y: 96 },   /* 坎-北 bottom */
-                    { ...TRIGRAMS[0], x: 17, y: 83 },   /* 乾-西北 */
-                    { ...TRIGRAMS[7], x: 4, y: 50 },    /* 兑-西 left */
-                    { ...TRIGRAMS[1], x: 17, y: 17 },   /* 坤-西南 */
-                  ].map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => setSelectedTrigram(selectedTrigram === t.id ? "" : t.id)}
-                      className={cn(
-                        "absolute flex flex-col items-center rounded-md border px-0.5 py-0.5 transition-all -translate-x-1/2 -translate-y-1/2 w-9 sm:w-10",
-                        selectedTrigram === t.id
-                          ? "border-amber-500/50 bg-amber-500/15 text-amber-200 shadow-lg shadow-amber-500/10 z-10"
-                          : "border-zinc-700/50 bg-zinc-900/80 text-zinc-400 hover:border-amber-500/30 hover:bg-zinc-800/80"
-                      )}
-                      style={{ left: `${t.x}%`, top: `${t.y}%` }}
-                    >
-                      <span className="text-xs sm:text-sm leading-none">{t.label.split(" ")[1]}</span>
-                      <span className="text-[8px] sm:text-[9px] font-medium leading-tight">{t.label.split(" ")[0]}</span>
-                    </button>
-                  ))}
+                    { ...TRIGRAMS[5], x: 50, y: 5,  dir: "南" },
+                    { ...TRIGRAMS[3], x: 82, y: 18, dir: "东南" },
+                    { ...TRIGRAMS[2], x: 95, y: 50, dir: "东" },
+                    { ...TRIGRAMS[6], x: 82, y: 82, dir: "东北" },
+                    { ...TRIGRAMS[4], x: 50, y: 95, dir: "北" },
+                    { ...TRIGRAMS[0], x: 18, y: 82, dir: "西北" },
+                    { ...TRIGRAMS[7], x: 5,  y: 50, dir: "西" },
+                    { ...TRIGRAMS[1], x: 18, y: 18, dir: "西南" },
+                  ].map((t) => {
+                    const active = selectedTrigram === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => setSelectedTrigram(active ? "" : t.id)}
+                        className={cn(
+                          "absolute flex flex-col items-center rounded-lg border transition-all duration-300 -translate-x-1/2 -translate-y-1/2 w-11 sm:w-12 py-1",
+                          active
+                            ? "border-amber-500/60 bg-amber-500/15 text-amber-200 shadow-lg shadow-amber-500/20 scale-110 z-10"
+                            : "border-zinc-700/40 bg-zinc-900/80 text-zinc-400 hover:border-amber-500/30 hover:bg-zinc-800/60 hover:scale-105"
+                        )}
+                        style={{ left: `${t.x}%`, top: `${t.y}%` }}
+                      >
+                        <span className="text-sm sm:text-base leading-none">{t.label.split(" ")[1]}</span>
+                        <span className="text-[8px] sm:text-[9px] font-semibold leading-tight mt-0.5">{t.label.split(" ")[0]}</span>
+                        <span className="text-[7px] text-zinc-600 leading-none mt-0.5">{t.nature}</span>
+                      </button>
+                    );
+                  })}
                 </div>
+                {selectedTrigram && (() => {
+                  const t = TRIGRAMS.find((tr) => tr.id === selectedTrigram);
+                  if (!t) return null;
+                  return (
+                    <div className="mt-3 text-center rounded-lg bg-amber-500/5 border border-amber-500/15 py-2 px-3">
+                      <span className="text-xs text-amber-300">{t.label}</span>
+                      <span className="text-[10px] text-zinc-400 ml-2">象{t.nature}，性{t.attr}</span>
+                    </div>
+                  );
+                })()}
               </InteractiveSection>
             )}
 
-            {/* Bazi/Ziwei: five elements */}
+            {/* Bazi/Ziwei: birth time centered + bazi display */}
             {(selectedCategory === "bazi" || selectedCategory === "ziwei") && (
-              <InteractiveSection title="你认为自己偏向哪种五行？（可选）" step={1}>
-                <div className="flex flex-wrap gap-2">
-                  {FIVE_ELEMENTS.map((e) => (
-                    <button
-                      key={e.id}
-                      onClick={() => setSelectedElement(selectedElement === e.id ? "" : e.id)}
-                      className={cn(
-                        "flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition-all",
-                        selectedElement === e.id
-                          ? e.color
-                          : "border-zinc-700/50 bg-zinc-800/30 text-zinc-400 hover:border-zinc-600"
-                      )}
-                    >
-                      {e.label}
-                      {selectedElement === e.id && <Check className="h-3 w-3" />}
-                    </button>
-                  ))}
+              <>
+                <div className="rounded-xl border border-amber-500/20 bg-gradient-to-b from-amber-500/5 to-transparent p-5">
+                  <div className="text-center mb-4">
+                    <Sun className="h-7 w-7 text-amber-400 mx-auto mb-2" />
+                    <h3 className="text-sm font-semibold text-amber-200">输入生辰八字</h3>
+                    <p className="text-[10px] text-zinc-500 mt-1">
+                      {selectedCategory === "bazi" ? "四柱干支推排需要精确的出生时间" : "紫微斗数排盘依赖准确的出生时辰"}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 max-w-sm mx-auto">
+                    <div className="space-y-1">
+                      <label className="text-[9px] text-zinc-500 text-center block">出生日期 *</label>
+                      <input
+                        type="date"
+                        value={birthDate}
+                        onChange={(e) => setBirthDate(e.target.value)}
+                        className="w-full text-xs rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-300 px-2.5 py-2 text-center focus:outline-none focus:border-amber-500/50 transition-colors"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] text-zinc-500 text-center block">出生时辰 *</label>
+                      <select
+                        value={birthTime}
+                        onChange={(e) => setBirthTime(e.target.value)}
+                        className="w-full text-xs rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-300 px-2.5 py-2 text-center focus:outline-none focus:border-amber-500/50 transition-colors"
+                      >
+                        <option value="">请选择</option>
+                        <option value="子时(23-01)">子时 23-01</option>
+                        <option value="丑时(01-03)">丑时 01-03</option>
+                        <option value="寅时(03-05)">寅时 03-05</option>
+                        <option value="卯时(05-07)">卯时 05-07</option>
+                        <option value="辰时(07-09)">辰时 07-09</option>
+                        <option value="巳时(09-11)">巳时 09-11</option>
+                        <option value="午时(11-13)">午时 11-13</option>
+                        <option value="未时(13-15)">未时 13-15</option>
+                        <option value="申时(15-17)">申时 15-17</option>
+                        <option value="酉时(17-19)">酉时 17-19</option>
+                        <option value="戌时(19-21)">戌时 19-21</option>
+                        <option value="亥时(21-23)">亥时 21-23</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] text-zinc-500 text-center block">性别</label>
+                      <select
+                        value={gender}
+                        onChange={(e) => setGender(e.target.value as "male" | "female" | "")}
+                        className="w-full text-xs rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-300 px-2.5 py-2 text-center focus:outline-none focus:border-amber-500/50 transition-colors"
+                      >
+                        <option value="">请选择</option>
+                        <option value="male">男命 ♂</option>
+                        <option value="female">女命 ♀</option>
+                      </select>
+                    </div>
+                  </div>
+                  {/* Bazi preview */}
+                  {birthDate && birthTime && (() => {
+                    const bazi = computeBazi(birthDate, birthTime);
+                    if (!bazi) return null;
+                    return (
+                      <div className="mt-4 pt-4 border-t border-amber-500/10">
+                        <p className="text-[9px] text-center text-zinc-500 mb-2">系统推算四柱</p>
+                        <div className="grid grid-cols-4 gap-2 max-w-xs mx-auto">
+                          {(["year", "month", "day", "hour"] as const).map((col) => (
+                            <div key={col} className="text-center rounded-lg border border-zinc-700/50 bg-zinc-800/50 py-2 px-1">
+                              <p className="text-[8px] text-zinc-600 mb-1">{col === "year" ? "年柱" : col === "month" ? "月柱" : col === "day" ? "日柱" : "时柱"}</p>
+                              <p className="text-sm font-bold text-amber-300">{bazi[col].stem}</p>
+                              <p className="text-sm font-bold text-amber-400/80">{bazi[col].branch}</p>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[8px] text-center text-zinc-600 mt-2 italic">
+                          注：此为简化推算，AI将基于精确万年历重新排盘
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
-              </InteractiveSection>
+                <InteractiveSection title="你认为自己偏向哪种五行？（可选）" step={2}>
+                  <div className="flex flex-wrap gap-2">
+                    {FIVE_ELEMENTS.map((e) => (
+                      <button
+                        key={e.id}
+                        onClick={() => setSelectedElement(selectedElement === e.id ? "" : e.id)}
+                        className={cn(
+                          "flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition-all",
+                          selectedElement === e.id
+                            ? e.color
+                            : "border-zinc-700/50 bg-zinc-800/30 text-zinc-400 hover:border-zinc-600"
+                        )}
+                      >
+                        {e.label}
+                        {selectedElement === e.id && <Check className="h-3 w-3" />}
+                      </button>
+                    ))}
+                  </div>
+                </InteractiveSection>
+              </>
             )}
 
             {/* Fengshui: house type, floor, facing direction */}
@@ -1118,6 +1570,123 @@ export default function DivinationTab() {
               </InteractiveSection>
             )}
 
+            {/* Qiuqian: question domain */}
+            {selectedCategory === "qiuqian" && (
+              <InteractiveSection title="求问领域" step={1}>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {QUESTION_DOMAINS.map((d) => (
+                    <OptionChip
+                      key={d.id}
+                      label={`${d.emoji} ${d.label}`}
+                      active={questionDomain === d.id}
+                      onClick={() => setQuestionDomain(questionDomain === d.id ? "" : d.id)}
+                    />
+                  ))}
+                </div>
+              </InteractiveSection>
+            )}
+
+            {/* Cezi: no special pre-interaction needed; ritual handles it */}
+
+            {/* Mianxiang: face/palm reading type and focus */}
+            {selectedCategory === "mianxiang" && (
+              <>
+                <InteractiveSection title="看相类型" step={1}>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { id: "face", label: "🧑 面相" },
+                      { id: "palm", label: "🤚 手相" },
+                      { id: "both", label: "🔮 面相+手相" },
+                    ].map((item) => (
+                      <OptionChip
+                        key={item.id}
+                        label={item.label}
+                        active={faceReadingType === item.id}
+                        onClick={() => setFaceReadingType(faceReadingType === item.id ? "" : item.id)}
+                      />
+                    ))}
+                  </div>
+                </InteractiveSection>
+                <InteractiveSection title="重点关注方向（可选）" step={2}>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { id: "career", label: "💼 事业运" },
+                      { id: "love", label: "💕 感情运" },
+                      { id: "wealth", label: "💰 财运" },
+                      { id: "health", label: "🏥 健康运" },
+                      { id: "general", label: "🌟 综合运势" },
+                    ].map((item) => (
+                      <OptionChip
+                        key={item.id}
+                        label={item.label}
+                        active={faceAnalysisFocus === item.id}
+                        onClick={() => setFaceAnalysisFocus(faceAnalysisFocus === item.id ? "" : item.id)}
+                      />
+                    ))}
+                  </div>
+                </InteractiveSection>
+              </>
+            )}
+
+            {/* Dream: dream type, emotion, frequency */}
+            {selectedCategory === "dream" && (
+              <>
+                <InteractiveSection title="梦境类型" step={1}>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { id: "normal", label: "🌙 普通梦境" },
+                      { id: "nightmare", label: "😱 噩梦" },
+                      { id: "lucid", label: "✨ 清醒梦" },
+                      { id: "recurring", label: "🔄 反复出现" },
+                      { id: "prophetic", label: "🔮 预感/预知" },
+                    ].map((item) => (
+                      <OptionChip
+                        key={item.id}
+                        label={item.label}
+                        active={dreamType === item.id}
+                        onClick={() => setDreamType(dreamType === item.id ? "" : item.id)}
+                      />
+                    ))}
+                  </div>
+                </InteractiveSection>
+                <InteractiveSection title="梦中主要情绪（可选）" step={2}>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { id: "fear", label: "😨 恐惧不安" },
+                      { id: "joy", label: "😊 喜悦兴奋" },
+                      { id: "confusion", label: "😶‍🌫️ 困惑迷茫" },
+                      { id: "sadness", label: "😢 伤感失落" },
+                      { id: "anxiety", label: "😰 焦虑紧张" },
+                      { id: "neutral", label: "😐 平静无感" },
+                    ].map((item) => (
+                      <OptionChip
+                        key={item.id}
+                        label={item.label}
+                        active={dreamEmotion === item.id}
+                        onClick={() => setDreamEmotion(dreamEmotion === item.id ? "" : item.id)}
+                      />
+                    ))}
+                  </div>
+                </InteractiveSection>
+                <InteractiveSection title="出现频率（可选）" step={3}>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { id: "once", label: "仅此一次" },
+                      { id: "recurring", label: "反复做此梦" },
+                      { id: "series", label: "系列连续梦" },
+                    ].map((item) => (
+                      <OptionChip
+                        key={item.id}
+                        label={item.label}
+                        active={dreamFrequency === item.id}
+                        onClick={() => setDreamFrequency(dreamFrequency === item.id ? "" : item.id)}
+                      />
+                    ))}
+                  </div>
+                </InteractiveSection>
+              </>
+            )}
+
             {/* Quick prompts */}
             <div className="pt-2 border-t border-zinc-800/50">
               <p className="text-[10px] text-zinc-600 mb-2">快捷提问：</p>
@@ -1178,6 +1747,34 @@ export default function DivinationTab() {
                     <QuickPrompt text="这个名字的五格数理吉凶如何" onSend={setInput} />
                   </>
                 )}
+                {selectedCategory === "qiuqian" && (
+                  <>
+                    <QuickPrompt text="请详细解读这支签的含义" onSend={setInput} />
+                    <QuickPrompt text="我最近事业不顺，此签有何指引" onSend={setInput} />
+                    <QuickPrompt text="感情方面有困惑，签意如何" onSend={setInput} />
+                  </>
+                )}
+                {selectedCategory === "cezi" && (
+                  <>
+                    <QuickPrompt text="请详细解析这个字的吉凶含义" onSend={setInput} />
+                    <QuickPrompt text="我想问近期事业，请拆字分析" onSend={setInput} />
+                    <QuickPrompt text="此字对感情运势有何暗示" onSend={setInput} />
+                  </>
+                )}
+                {selectedCategory === "mianxiang" && (
+                  <>
+                    <QuickPrompt text="我额头较宽、鼻梁挺直，请分析我的面相" onSend={setInput} />
+                    <QuickPrompt text="请帮我看手相，我的感情线和事业线如何" onSend={setInput} />
+                    <QuickPrompt text="我的面相适合做生意还是上班" onSend={setInput} />
+                  </>
+                )}
+                {selectedCategory === "dream" && (
+                  <>
+                    <QuickPrompt text="我梦到自己在飞，飞得很高很自由" onSend={setInput} />
+                    <QuickPrompt text="我梦见牙齿掉了好几颗，这是什么意思" onSend={setInput} />
+                    <QuickPrompt text="昨晚梦见已故的亲人和我说话" onSend={setInput} />
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1218,6 +1815,56 @@ export default function DivinationTab() {
                 setRitualCompleted(true);
               }}
             />
+          </div>
+        )}
+
+        {selectedCategory === "qiuqian" && (
+          <div className="mb-3">
+            <FortuneStickRitual
+              key={ritualKey}
+              onComplete={(_num, summary) => {
+                setRitualResult(summary);
+                setRitualCompleted(true);
+              }}
+            />
+          </div>
+        )}
+
+        {selectedCategory === "cezi" && (
+          <div className="mb-3">
+            <CharacterWriteRitual
+              key={ritualKey}
+              onComplete={(_char, summary) => {
+                setRitualResult(summary);
+                setRitualCompleted(true);
+              }}
+            />
+          </div>
+        )}
+
+        {/* Mianxiang: Photo upload for face/palm reading */}
+        {selectedCategory === "mianxiang" && (
+          <div className="mb-3 rounded-xl border border-rose-500/20 bg-rose-500/5 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Eye className="h-4 w-4 text-rose-400" />
+              <span className="text-xs font-medium text-rose-300">上传面相/手相照片（可选）</span>
+              <span className="text-[9px] text-zinc-500">AI将自动分析面部/掌纹特征</span>
+            </div>
+            <ImageUpload
+              images={faceImages}
+              onChange={setFaceImages}
+              showOCR
+              onOCR={handleFaceOCR}
+              maxCount={3}
+              placeholder="上传正面照或手掌照片"
+              accept="image/png,image/jpeg,image/webp"
+            />
+            {faceOcrResult && (
+              <div className="rounded-lg border border-rose-500/10 bg-zinc-900/50 p-3">
+                <p className="text-[9px] text-rose-400 font-medium mb-1">AI 面容/掌纹描述:</p>
+                <p className="text-[10px] text-zinc-400 whitespace-pre-wrap leading-relaxed max-h-24 overflow-y-auto">{faceOcrResult}</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -1272,7 +1919,7 @@ export default function DivinationTab() {
           <div className="flex items-center gap-2 px-2">
             <Check className="h-3 w-3 text-emerald-400 shrink-0" />
             <span className="text-[10px] text-emerald-400/80">
-              {selectedCategory === "tarot" ? "牌阵已就绪" : selectedCategory === "qimen" ? "盘局已起" : "卦象已成"} — 请输入您的问题，结果将一并提交解读
+              {selectedCategory === "tarot" ? "牌阵已就绪" : selectedCategory === "qimen" ? "盘局已起" : selectedCategory === "qiuqian" ? "签文已出" : selectedCategory === "cezi" ? "字已定" : "卦象已成"} — 请输入您的问题，结果将一并提交解读
             </span>
           </div>
         )}
@@ -1306,6 +1953,7 @@ export default function DivinationTab() {
           </button>
         </div>
       </div>
+      </div>{/* end flex-col wrapper */}
     </div>
   );
 }

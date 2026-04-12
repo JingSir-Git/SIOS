@@ -19,8 +19,9 @@ import ThemeProvider from "./ThemeProvider";
 import UserPreferences from "./UserPreferences";
 import ToastContainer from "./ToastContainer";
 import QuickAssistPanel from "./QuickAssistPanel";
-import RealtimeAssistant from "./RealtimeAssistant";
+import LegalAdvisor from "./LegalAdvisor";
 import PWAInstallPrompt from "./PWAInstallPrompt";
+import UserMemoryPanel from "./UserMemoryPanel";
 import { cn } from "@/lib/utils";
 
 /**
@@ -85,19 +86,11 @@ export default function AppShell() {
           <TabPane id="psychology" active={activeTab === "psychology"}>
             <PsychologyTab />
           </TabPane>
+          <TabPane id="legal" active={activeTab === "legal"}>
+            <LegalAdvisor />
+          </TabPane>
           <TabPane id="planning" active={activeTab === "planning"}>
             <PlanningTab />
-          </TabPane>
-          <TabPane id="realtime" active={activeTab === "realtime"}>
-            <div className="flex flex-col h-full">
-              <div className="border-b border-zinc-800 px-6 py-4">
-                <h1 className="text-lg font-semibold text-zinc-100">实时助手</h1>
-                <p className="text-xs text-zinc-500 mt-1">RAG记忆增强 · 情绪预测 · 实时回复建议</p>
-              </div>
-              <div className="flex-1 overflow-hidden px-6 py-4">
-                <RealtimeAssistant />
-              </div>
-            </div>
           </TabPane>
           <TabPane id="dashboard" active={activeTab === "dashboard"}>
             <DashboardTab />
@@ -108,12 +101,20 @@ export default function AppShell() {
           <TabPane id="settings" active={activeTab === "settings"}>
             <div className="flex flex-col h-full">
               <div className="border-b border-zinc-800 px-6 py-4">
-                <h1 className="text-lg font-semibold text-zinc-100">设置</h1>
-                <p className="text-xs text-zinc-500 mt-1">个性化偏好、数据管理。本地优先，安全可控。</p>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-zinc-500/10 border border-zinc-500/20 shadow-lg shadow-zinc-500/5">
+                    <svg className="h-5 w-5 text-zinc-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </div>
+                  <div>
+                    <h1 className="text-lg font-semibold text-zinc-100">数据管理</h1>
+                    <p className="text-[10px] text-zinc-500">个性化偏好 · 数据管理 · 本地优先</p>
+                  </div>
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto">
                 <div className="max-w-2xl mx-auto px-6 py-6 space-y-8">
                   <UserPreferences />
+                  <UserMemoryPanel />
                   <DataManager />
                 </div>
               </div>

@@ -19,21 +19,37 @@ import { useAppStore } from "@/lib/store";
 import { apiFetch } from "@/lib/api-fetch";
 
 const PRESET_MODELS = [
-  { label: "MiniMax M2.7 Highspeed", value: "MiniMax-M2.7-highspeed" },
-  { label: "MiniMax M1", value: "MiniMax-M1" },
-  { label: "Claude 3.5 Sonnet", value: "claude-3-5-sonnet-20241022" },
-  { label: "Claude 3 Haiku", value: "claude-3-haiku-20240307" },
-  { label: "GPT-4o", value: "gpt-4o" },
-  { label: "GPT-4o-mini", value: "gpt-4o-mini" },
-  { label: "DeepSeek V3", value: "deepseek-chat" },
-  { label: "Qwen Max", value: "qwen-max" },
+  { label: "MiniMax M2.7 Highspeed", value: "MiniMax-M2.7-highspeed", tags: ["fast", "vision"] },
+  { label: "MiniMax M1", value: "MiniMax-M1", tags: ["balanced"] },
+  { label: "Claude 3.5 Sonnet", value: "claude-3-5-sonnet-20241022", tags: ["smart", "vision"] },
+  { label: "Claude 3 Haiku", value: "claude-3-haiku-20240307", tags: ["fast", "cheap"] },
+  { label: "GPT-4o", value: "gpt-4o", tags: ["smart", "vision"] },
+  { label: "GPT-4o-mini", value: "gpt-4o-mini", tags: ["fast", "cheap"] },
+  { label: "DeepSeek V3", value: "deepseek-chat", tags: ["smart", "cheap"] },
+  { label: "Qwen Max", value: "qwen-max", tags: ["smart"] },
 ];
+
+const TAG_STYLES: Record<string, { label: string; color: string }> = {
+  fast: { label: "⚡ 快速", color: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
+  smart: { label: "🧠 智能", color: "bg-violet-500/15 text-violet-300 border-violet-500/30" },
+  vision: { label: "👁 视觉", color: "bg-blue-500/15 text-blue-300 border-blue-500/30" },
+  cheap: { label: "💰 经济", color: "bg-amber-500/15 text-amber-300 border-amber-500/30" },
+  balanced: { label: "⚖️ 均衡", color: "bg-zinc-500/15 text-zinc-300 border-zinc-500/30" },
+};
 
 const PRESET_ENDPOINTS = [
   { label: "MiniMax (默认)", value: "https://api.minimaxi.com/anthropic" },
   { label: "Anthropic 官方", value: "https://api.anthropic.com" },
   { label: "OpenAI 兼容", value: "https://api.openai.com/v1" },
   { label: "DeepSeek", value: "https://api.deepseek.com" },
+];
+
+/** One-click provider presets: baseURL + model + recommended endpoint */
+const PROVIDER_PRESETS = [
+  { label: "MiniMax 极速", emoji: "🚀", baseURL: "https://api.minimaxi.com/anthropic", model: "MiniMax-M2.7-highspeed", desc: "默认方案，速度最快" },
+  { label: "Claude Sonnet", emoji: "🎭", baseURL: "https://api.anthropic.com", model: "claude-3-5-sonnet-20241022", desc: "最聪明，适合复杂分析" },
+  { label: "GPT-4o", emoji: "🤖", baseURL: "https://api.openai.com/v1", model: "gpt-4o", desc: "OpenAI旗舰，支持视觉" },
+  { label: "DeepSeek", emoji: "🔍", baseURL: "https://api.deepseek.com", model: "deepseek-chat", desc: "高性价比中文模型" },
 ];
 
 export default function ApiSettingsPanel() {
@@ -43,9 +59,10 @@ export default function ApiSettingsPanel() {
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null);
   const [newModel, setNewModel] = useState("");
 
+  const customModels = apiSettings.customModels ?? [];
   const allModels = [
     ...PRESET_MODELS,
-    ...apiSettings.customModels.map((m) => ({ label: `自定义: ${m}`, value: m })),
+    ...customModels.map((m) => ({ label: `自定义: ${m}`, value: m })),
   ];
 
   const handleTest = useCallback(async () => {
@@ -93,6 +110,40 @@ export default function ApiSettingsPanel() {
         <Settings2 className="w-5 h-5 text-violet-400" />
         <h3 className="text-lg font-semibold">API 配置</h3>
         <span className="text-xs text-white/40 ml-2">自定义LLM服务端点、密钥和模型</span>
+      </div>
+
+      {/* One-click Provider Presets */}
+      <div className="space-y-2">
+        <label className="flex items-center gap-2 text-sm font-medium text-white/80">
+          <Cpu className="w-4 h-4 text-emerald-400" />
+          快速切换方案
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {PROVIDER_PRESETS.map((p) => {
+            const isActive = apiSettings.baseURL === p.baseURL && apiSettings.model === p.model;
+            return (
+              <button
+                key={p.model}
+                onClick={() => updateApiSettings({ baseURL: p.baseURL, model: p.model })}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-xl border p-3 text-left transition-all",
+                  isActive
+                    ? "border-violet-500/50 bg-violet-500/10 shadow-lg shadow-violet-500/10"
+                    : "border-zinc-700/50 bg-zinc-800/30 hover:border-zinc-600"
+                )}
+              >
+                <span className="text-lg">{p.emoji}</span>
+                <div className="min-w-0">
+                  <div className={cn("text-xs font-medium", isActive ? "text-violet-300" : "text-zinc-300")}>
+                    {p.label}
+                    {isActive && <span className="ml-1.5 text-[8px] text-emerald-400">✓ 当前</span>}
+                  </div>
+                  <div className="text-[9px] text-zinc-500 truncate">{p.desc}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* API Base URL */}
@@ -160,20 +211,29 @@ export default function ApiSettingsPanel() {
           模型选择
         </label>
         <div className="flex gap-2 flex-wrap">
-          {allModels.map((m) => (
+          {allModels.map((m) => {
+            const presetModel = PRESET_MODELS.find(p => p.value === m.value);
+            const tags = presetModel?.tags || [];
+            return (
             <div key={m.value} className="flex items-center gap-1">
               <button
                 onClick={() => updateApiSettings({ model: m.value })}
                 className={cn(
-                  "px-3 py-1 rounded-lg text-xs transition-all",
+                  "px-3 py-1 rounded-lg text-xs transition-all flex items-center gap-1.5",
                   apiSettings.model === m.value
                     ? "bg-emerald-500/30 text-emerald-300 ring-1 ring-emerald-500/50"
                     : "bg-white/5 text-white/60 hover:bg-white/10"
                 )}
               >
                 {m.label}
+                {tags.map(t => {
+                  const style = TAG_STYLES[t];
+                  return style ? (
+                    <span key={t} className={cn("text-[7px] px-1 py-0 rounded border", style.color)}>{style.label}</span>
+                  ) : null;
+                })}
               </button>
-              {apiSettings.customModels.includes(m.value) && (
+              {customModels.includes(m.value) && (
                 <button
                   onClick={() => {
                     removeCustomModel(m.value);
@@ -185,7 +245,8 @@ export default function ApiSettingsPanel() {
                 </button>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
         <div className="flex gap-2">
           <input

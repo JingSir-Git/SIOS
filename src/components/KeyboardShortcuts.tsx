@@ -11,9 +11,9 @@ const TAB_SHORTCUTS = [
   { id: "profiles",    label: "人物画像",   key: "3" },
   { id: "drill",       label: "模拟演练",   key: "4" },
   { id: "psychology",  label: "心理顾问",   key: "5" },
-  { id: "planning",    label: "规划制定",   key: "6" },
-  { id: "divination",  label: "风水玄学",   key: "7" },
-  { id: "realtime",    label: "实时助手",   key: "8" },
+  { id: "legal",       label: "法律顾问",   key: "6" },
+  { id: "planning",    label: "规划制定",   key: "7" },
+  { id: "divination",  label: "风水玄学",   key: "8" },
   { id: "mbti",        label: "MBTI 检测",  key: "9" },
   { id: "settings",    label: "数据管理",   key: "0" },
 ];

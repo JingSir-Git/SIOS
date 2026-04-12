@@ -277,14 +277,16 @@ ${result.reviewSchedule}`;
   return (
     <div className="flex flex-col h-full">
       <div className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 shadow-lg shadow-emerald-500/10">
             <CalendarClock className="h-5 w-5 text-emerald-400" />
-            规划制定
-          </h1>
-          <p className="text-xs text-zinc-500 mt-1">
-            从日常任务到人生战略——AI帮你制定可执行的行动方案，小到几小时的行程，大到几年的长期规划
-          </p>
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold text-zinc-100">规划制定</h1>
+            <p className="text-[10px] text-zinc-500">
+              日常任务 · 人生战略 · AI行动方案
+            </p>
+          </div>
         </div>
         <ModuleHistoryPanel
           module="planning"

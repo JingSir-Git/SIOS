@@ -640,3 +640,292 @@ export function QimenRitual({
     </div>
   );
 }
+
+// ============================================================
+// 4. Fortune Stick Ritual (求签)
+// ============================================================
+// Simulates shaking a bamboo tube of numbered sticks until one falls out
+
+// Sample signs database (观音灵签 excerpts)
+const FORTUNE_SIGNS: { num: number; grade: string; gradeColor: string; title: string; poem: string[]; allusion: string }[] = [
+  { num: 1, grade: "上上签", gradeColor: "text-emerald-300", title: "开天辟地", poem: ["天开地辟结良缘", "日吉时良万事全", "若得此签非小可", "人行忠正帝王宣"], allusion: "盘古初开天地" },
+  { num: 3, grade: "上吉签", gradeColor: "text-emerald-300", title: "董永遇仙", poem: ["衣冠重整旧家风", "道是无穷却有功", "明月清风人意好", "高堂桂子早攀丛"], allusion: "董永卖身葬父遇七仙女" },
+  { num: 7, grade: "中吉签", gradeColor: "text-amber-300", title: "苏武牧羊", poem: ["奔波阵阵任浮沉", "心事频频独自吟", "既遇高人开口笑", "功名富贵逼人来"], allusion: "苏武北海牧羊十九年" },
+  { num: 11, grade: "中平签", gradeColor: "text-zinc-300", title: "书生遇难", poem: ["谁知苍翠性情乖", "恰似黄金不满怀", "也可安身过日子", "莫将心事绊风雷"], allusion: "古人赶考途中逢雨" },
+  { num: 14, grade: "中签", gradeColor: "text-zinc-400", title: "子牙收妖", poem: ["前途功事未为真", "且把心机仔细陈", "若遇鼠牛交接处", "一番声气动乾坤"], allusion: "姜子牙渭水钓鱼" },
+  { num: 21, grade: "上吉签", gradeColor: "text-emerald-300", title: "李旦复国", poem: ["阴阳道合总由天", "仕女求之喜自然", "但看春园花与月", "一番雨过一番鲜"], allusion: "唐睿宗李旦复位" },
+  { num: 25, grade: "中吉签", gradeColor: "text-amber-300", title: "张骞博望", poem: ["过了忧危事几重", "从今再立旧家风", "田园事业重重好", "生计应须用力工"], allusion: "张骞出使西域归来" },
+  { num: 32, grade: "中平签", gradeColor: "text-zinc-300", title: "刘备求贤", poem: ["前程杳杳定无疑", "石中耀火淬金时", "春到凤凰翻羽翼", "临旦黄鸡报晓期"], allusion: "刘备三顾茅庐" },
+  { num: 42, grade: "上上签", gradeColor: "text-emerald-300", title: "目莲救母", poem: ["一年作事急如飞", "君尔宽心莫迟疑", "贵人还在千里外", "音信月中渐渐知"], allusion: "目犍连尊者入地狱救母" },
+  { num: 51, grade: "中签", gradeColor: "text-zinc-400", title: "孔明借箭", poem: ["夏日初临日正长", "翩翩彩蝶过东墙", "风来梦里精神爽", "一举便登龙虎榜"], allusion: "孔明草船借箭" },
+  { num: 58, grade: "下签", gradeColor: "text-red-300", title: "文王遇凶", poem: ["事与心违不自由", "暗中牵绊几时休", "心头会合难成事", "且向江边弄钓舟"], allusion: "周文王困于羑里" },
+  { num: 66, grade: "中吉签", gradeColor: "text-amber-300", title: "王昭君", poem: ["一轮明月照天下", "何处知音到九霄", "诸般事务皆成就", "悲欢离合任逍遥"], allusion: "王昭君出塞和亲" },
+  { num: 73, grade: "中平签", gradeColor: "text-zinc-300", title: "陶渊明归隐", poem: ["春来雷震百虫鸣", "番身一转离泥中", "始知出入还来往", "一笑时通万事通"], allusion: "陶渊明辞官归田" },
+  { num: 81, grade: "上吉签", gradeColor: "text-emerald-300", title: "风送滕王阁", poem: ["梧桐叶落秋将暮", "行客归程去似云", "谢得天公高着力", "一声雷送到龙门"], allusion: "王勃乘风赴滕王阁作序" },
+  { num: 88, grade: "下签", gradeColor: "text-red-300", title: "庞涓恃才", poem: ["似鹤飞来自入笼", "心中急切意无穷", "仔细看来须仔细", "门前许多是非生"], allusion: "庞涓恃才害孙膑反遭杀" },
+  { num: 93, grade: "中签", gradeColor: "text-zinc-400", title: "高文举中状", poem: ["鸡鸣歌唱晓天开", "忽见明云拨雾来", "且向前途行正道", "一番利益自然财"], allusion: "寒窗苦读金榜题名" },
+  { num: 100, grade: "上上签", gradeColor: "text-emerald-300", title: "三教谈经", poem: ["佛神灵通天地间", "愿求签者尽开颜", "若问诸般皆遂意", "花开富贵在眼前"], allusion: "儒释道三教归一" },
+];
+
+function pickRandomSign(): typeof FORTUNE_SIGNS[0] {
+  const pick = FORTUNE_SIGNS[Math.floor(Math.random() * FORTUNE_SIGNS.length)];
+  return { ...pick, num: Math.floor(Math.random() * 100) + 1, title: pick.title, poem: pick.poem, grade: pick.grade, gradeColor: pick.gradeColor, allusion: pick.allusion };
+}
+
+export function FortuneStickRitual({
+  onComplete,
+}: {
+  onComplete: (signNumber: number, summary: string) => void;
+}) {
+  const [phase, setPhase] = useState<"idle" | "shaking" | "falling" | "done">("idle");
+  const [shakeCount, setShakeCount] = useState(0);
+  const [stickOffset, setStickOffset] = useState(0);
+  const [sign, setSign] = useState<typeof FORTUNE_SIGNS[0] | null>(null);
+  const [stickAngles, setStickAngles] = useState<number[]>([]);
+  const [poemReveal, setPoemReveal] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    setStickAngles(Array.from({ length: 12 }, () => -3 + Math.random() * 6));
+  }, []);
+
+  const startShaking = useCallback(() => {
+    if (phase !== "idle") return;
+    setPhase("shaking");
+    setShakeCount(0);
+    setStickOffset(0);
+    setPoemReveal(0);
+
+    let count = 0;
+    const maxShakes = 20 + Math.floor(Math.random() * 15);
+
+    intervalRef.current = setInterval(() => {
+      count++;
+      setShakeCount(count);
+      setStickOffset(Math.sin(count * 0.8) * (3 + count * 0.3));
+      if (count % 4 === 0) playCoinSound();
+
+      if (count >= maxShakes) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        const picked = pickRandomSign();
+        setSign(picked);
+        setPhase("falling");
+        playRevealSound();
+
+        setTimeout(() => {
+          setPhase("done");
+          // Reveal poem lines one by one
+          let line = 0;
+          const revealInterval = setInterval(() => {
+            line++;
+            setPoemReveal(line);
+            if (line >= 4) {
+              clearInterval(revealInterval);
+              onComplete(picked.num, `【求签结果】观音灵签 第${picked.num}签 · ${picked.grade} ·「${picked.title}」\n签诗：${picked.poem.join("，")}\n典故：${picked.allusion}\n请AI大师为我详细解读此签。`);
+            }
+          }, 600);
+        }, 1500);
+      }
+    }, 100);
+  }, [phase, onComplete]);
+
+  useEffect(() => {
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, []);
+
+  return (
+    <div className="rounded-xl border border-yellow-500/20 bg-gradient-to-b from-yellow-500/5 to-transparent p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-semibold text-yellow-300 flex items-center gap-1.5">
+          <Sparkles className="h-3.5 w-3.5" /> 摇签问卦
+        </h3>
+      </div>
+
+      {phase === "idle" && (
+        <>
+          <p className="text-[10px] text-zinc-500 mb-3 text-center">
+            心中默念所求之事，然后点击摇签
+          </p>
+          <div className="flex justify-center mb-3">
+            <div className="relative w-16 h-28">
+              <div className="absolute bottom-0 w-full h-24 rounded-b-2xl border border-yellow-600/40 bg-gradient-to-b from-yellow-900/30 to-yellow-950/50 overflow-hidden">
+                {stickAngles.map((angle, i) => (
+                  <div key={i} className="absolute bottom-2 w-0.5 bg-gradient-to-t from-yellow-700/80 to-yellow-500/60 rounded-full" style={{ height: `${60 + i * 3}%`, left: `${20 + (i % 5) * 12}%`, transform: `rotate(${angle}deg)` }} />
+                ))}
+              </div>
+              <div className="absolute bottom-[92px] w-full h-2 rounded-t-lg bg-yellow-800/40 border-x border-t border-yellow-600/40" />
+            </div>
+          </div>
+          <button onClick={startShaking} className="w-full rounded-lg py-2.5 text-xs font-medium transition-all bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 border border-yellow-500/30 active:scale-95">
+            🙏 虔心摇签
+          </button>
+        </>
+      )}
+
+      {phase === "shaking" && (
+        <div className="text-center py-2">
+          <div className="flex justify-center mb-2">
+            <div className="relative w-16 h-28 transition-transform" style={{ transform: `translateX(${stickOffset}px) rotate(${Math.sin(shakeCount * 0.6) * 3}deg)` }}>
+              <div className="absolute bottom-0 w-full h-24 rounded-b-2xl border border-yellow-600/50 bg-gradient-to-b from-yellow-900/40 to-yellow-950/60 overflow-hidden">
+                {stickAngles.map((angle, i) => (
+                  <div key={i} className="absolute bottom-2 w-0.5 bg-gradient-to-t from-yellow-700/80 to-yellow-500/60 rounded-full transition-transform" style={{ height: `${60 + i * 3}%`, left: `${20 + (i % 5) * 12}%`, transform: `rotate(${angle + Math.sin(shakeCount * 0.5 + i) * 4}deg)` }} />
+                ))}
+              </div>
+              <div className="absolute bottom-[92px] w-full h-2 rounded-t-lg bg-yellow-800/50 border-x border-t border-yellow-600/50" />
+            </div>
+          </div>
+          <p className="text-[10px] text-yellow-400 animate-pulse">正在摇签... ({shakeCount})</p>
+        </div>
+      )}
+
+      {phase === "falling" && (
+        <div className="text-center py-4">
+          <div className="relative h-24 flex justify-center items-end mb-2">
+            <div className="w-1.5 h-20 bg-gradient-to-t from-yellow-600 to-yellow-400 rounded-full shadow-lg shadow-yellow-500/30" style={{ animation: "fall-stick 1.2s ease-in forwards" }} />
+          </div>
+          <style>{`@keyframes fall-stick { 0% { transform: translateY(-60px) rotate(-15deg); opacity: 0; } 40% { transform: translateY(0) rotate(5deg); opacity: 1; } 60% { transform: translateY(-8px) rotate(-2deg); } 80% { transform: translateY(0) rotate(1deg); } 100% { transform: translateY(0) rotate(0deg); } }`}</style>
+          <p className="text-xs text-yellow-300 font-bold animate-pulse">一签落出...</p>
+        </div>
+      )}
+
+      {phase === "done" && sign && (
+        <div className="space-y-3">
+          {/* Sign card — resembles a real fortune paper */}
+          <div className="relative rounded-xl border-2 border-yellow-500/30 bg-gradient-to-b from-yellow-950/60 via-yellow-950/40 to-zinc-900/80 p-5 overflow-hidden">
+            {/* Decorative corner marks */}
+            <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-yellow-600/30 rounded-tl" />
+            <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-yellow-600/30 rounded-tr" />
+            <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-yellow-600/30 rounded-bl" />
+            <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-yellow-600/30 rounded-br" />
+
+            {/* Header */}
+            <div className="text-center mb-3">
+              <p className="text-[9px] text-yellow-600 tracking-widest mb-1">观 音 灵 签</p>
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-lg font-bold text-yellow-300">第 {sign.num} 签</span>
+                <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full border border-current/20", sign.gradeColor)}>{sign.grade}</span>
+              </div>
+              <p className="text-[10px] text-yellow-400/80 mt-1">「{sign.title}」</p>
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-yellow-600/30 to-transparent" />
+              <span className="text-[8px] text-yellow-700">签 诗</span>
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-yellow-600/30 to-transparent" />
+            </div>
+
+            {/* Poem — revealed line by line */}
+            <div className="space-y-1.5 text-center font-serif">
+              {sign.poem.map((line, i) => (
+                <p key={i} className={cn(
+                  "text-xs tracking-widest transition-all duration-700",
+                  i < poemReveal ? "opacity-100 text-yellow-200 translate-y-0" : "opacity-0 text-yellow-200/0 translate-y-2"
+                )}>
+                  {line}
+                </p>
+              ))}
+            </div>
+
+            {/* Allusion */}
+            {poemReveal >= 4 && (
+              <div className="mt-3 pt-2 border-t border-yellow-600/20 text-center animate-in fade-in-0 duration-500">
+                <p className="text-[9px] text-yellow-600/70">典故：{sign.allusion}</p>
+              </div>
+            )}
+          </div>
+
+          {poemReveal >= 4 && (
+            <p className="text-[10px] text-zinc-500 text-center">签文已出，请输入您的问题以获取详细解读</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// 5. Character Writing Ritual (测字)
+// ============================================================
+
+export function CharacterWriteRitual({
+  onComplete,
+}: {
+  onComplete: (char: string, summary: string) => void;
+}) {
+  const [inputChar, setInputChar] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [animating, setAnimating] = useState(false);
+
+  const handleConfirm = () => {
+    if (!inputChar.trim()) return;
+    setAnimating(true);
+    playRevealSound();
+    setTimeout(() => {
+      setAnimating(false);
+      setConfirmed(true);
+      const c = inputChar.trim().charAt(0);
+      onComplete(c, `【测字】用户所书之字：「${c}」\n请基于此字进行全面的拆字、象形、会意分析。`);
+    }, 1500);
+  };
+
+  return (
+    <div className="rounded-xl border border-sky-500/20 bg-gradient-to-b from-sky-500/5 to-transparent p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-semibold text-sky-300 flex items-center gap-1.5">
+          <Sparkles className="h-3.5 w-3.5" /> 测字
+        </h3>
+      </div>
+
+      {!confirmed ? (
+        <>
+          <p className="text-[10px] text-zinc-500 mb-3 text-center">
+            心中想着所求之事，随意写下一个字
+          </p>
+          <div className="flex justify-center mb-3">
+            <div className={cn(
+              "relative w-24 h-24 rounded-xl border-2 border-dashed flex items-center justify-center transition-all duration-500",
+              inputChar
+                ? "border-sky-500/40 bg-sky-500/5"
+                : "border-zinc-700/50 bg-zinc-800/30",
+              animating && "scale-110 border-sky-400/60 shadow-lg shadow-sky-500/20"
+            )}>
+              {animating ? (
+                <span className="text-4xl font-bold text-sky-300 animate-pulse">{inputChar.charAt(0)}</span>
+              ) : (
+                <input
+                  type="text"
+                  value={inputChar}
+                  onChange={(e) => setInputChar(e.target.value.slice(0, 1))}
+                  placeholder="字"
+                  maxLength={1}
+                  className="w-full h-full bg-transparent text-center text-4xl font-bold text-sky-200 placeholder:text-zinc-700 focus:outline-none"
+                />
+              )}
+            </div>
+          </div>
+          <button
+            onClick={handleConfirm}
+            disabled={!inputChar.trim() || animating}
+            className={cn(
+              "w-full rounded-lg py-2.5 text-xs font-medium transition-all border",
+              !inputChar.trim()
+                ? "bg-zinc-800 text-zinc-600 border-zinc-700 cursor-not-allowed"
+                : "bg-sky-500/20 text-sky-300 hover:bg-sky-500/30 border-sky-500/30"
+            )}
+          >
+            确认此字
+          </button>
+        </>
+      ) : (
+        <div className="text-center py-3 space-y-2">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl border-2 border-sky-500/40 bg-sky-500/10">
+            <span className="text-3xl font-bold text-sky-200">{inputChar.charAt(0)}</span>
+          </div>
+          <p className="text-xs text-sky-200 font-semibold">「{inputChar.charAt(0)}」字已定</p>
+          <p className="text-[10px] text-zinc-500">请输入您想测的具体问题</p>
+        </div>
+      )}
+    </div>
+  );
+}

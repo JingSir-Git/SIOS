@@ -18,6 +18,8 @@ import {
   Fingerprint,
   History,
   Clock,
+  MessageSquareText,
+  FileImage,
 } from "lucide-react";
 import { cn, getTipTypeIcon } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
@@ -37,6 +39,7 @@ import { extractMemoriesFromAnalysis, formatMemoriesForPrompt } from "@/lib/memo
 import { retrieveRAGContext } from "@/lib/rag-memory";
 import { apiFetch } from "@/lib/api-fetch";
 import VoiceInputButton from "./VoiceInputButton";
+import ImageUpload, { type UploadedImage } from "./ImageUpload";
 import { verifyTimeOrder, type TimeOrderIssue } from "@/lib/timestamp-parser";
 
 // ---- Types ----
@@ -168,6 +171,9 @@ export default function AnalyzeTab() {
   const [showHistory, setShowHistory] = useState(false);
   // Time order issues
   const [timeIssues, setTimeIssues] = useState<TimeOrderIssue[]>([]);
+  // Image upload for chat screenshots
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
+  const [ocrProcessing, setOcrProcessing] = useState(false);
 
   const { addConversation, addProfile, updateProfile, snapshotProfile, profiles, conversations, mbtiResults, addModuleHistory, navigateToTab, getActiveMemoriesForProfile, addMemoriesBatch, addToast, activeTab } = useAppStore();
 
@@ -750,15 +756,69 @@ export default function AnalyzeTab() {
     );
   };
 
+  // ---- Image OCR Handler ----
+  const handleImageOCR = useCallback(async (imageId: string) => {
+    const img = uploadedImages.find((i) => i.id === imageId);
+    if (!img || !img.base64 || img.ocrLoading) return;
+
+    setUploadedImages((prev) => prev.map((i) => i.id === imageId ? { ...i, ocrLoading: true } : i));
+
+    try {
+      const res = await apiFetch("/api/ocr", {
+        method: "POST",
+        body: JSON.stringify({ image: img.base64, mode: "chat" }),
+      });
+
+      if (!res.ok) throw new Error("OCR请求失败");
+
+      const data = await res.json();
+      const ocrText = data.text || "";
+
+      setUploadedImages((prev) =>
+        prev.map((i) => i.id === imageId ? { ...i, ocrText, ocrLoading: false } : i)
+      );
+
+      // Append OCR result to conversation text
+      if (ocrText) {
+        setConversation((prev) => {
+          const separator = prev.trim() ? "\n\n--- 截图识别内容 ---\n" : "";
+          return prev + separator + ocrText;
+        });
+        addToast({ type: "success", title: "截图识别完成", message: `已识别 ${ocrText.split("\n").length} 行对话` });
+      }
+    } catch (err) {
+      setUploadedImages((prev) =>
+        prev.map((i) => i.id === imageId ? { ...i, ocrLoading: false } : i)
+      );
+      addToast({ type: "error", title: "识别失败", message: err instanceof Error ? err.message : "OCR识别出错" });
+    }
+  }, [uploadedImages, addToast]);
+
+  // Batch OCR all images
+  const handleBatchOCR = useCallback(async () => {
+    const pending = uploadedImages.filter((i) => i.base64 && !i.ocrText && !i.ocrLoading);
+    if (pending.length === 0) return;
+    setOcrProcessing(true);
+    for (const img of pending) {
+      await handleImageOCR(img.id);
+    }
+    setOcrProcessing(false);
+  }, [uploadedImages, handleImageOCR]);
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-zinc-100">对话分析</h1>
-          <p className="text-xs text-zinc-500 mt-1">
-            粘贴一段对话，AI将从五个层次深度解析沟通信号。支持直接粘贴微信聊天记录。
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-violet-500/10 border border-violet-500/20 shadow-lg shadow-violet-500/10">
+            <MessageSquareText className="h-5 w-5 text-violet-400" />
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold text-zinc-100">对话分析</h1>
+            <p className="text-[10px] text-zinc-500">
+              粘贴对话 · 五层深度解析 · 支持微信聊天记录
+            </p>
+          </div>
         </div>
         {conversations.length > 0 && (
           <button
@@ -789,14 +849,14 @@ export default function AnalyzeTab() {
             />
           )}
 
-          {/* ===== Scenario Shortcuts — show when no conversation entered ===== */}
-          {stage === "input" && !conversation.trim() && (
+          {/* ===== Scenario Shortcuts — hidden for now (too abrupt in chat context) ===== */}
+          {/* {stage === "input" && !conversation.trim() && (
             <ScenarioShortcuts
               onNavigate={(tab, context, goal) => {
                 navigateToTab(tab);
               }}
             />
-          )}
+          )} */}
 
           {/* ===== STAGE: INPUT ===== */}
           {(stage === "input" || stage === "results") && (
@@ -1018,6 +1078,38 @@ export default function AnalyzeTab() {
                   className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/20"
                 />
               )}
+
+              {/* Screenshot Upload for Chat OCR */}
+              <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/30 p-3 space-y-2">
+                <ImageUpload
+                  images={uploadedImages}
+                  onChange={setUploadedImages}
+                  showOCR
+                  onOCR={handleImageOCR}
+                  compact
+                  maxCount={6}
+                  label="聊天截图识别（可选）"
+                  placeholder="上传聊天截图，AI自动识别文字"
+                />
+                {uploadedImages.length > 0 && uploadedImages.some((i) => i.base64 && !i.ocrText) && (
+                  <button
+                    onClick={handleBatchOCR}
+                    disabled={ocrProcessing}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all",
+                      ocrProcessing
+                        ? "bg-violet-500/10 text-violet-400 cursor-wait"
+                        : "bg-violet-500/15 text-violet-300 hover:bg-violet-500/25 border border-violet-500/30"
+                    )}
+                  >
+                    {ocrProcessing ? (
+                      <><Loader2 className="h-3 w-3 animate-spin" /> 正在识别...</>
+                    ) : (
+                      <><FileImage className="h-3 w-3" /> 一键识别全部截图</>
+                    )}
+                  </button>
+                )}
+              </div>
 
               <div className="relative">
                 <textarea

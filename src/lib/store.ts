@@ -20,6 +20,10 @@ import type {
   EQScoreEntry,
   ProfileMemoryEntry,
   PlaybookVersion,
+  UserMemoryEntry,
+  ChatSessionEntry,
+  ChatSessionDomain,
+  ChatSessionMessage,
 } from "./types";
 import type { LearningProfile, FeedbackEntry } from "./adaptive-learning";
 import { getDefaultLearningProfile, processFeedback } from "./adaptive-learning";
@@ -205,6 +209,26 @@ interface AppState {
   feedbackHistory: FeedbackEntry[];
   addFeedback: (entry: FeedbackEntry) => void;
   resetLearningProfile: () => void;
+
+  // ---- User-level Long-term Memory ----
+  userMemories: UserMemoryEntry[];
+  addUserMemory: (entry: UserMemoryEntry) => void;
+  updateUserMemory: (id: string, updates: Partial<UserMemoryEntry>) => void;
+  deleteUserMemory: (id: string) => void;
+  getActiveUserMemories: () => UserMemoryEntry[];
+  getUserMemoriesByCategory: (category: string) => UserMemoryEntry[];
+
+  // ---- Chat Session History (S11) ----
+  chatSessions: ChatSessionEntry[];
+  addChatSession: (session: ChatSessionEntry) => void;
+  updateChatSession: (id: string, updates: Partial<ChatSessionEntry>) => void;
+  deleteChatSession: (id: string) => void;
+  getChatSessionsByDomain: (domain: ChatSessionDomain) => ChatSessionEntry[];
+  appendChatMessage: (sessionId: string, message: ChatSessionMessage) => void;
+
+  // ---- Language / i18n ----
+  language: "zh" | "en";
+  setLanguage: (lang: "zh" | "en") => void;
 
   // ---- Data Privacy (GDPR) ----
   privacySettings: {
@@ -753,6 +777,63 @@ export const useAppStore = create<AppState>()(
           feedbackHistory: [],
         })),
 
+      // ---- User-level Long-term Memory ----
+      userMemories: [],
+      addUserMemory: (entry) =>
+        set((state) => ({
+          userMemories: [...state.userMemories, entry],
+        })),
+      updateUserMemory: (id, updates) =>
+        set((state) => ({
+          userMemories: state.userMemories.map((m) =>
+            m.id === id ? { ...m, ...updates, updatedAt: new Date().toISOString() } : m
+          ),
+        })),
+      deleteUserMemory: (id) =>
+        set((state) => ({
+          userMemories: state.userMemories.filter((m) => m.id !== id),
+        })),
+      getActiveUserMemories: () =>
+        get().userMemories.filter((m) => !m.archived),
+      getUserMemoriesByCategory: (category) =>
+        get().userMemories.filter((m) => m.category === category && !m.archived),
+
+      // ---- Chat Session History (S11) ----
+      chatSessions: [],
+
+      addChatSession: (session) =>
+        set((state) => ({
+          chatSessions: [session, ...state.chatSessions],
+        })),
+
+      updateChatSession: (id, updates) =>
+        set((state) => ({
+          chatSessions: state.chatSessions.map((s) =>
+            s.id === id ? { ...s, ...updates, updatedAt: new Date().toISOString() } : s
+          ),
+        })),
+
+      deleteChatSession: (id) =>
+        set((state) => ({
+          chatSessions: state.chatSessions.filter((s) => s.id !== id),
+        })),
+
+      getChatSessionsByDomain: (domain) =>
+        get().chatSessions.filter((s) => s.domain === domain && !s.archived),
+
+      appendChatMessage: (sessionId, message) =>
+        set((state) => ({
+          chatSessions: state.chatSessions.map((s) =>
+            s.id === sessionId
+              ? { ...s, messages: [...s.messages, message], updatedAt: new Date().toISOString() }
+              : s
+          ),
+        })),
+
+      // ---- Language / i18n ----
+      language: "zh" as "zh" | "en",
+      setLanguage: (lang) => set({ language: lang }),
+
       // ---- Data Privacy (GDPR) ----
       privacySettings: {
         dataEncryptionEnabled: false,
@@ -776,6 +857,7 @@ export const useAppStore = create<AppState>()(
           profileMemories: [],
           playbookVersions: [],
           divinationRecords: [],
+          userMemories: [],
         })),
       exportAnonymizedData: () => {
         const state = get();
@@ -839,6 +921,7 @@ export const useAppStore = create<AppState>()(
         eqScores: state.eqScores,
         fontSize: state.fontSize,
         theme: state.theme,
+        language: state.language,
         moduleHistory: state.moduleHistory,
         profileMemories: state.profileMemories,
         playbookVersions: state.playbookVersions,
@@ -847,7 +930,20 @@ export const useAppStore = create<AppState>()(
         feedbackHistory: state.feedbackHistory,
         privacySettings: state.privacySettings,
         divinationRecords: state.divinationRecords,
+        userMemories: state.userMemories,
+        chatSessions: state.chatSessions,
       }),
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState ?? {}) as Partial<AppState>;
+        return {
+          ...currentState,
+          ...persisted,
+          // Deep merge nested objects so new fields get their defaults
+          apiSettings: { ...currentState.apiSettings, ...(persisted.apiSettings ?? {}) },
+          privacySettings: { ...currentState.privacySettings, ...(persisted.privacySettings ?? {}) },
+          learningProfile: { ...currentState.learningProfile, ...(persisted.learningProfile ?? {}) },
+        };
+      },
     }
   )
 );

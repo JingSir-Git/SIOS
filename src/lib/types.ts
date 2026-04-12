@@ -210,6 +210,7 @@ export interface ConversationSession {
   context?: string;  // background info provided by user
   rawText?: string;  // original conversation text for re-analysis
   targetName?: string;  // the other party's name/label
+  tags?: string[];       // auto-generated or user-defined labels
 }
 
 // ============================================================
@@ -642,6 +643,55 @@ export interface PlaybookVersion {
   summary: string;
   /** Number of conversations used when generating */
   conversationCount: number;
+}
+
+/** User-level memory entry — cross-session context about the user themselves */
+export type UserMemoryCategory =
+  | "preference"        // user preferences (language, interaction style)
+  | "family"            // family info (members, relationships)
+  | "work"              // work context (industry, role, company)
+  | "health"            // health-related notes
+  | "legal"             // legal consultation history summaries
+  | "psychology"        // counseling session summaries
+  | "divination"        // divination preferences & patterns
+  | "general";          // misc facts
+
+export interface UserMemoryEntry {
+  id: string;
+  category: UserMemoryCategory;
+  content: string;
+  source: string;          // e.g. "法律顾问 2024-01-15", "用户手动添加"
+  importance: number;      // 1-5
+  createdAt: string;
+  updatedAt: string;
+  archived: boolean;
+}
+
+// ============================================================
+// §  Chat Session History (S11) — Legal / Psychology / Divination
+// ============================================================
+
+export type ChatSessionDomain = "legal" | "psychology" | "divination";
+
+export interface ChatSessionMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+}
+
+export interface ChatSessionEntry {
+  id: string;
+  domain: ChatSessionDomain;
+  title: string;                  // auto-generated or user-editable
+  messages: ChatSessionMessage[];
+  createdAt: string;
+  updatedAt: string;
+  archived: boolean;
+  /** Divination-specific: which sub-category was used */
+  divinationCategory?: string;
+  /** Summary snippet for search/display */
+  summary?: string;
 }
 
 /** A single structured memory entry linked to a profile. */

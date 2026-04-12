@@ -17,10 +17,15 @@ import {
   AlertTriangle,
   Sparkles,
   RotateCcw,
+  FileDown,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { apiFetch } from "@/lib/api-fetch";
+import { exportChatSessionReport } from "@/lib/export-report";
+import ChatHistoryPanel from "./ChatHistoryPanel";
+import type { ChatSessionEntry } from "@/lib/types";
 
 interface PsyMessage {
   id: string;
@@ -46,7 +51,7 @@ interface PsyAnalysis {
 }
 
 export default function PsychologyTab() {
-  const { profiles, preSelectedProfileId, clearPreSelection, addToast } = useAppStore();
+  const { profiles, preSelectedProfileId, clearPreSelection, addToast, addUserMemory, getActiveUserMemories, addChatSession, appendChatMessage, updateChatSession } = useAppStore();
   const [messages, setMessages] = useState<PsyMessage[]>([]);
   const [input, setInput] = useState("");
   const [selfDescription, setSelfDescription] = useState("");
@@ -57,7 +62,44 @@ export default function PsychologyTab() {
   const [selectedProfileIds, setSelectedProfileIds] = useState<Set<string>>(new Set());
   const [showProfilePicker, setShowProfilePicker] = useState(false);
   const [focusProfileId, setFocusProfileId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const ensureSession = useCallback((): string => {
+    if (activeSessionId) return activeSessionId;
+    const id = `psy_${Date.now()}`;
+    const now = new Date().toISOString();
+    addChatSession({
+      id,
+      domain: "psychology",
+      title: "心理咨询",
+      messages: [],
+      createdAt: now,
+      updatedAt: now,
+      archived: false,
+    });
+    setActiveSessionId(id);
+    return id;
+  }, [activeSessionId, addChatSession]);
+
+  const handleSelectSession = useCallback((session: ChatSessionEntry) => {
+    setActiveSessionId(session.id);
+    setMessages(session.messages.map(m => ({
+      id: m.id,
+      role: m.role === "user" ? "user" as const : "counselor" as const,
+      content: m.content,
+    })));
+    setShowHistory(false);
+  }, []);
+
+  const handleNewSession = useCallback(() => {
+    setActiveSessionId(null);
+    setMessages([]);
+    setInput("");
+    setExpandedId(null);
+    setShowHistory(false);
+  }, []);
 
   // Pick up cross-tab pre-selection
   useEffect(() => {
@@ -139,6 +181,10 @@ export default function PsychologyTab() {
     setInput("");
     setLoading(true);
 
+    // Persist user message
+    const sessionId = ensureSession();
+    appendChatMessage(sessionId, { id: userMsg.id, role: "user", content: currentInput, timestamp: new Date().toISOString() });
+
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -147,12 +193,19 @@ export default function PsychologyTab() {
     setMessages((prev) => [...prev, { id: counselorMsgId, role: "counselor", content: "" }]);
 
     try {
+      // Inject user long-term memories for cross-session context
+      const userMems = getActiveUserMemories().filter(m => m.category === "psychology" || m.category === "family" || m.category === "general");
+      const memoryCtx = userMems.length > 0
+        ? `\n【用户历史背景记忆】\n${userMems.map(m => `- ${m.content}`).join("\n")}`
+        : "";
+      const enrichedSelfDesc = (selfDescription.trim() || "") + memoryCtx;
+
       const res = await apiFetch("/api/psychology?stream=true", {
         method: "POST",
         body: JSON.stringify({
           message: currentInput,
           profilesSummary: buildProfilesSummary() || undefined,
-          selfDescription: selfDescription.trim() || undefined,
+          selfDescription: enrichedSelfDesc || undefined,
           conversationHistory: buildConversationHistory() || undefined,
         }),
         signal: controller.signal,
@@ -178,8 +231,9 @@ export default function PsychologyTab() {
             const event = JSON.parse(line.slice(6).trim());
             if (event.type === "progress" && event.text) {
               streamedText += event.text;
+              const display = streamedText.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<think>[\s\S]*$/g, "").trim();
               setMessages((prev) =>
-                prev.map((m) => m.id === counselorMsgId ? { ...m, content: streamedText } : m)
+                prev.map((m) => m.id === counselorMsgId ? { ...m, content: display || "正在思考..." } : m)
               );
             } else if (event.type === "result" && event.data) {
               const data = event.data as PsyAnalysis & { empathyResponse?: string };
@@ -203,6 +257,14 @@ export default function PsychologyTab() {
           } catch { /* skip malformed SSE line */ }
         }
       }
+      // Persist assistant message
+      setMessages(prev => {
+        const counselorMsg = prev.find(m => m.id === counselorMsgId);
+        if (counselorMsg?.content) {
+          appendChatMessage(sessionId, { id: counselorMsgId, role: "assistant", content: counselorMsg.content, timestamp: new Date().toISOString() });
+        }
+        return prev;
+      });
       // Notify if user switched away
       const currentTab = useAppStore.getState().activeTab;
       if (currentTab !== "psychology") {
@@ -231,33 +293,93 @@ export default function PsychologyTab() {
   };
 
   const resetSession = () => {
+    // Auto-save session summary as user memory if conversation had substance
+    if (messages.length >= 4) {
+      const userQs = messages.filter(m => m.role === "user").map(m => m.content);
+      const summary = `[心理咨询] ${userQs.slice(0, 2).join("；").slice(0, 120)}`;
+      addUserMemory({
+        id: `psy_${Date.now()}`,
+        category: "psychology",
+        content: summary,
+        source: `心理顾问 ${new Date().toLocaleDateString("zh-CN")}`,
+        importance: 3,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        archived: false,
+      });
+      if (activeSessionId) {
+        updateChatSession(activeSessionId, { summary: summary.slice(0, 100) });
+      }
+    }
+    setActiveSessionId(null);
     setMessages([]);
     setExpandedId(null);
   };
 
   return (
     <div className="flex h-full">
+      {/* History sidebar */}
+      {showHistory && (
+        <div className="w-64 border-r border-zinc-800 bg-zinc-950 shrink-0">
+          <ChatHistoryPanel
+            domain="psychology"
+            activeSessionId={activeSessionId}
+            onSelectSession={handleSelectSession}
+            onNewSession={handleNewSession}
+          />
+        </div>
+      )}
       {/* Main Chat */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <div className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className={cn(
+                "flex items-center justify-center w-9 h-9 rounded-xl border transition-colors",
+                showHistory
+                  ? "bg-rose-500/20 border-rose-500/30 text-rose-400"
+                  : "bg-rose-500/10 border-rose-500/20 text-rose-400/60 hover:text-rose-400"
+              )}
+              title="历史会话"
+            >
+              <History className="h-4 w-4" />
+            </button>
+            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 shadow-lg shadow-rose-500/10">
               <HeartHandshake className="h-5 w-5 text-rose-400" />
-              心理顾问
-            </h1>
-            <p className="text-xs text-zinc-500 mt-1">
-              基于你的关系网络和人物画像，提供个性化心理疏导与关系优化建议
-            </p>
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-zinc-100">心理顾问</h1>
+              <p className="text-[10px] text-zinc-500">
+                关系网络画像 · 个性化心理疏导 · 关系优化建议
+              </p>
+            </div>
           </div>
           {messages.length > 0 && (
-            <button
-              onClick={resetSession}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300 transition-colors"
-            >
-              <RotateCcw className="h-3 w-3" />
-              新对话
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => {
+                  exportChatSessionReport({
+                    title: "心理顾问咨询记录",
+                    subtitle: `${messages.length} 条对话 · ${new Date().toLocaleDateString("zh-CN")}`,
+                    messages: messages.map(m => ({ role: m.role === "user" ? "user" as const : "counselor" as const, content: m.content })),
+                    disclaimer: "AI心理顾问仅供参考，不能替代专业心理咨询。如有严重心理困扰，请寻求专业帮助。",
+                  });
+                }}
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300 transition-colors"
+              >
+                <FileDown className="h-3 w-3" />
+                导出
+              </button>
+              <button
+                onClick={resetSession}
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300 transition-colors"
+              >
+                <RotateCcw className="h-3 w-3" />
+                新对话
+              </button>
+            </div>
           )}
         </div>
 

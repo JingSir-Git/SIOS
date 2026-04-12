@@ -6,6 +6,7 @@ import {
   Type,
   Palette,
   RotateCcw,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ApiSettingsPanel from "./ApiSettingsPanel";
@@ -22,7 +23,7 @@ const FONT_SIZE_LEVELS = [
 ];
 
 export default function UserPreferences() {
-  const { fontSize, setFontSize, theme, setTheme } = useAppStore();
+  const { fontSize, setFontSize, theme, setTheme, language, setLanguage } = useAppStore();
   const currentLevel = FONT_SIZE_LEVELS.find((l) => l.value === fontSize) || FONT_SIZE_LEVELS[2];
 
   return (
@@ -119,6 +120,45 @@ export default function UserPreferences() {
         </div>
         <p className="text-[10px] text-zinc-600 mt-3">
           选择你偏好的界面配色方案。护眼模式可降低长时间使用的视觉疲劳。
+        </p>
+      </div>
+
+      {/* Language */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Globe className="h-4 w-4 text-violet-400" />
+          <h3 className="text-sm font-medium text-zinc-200">语言 / Language</h3>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {(["zh", "en"] as const).map((lang) => {
+            const isActive = language === lang;
+            const label = lang === "zh" ? "中文" : "English";
+            const sub = lang === "zh" ? "简体中文" : "English (US)";
+            return (
+              <button
+                key={lang}
+                onClick={() => setLanguage(lang)}
+                className={cn(
+                  "flex items-center gap-3 rounded-xl p-3 border-2 transition-all",
+                  isActive
+                    ? "border-violet-500 bg-violet-500/10 shadow-lg shadow-violet-500/10"
+                    : "border-zinc-700 hover:border-zinc-500 bg-zinc-800/30"
+                )}
+              >
+                <span className="text-lg">{lang === "zh" ? "🇨🇳" : "🇺🇸"}</span>
+                <div>
+                  <div className={cn("text-xs font-medium", isActive ? "text-violet-300" : "text-zinc-400")}>
+                    {label}
+                    {isActive && <span className="ml-1.5 text-[8px] text-emerald-400">✓</span>}
+                  </div>
+                  <div className="text-[9px] text-zinc-600">{sub}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[10px] text-zinc-600 mt-3">
+          界面语言切换。切换后部分内容将以所选语言显示。
         </p>
       </div>
 
