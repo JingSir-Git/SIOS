@@ -356,6 +356,47 @@ export default function DivinationTab() {
   const [dreamEmotion, setDreamEmotion] = useState(""); // fear / joy / confusion / sadness / neutral
   const [dreamFrequency, setDreamFrequency] = useState(""); // once / recurring / series
 
+  // ---- Reset ALL interactive params when switching categories ----
+  const resetInteractiveParams = useCallback(() => {
+    setQuestionDomain("");
+    setSelectedElement("");
+    setSelectedDirection("");
+    setSelectedTrigram("");
+    setSelectedSpread("");
+    setHouseType("");
+    setFloorRange("");
+    setFacingDirection("");
+    setBirthDate("");
+    setBirthTime("");
+    setGender("");
+    setLinkedProfileId("");
+    setRitualResult("");
+    setRitualCompleted(false);
+    setRitualKey((k) => k + 1);
+    setFaceImages([]);
+    setFaceOcrResult("");
+    setFaceReadingType("");
+    setFaceAnalysisFocus("");
+    setDreamType("");
+    setDreamEmotion("");
+    setDreamFrequency("");
+  }, []);
+
+  // Wrapper: switch category with full state isolation
+  const handleCategorySelect = useCallback((catId: Category) => {
+    resetInteractiveParams();
+    setMessages([]);
+    setInput("");
+    setStreamingText("");
+    setActiveSessionId(null);
+    setLoading(false);
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    setSelectedCategory(catId);
+  }, [resetInteractiveParams]);
+
   const category = DIVINATION_CATEGORIES.find((c) => c.id === selectedCategory);
 
   // Build contextual info from interactive selections
@@ -1004,15 +1045,11 @@ export default function DivinationTab() {
   };
 
   const handleReset = () => {
+    resetInteractiveParams();
     setActiveSessionId(null);
     setMessages([]);
     setStreamingText("");
     setInput("");
-    setRitualResult("");
-    setRitualCompleted(false);
-    setRitualKey((k) => k + 1);
-    setFaceImages([]);
-    setFaceOcrResult("");
     if (abortRef.current) {
       abortRef.current.abort();
       abortRef.current = null;
@@ -1079,7 +1116,7 @@ export default function DivinationTab() {
               return (
                 <button
                   key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
+                  onClick={() => handleCategorySelect(cat.id)}
                   className={cn(
                     "group relative flex items-start gap-3 rounded-xl border p-4 text-left transition-all duration-300 hover:scale-[1.03] shadow-md",
                     cat.bg,
