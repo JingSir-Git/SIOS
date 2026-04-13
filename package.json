@@ -8,9 +8,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "electron:dev": "next build && electron .",
-    "electron:build": "next build && electron-builder",
-    "postbuild": "node scripts/copy-static.js"
+    "postbuild": "node scripts/copy-static.js",
+    "icon": "node scripts/generate-icon.js",
+    "electron:dev": "npm run build && electron .",
+    "electron:pack": "npm run build && npm run icon && node scripts/pack-electron.js",
+    "electron:builder": "npm run build && npm run icon && electron-builder --win --config electron-builder.yml",
+    "electron:portable": "npm run build && npm run icon && node scripts/pack-electron.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
@@ -27,14 +30,19 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@electron/packager": "^19.1.0",
     "@netlify/plugin-nextjs": "^5.15.9",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
+    "electron": "^41.2.0",
+    "electron-builder": "^26.8.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
