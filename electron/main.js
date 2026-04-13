@@ -19,6 +19,14 @@ let serverProcess = null;
 let splashWindow = null;
 const PORT = 3456;
 
+// ---- Debug logging to file ----
+const logFile = path.join(app.getPath("userData"), "sios-debug.log");
+function logDebug(...args) {
+  const line = `[${new Date().toISOString()}] ${args.map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ")}`;
+  console.log(...args);
+  try { fs.appendFileSync(logFile, line + "\n"); } catch { /* ignore */ }
+}
+
 // ---- Resolve paths for both dev and packaged modes ----
 function isPackaged() {
   return app.isPackaged;
@@ -163,6 +171,11 @@ async function startServer() {
   const serverPath = getServerJsPath();
   const standalonePath = getStandalonePath();
 
+  logDebug("[startServer] serverPath:", serverPath);
+  logDebug("[startServer] standalonePath:", standalonePath);
+  logDebug("[startServer] isPackaged:", isPackaged());
+  logDebug("[startServer] resourcesPath:", process.resourcesPath);
+
   // Verify server.js exists
   if (!fs.existsSync(serverPath)) {
     throw new Error(
@@ -170,6 +183,7 @@ async function startServer() {
       `Please run 'npm run build' first to generate the standalone output.`
     );
   }
+  logDebug("[startServer] server.js found OK");
 
   // In packaged mode, ensure public/ and .next/static/ exist inside standalone
   if (isPackaged()) {
@@ -196,7 +210,7 @@ async function startServer() {
 
     serverProcess.stdout.on("data", (data) => {
       const output = data.toString();
-      console.log("[server]", output);
+      logDebug("[server:out]", output.trim());
       if (!started && (output.includes("Ready") || output.includes("started") || output.includes("localhost"))) {
         started = true;
         resolve(port);
@@ -204,7 +218,7 @@ async function startServer() {
     });
 
     serverProcess.stderr.on("data", (data) => {
-      console.error("[server:err]", data.toString());
+      logDebug("[server:err]", data.toString().trim());
     });
 
     serverProcess.on("error", (err) => {
@@ -246,7 +260,23 @@ function createWindow(port) {
     show: false,
   });
 
-  mainWindow.loadURL(`http://127.0.0.1:${port}`);
+  const url = `http://127.0.0.1:${port}`;
+  logDebug("[window] Loading URL:", url);
+
+  mainWindow.webContents.on("did-fail-load", (_e, code, desc) => {
+    logDebug("[window] did-fail-load:", code, desc);
+    // Retry once after 2 seconds
+    setTimeout(() => {
+      logDebug("[window] Retrying load...");
+      mainWindow?.loadURL(url);
+    }, 2000);
+  });
+
+  mainWindow.webContents.on("did-finish-load", () => {
+    logDebug("[window] did-finish-load OK");
+  });
+
+  mainWindow.loadURL(url);
 
   mainWindow.once("ready-to-show", () => {
     // Close splash and show main window
@@ -318,7 +348,7 @@ app.whenReady().then(async () => {
 
   try {
     const port = await startServer();
-    console.log(`Server started on port ${port}`);
+    logDebug(`[app] Server started on port ${port}`);
     createWindow(port);
   } catch (err) {
     console.error("Failed to start:", err);
