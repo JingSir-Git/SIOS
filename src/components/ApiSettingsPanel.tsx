@@ -42,6 +42,7 @@ const PRESET_ENDPOINTS = [
   { label: "Anthropic 官方", value: "https://api.anthropic.com" },
   { label: "OpenAI 兼容", value: "https://api.openai.com/v1" },
   { label: "DeepSeek", value: "https://api.deepseek.com" },
+  { label: "Ollama 本地", value: "http://localhost:11434/v1" },
 ];
 
 /** One-click provider presets: baseURL + model + recommended endpoint */
@@ -50,6 +51,7 @@ const PROVIDER_PRESETS = [
   { label: "Claude Sonnet", emoji: "🎭", baseURL: "https://api.anthropic.com", model: "claude-3-5-sonnet-20241022", desc: "最聪明，适合复杂分析" },
   { label: "GPT-4o", emoji: "🤖", baseURL: "https://api.openai.com/v1", model: "gpt-4o", desc: "OpenAI旗舰，支持视觉" },
   { label: "DeepSeek", emoji: "🔍", baseURL: "https://api.deepseek.com", model: "deepseek-chat", desc: "高性价比中文模型" },
+  { label: "Ollama 本地", emoji: "🏠", baseURL: "http://localhost:11434/v1", model: "qwen2.5:7b", desc: "完全离线，无需API Key" },
 ];
 
 export default function ApiSettingsPanel() {
@@ -65,28 +67,31 @@ export default function ApiSettingsPanel() {
     ...customModels.map((m) => ({ label: `自定义: ${m}`, value: m })),
   ];
 
+  const [testDetail, setTestDetail] = useState<string>("");
+
   const handleTest = useCallback(async () => {
     setTesting(true);
     setTestResult(null);
+    setTestDetail("");
     try {
-      const res = await apiFetch("/api/coach?stream=true", {
+      const res = await apiFetch("/api/test-connection", {
         method: "POST",
-        body: JSON.stringify({
-          messages: "测试: 你好",
-          userGoal: "API连接测试",
-        }),
       });
-      if (res.ok) {
+      const data = await res.json();
+      if (data.ok) {
         setTestResult("success");
-        addToast({ type: "success", title: "API连接成功", message: "已成功连接到LLM服务" });
+        setTestDetail(`模型: ${data.model} | 延迟: ${data.latencyMs}ms | tokens: ${data.usage?.input ?? 0}+${data.usage?.output ?? 0}`);
+        addToast({ type: "success", title: "API 连接成功", message: `模型 ${data.model} 响应正常 (${data.latencyMs}ms)` });
       } else {
-        const errData = await res.json().catch(() => ({}));
         setTestResult("error");
-        addToast({ type: "error", title: "API连接失败", message: (errData as { error?: string }).error || `HTTP ${res.status}` });
+        setTestDetail(data.error || "未知错误");
+        addToast({ type: "error", title: "API 连接失败", message: data.error || `HTTP ${res.status}` });
       }
     } catch (err) {
       setTestResult("error");
-      addToast({ type: "error", title: "API连接失败", message: err instanceof Error ? err.message : "网络错误" });
+      const msg = err instanceof Error ? err.message : "网络错误";
+      setTestDetail(msg);
+      addToast({ type: "error", title: "API 连接失败", message: msg });
     } finally {
       setTesting(false);
     }
@@ -272,39 +277,52 @@ export default function ApiSettingsPanel() {
       </div>
 
       {/* Connection Test */}
-      <div className="flex items-center gap-3 pt-2 border-t border-white/10">
-        <button
-          onClick={handleTest}
-          disabled={testing}
-          className="flex items-center gap-2 px-4 py-2 bg-violet-500/20 text-violet-300 rounded-lg text-sm hover:bg-violet-500/30 disabled:opacity-50 transition-all"
-        >
-          {testing ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : testResult === "success" ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          ) : testResult === "error" ? (
-            <AlertCircle className="w-4 h-4 text-red-400" />
-          ) : (
-            <Globe className="w-4 h-4" />
+      <div className="space-y-2 pt-2 border-t border-white/10">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleTest}
+            disabled={testing}
+            className="flex items-center gap-2 px-4 py-2 bg-violet-500/20 text-violet-300 rounded-lg text-sm hover:bg-violet-500/30 disabled:opacity-50 transition-all"
+          >
+            {testing ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : testResult === "success" ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            ) : testResult === "error" ? (
+              <AlertCircle className="w-4 h-4 text-red-400" />
+            ) : (
+              <Globe className="w-4 h-4" />
+            )}
+            {testing ? "测试中..." : "测试连接"}
+          </button>
+          {testResult === "success" && (
+            <span className="text-xs text-emerald-400">✓ 连接成功</span>
           )}
-          {testing ? "测试中..." : "测试连接"}
-        </button>
-        {testResult === "success" && (
-          <span className="text-xs text-emerald-400">✓ 连接成功</span>
+          {testResult === "error" && (
+            <span className="text-xs text-red-400">✗ 连接失败</span>
+          )}
+          <button
+            onClick={() => {
+              updateApiSettings({ baseURL: "", apiKey: "", model: "" });
+              setTestResult(null);
+              setTestDetail("");
+              addToast({ type: "info", title: "已重置", message: "API配置已重置为服务器默认值" });
+            }}
+            className="ml-auto px-3 py-1.5 text-xs text-white/40 hover:text-white/70 transition-colors"
+          >
+            重置为默认
+          </button>
+        </div>
+        {testDetail && (
+          <div className={cn(
+            "px-3 py-2 rounded-lg text-xs",
+            testResult === "success"
+              ? "bg-emerald-500/10 text-emerald-300/80 border border-emerald-500/20"
+              : "bg-red-500/10 text-red-300/80 border border-red-500/20"
+          )}>
+            {testDetail}
+          </div>
         )}
-        {testResult === "error" && (
-          <span className="text-xs text-red-400">✗ 连接失败，请检查配置</span>
-        )}
-        <button
-          onClick={() => {
-            updateApiSettings({ baseURL: "", apiKey: "", model: "" });
-            setTestResult(null);
-            addToast({ type: "info", title: "已重置", message: "API配置已重置为服务器默认值" });
-          }}
-          className="ml-auto px-3 py-1.5 text-xs text-white/40 hover:text-white/70 transition-colors"
-        >
-          重置为默认
-        </button>
       </div>
 
       {/* Current effective config summary */}
@@ -314,6 +332,20 @@ export default function ApiSettingsPanel() {
         <div>密钥: {apiSettings.apiKey ? `${apiSettings.apiKey.slice(0, 6)}...已配置` : "(使用服务器默认)"}</div>
         <div>模型: {apiSettings.model || "(使用服务器默认)"}</div>
       </div>
+
+      {/* Ollama local setup guide */}
+      {apiSettings.baseURL?.includes("localhost:11434") && (
+        <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-xs text-blue-300/80 space-y-1.5">
+          <div className="font-medium text-blue-300">🏠 Ollama 本地模型设置指南</div>
+          <ol className="list-decimal ml-4 space-y-1">
+            <li>安装 Ollama: 访问 <span className="text-blue-400">ollama.com</span> 下载安装</li>
+            <li>拉取模型: 打开终端运行 <code className="px-1 py-0.5 bg-white/10 rounded">ollama pull qwen2.5:7b</code></li>
+            <li>启动服务: <code className="px-1 py-0.5 bg-white/10 rounded">ollama serve</code></li>
+            <li>API Key 填写 <code className="px-1 py-0.5 bg-white/10 rounded">ollama</code> (任意非空字符串即可)</li>
+          </ol>
+          <div className="text-[10px] text-blue-400/60 mt-1">推荐模型: qwen2.5:7b (中文优秀) | llama3.1:8b (英文优秀) | mistral:7b (通用)</div>
+        </div>
+      )}
     </div>
   );
 }

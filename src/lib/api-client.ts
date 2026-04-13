@@ -16,9 +16,18 @@ export interface LLMConfig {
 // Cache clients by baseURL+apiKey to avoid re-creating on every request
 const clientCache = new Map<string, Anthropic>();
 
+function isLocalProvider(baseURL: string): boolean {
+  return baseURL.includes("localhost") || baseURL.includes("127.0.0.1");
+}
+
 function getClient(config?: LLMConfig): Anthropic {
   const baseURL = config?.baseURL || process.env.ANTHROPIC_BASE_URL || "https://api.minimaxi.com/anthropic";
-  const apiKey = config?.apiKey || process.env.ANTHROPIC_API_KEY || "";
+  let apiKey = config?.apiKey || process.env.ANTHROPIC_API_KEY || "";
+
+  // Local providers (Ollama, LM Studio, etc.) don't need a real API key
+  if (!apiKey && isLocalProvider(baseURL)) {
+    apiKey = "ollama";
+  }
 
   if (!apiKey) {
     throw new Error(

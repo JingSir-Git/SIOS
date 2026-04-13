@@ -1,6 +1,8 @@
 {
   "name": "read-your-mind",
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "description": "SIOS — Social Intelligence OS: AI-powered social cognition and interpersonal strategy platform",
+  "author": "SIOS Team",
   "private": true,
   "main": "electron/main.js",
   "scripts": {
@@ -12,8 +14,8 @@
     "icon": "node scripts/generate-icon.js",
     "electron:dev": "npm run build && electron .",
     "electron:pack": "npm run build && npm run icon && node scripts/pack-electron.js",
-    "electron:builder": "npm run build && npm run icon && electron-builder --win --config electron-builder.yml",
-    "electron:portable": "npm run build && npm run icon && node scripts/pack-electron.js"
+    "electron:installer": "node scripts/pack-electron.js && electron-builder --pd dist-electron/SIOS-win32-x64 --win nsis --config electron-builder.yml",
+    "electron:all": "npm run build && npm run icon && node scripts/pack-electron.js && electron-builder --pd dist-electron/SIOS-win32-x64 --win nsis --config electron-builder.yml"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",

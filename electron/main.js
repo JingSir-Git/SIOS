@@ -68,6 +68,37 @@ function getIconPath() {
   return path.join(pubPath, "icon-512.svg");
 }
 
+// ---- Ensure standalone has public/ and .next/static/ (packaged mode) ----
+function copyDirSync(src, dest) {
+  if (!fs.existsSync(src)) return;
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDirSync(srcPath, destPath);
+    } else {
+      if (!fs.existsSync(destPath)) {
+        fs.copyFileSync(srcPath, destPath);
+      }
+    }
+  }
+}
+
+function ensureStandaloneAssets(standalonePath) {
+  const publicSrc = path.join(process.resourcesPath, "public");
+  const publicDest = path.join(standalonePath, "public");
+  if (fs.existsSync(publicSrc) && !fs.existsSync(publicDest)) {
+    console.log("[setup] Copying public/ into standalone...");
+    copyDirSync(publicSrc, publicDest);
+  }
+  // .next/static should already be inside standalone from postbuild
+  const staticDir = path.join(standalonePath, ".next", "static");
+  if (!fs.existsSync(staticDir)) {
+    console.warn("[setup] Warning: .next/static not found in standalone — CSS/JS may not load.");
+  }
+}
+
 // ---- Find a free port ----
 function findFreePort(startPort) {
   return new Promise((resolve) => {
@@ -140,12 +171,19 @@ async function startServer() {
     );
   }
 
+  // In packaged mode, ensure public/ and .next/static/ exist inside standalone
+  if (isPackaged()) {
+    ensureStandaloneAssets(standalonePath);
+  }
+
   return new Promise((resolve, reject) => {
     const env = {
       ...process.env,
       PORT: String(port),
       HOSTNAME: "127.0.0.1",
       NODE_ENV: "production",
+      // Required: make Electron binary act as plain Node.js
+      ELECTRON_RUN_AS_NODE: "1",
     };
 
     serverProcess = spawn(process.execPath, [serverPath], {
