@@ -56,9 +56,8 @@ function TabPane({ id, active, children }: TabPaneProps) {
 
 function AchievementToastWrapper() {
   const { newAchievement, clearToast } = useAchievementChecker();
-  if (!newAchievement) return null;
-  // Re-use the toast from AchievementPanel (inline import-safe)
   const language = useAppStore((s) => s.language);
+  if (!newAchievement) return null;
   return (
     <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] animate-in slide-in-from-top-4 fade-in duration-500">
       <button onClick={clearToast} className="flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-zinc-900/95 backdrop-blur-xl px-5 py-3 shadow-2xl shadow-amber-500/20 cursor-pointer hover:border-amber-500/50 transition-colors">
