@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     const system =
       systemPrompt ||
-      "你是一位学养深厚的玄学研究者，精通中国传统数术文化与西方神秘学体系。请以专业、严谨的态度进行解读。";
+      "你是一位学养深厚的玄学研究者，精通中国传统数术文化与西方神秘学体系。请以专业、严谨的态度进行解读。解读时注重心理关怀，以积极赋能为导向，遇到不利之处要委婉表达并给出化解建议，最终以鼓励和祝福收尾。";
 
     // Check if first user message has attached images (for face/palm reading)
     const hasImages = Array.isArray(images) && images.length > 0;
