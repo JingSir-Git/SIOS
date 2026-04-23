@@ -65,7 +65,7 @@ export default function ImageUpload({
   const [previewId, setPreviewId] = useState<string | null>(null);
 
   const processFiles = useCallback(
-    (files: FileList | File[]) => {
+    async (files: FileList | File[]) => {
       const newImages: UploadedImage[] = [];
       const existingCount = images.length;
 
@@ -81,17 +81,23 @@ export default function ImageUpload({
       }
 
       if (newImages.length > 0) {
-        // Read base64 for each
-        newImages.forEach((img) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            img.base64 = reader.result as string;
-            onChange([...images, ...newImages]);
-          };
-          reader.readAsDataURL(img.file);
-        });
-        // Immediately update with previews (base64 will populate async)
+        // Immediately show previews
         onChange([...images, ...newImages]);
+        // Read base64 for all images, then update with a new array containing base64 data
+        const withBase64 = await Promise.all(
+          newImages.map(
+            (img) =>
+              new Promise<UploadedImage>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve({ ...img, base64: reader.result as string });
+                reader.onerror = () => resolve(img);
+                reader.readAsDataURL(img.file);
+              })
+          )
+        );
+        // Merge: replace newImages entries with base64-populated versions
+        const merged = [...images, ...withBase64];
+        onChange(merged);
       }
     },
     [images, maxCount, maxSizeMB, onChange]

@@ -26,7 +26,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { exportChatSessionReport } from "@/lib/export-report";
 import ChatHistoryPanel from "./ChatHistoryPanel";
 import type { ChatSessionEntry } from "@/lib/types";
-import ChatImageAttach, { type AttachedImage, formatAttachedImages } from "./ChatImageAttach";
+import ChatImageAttach, { type AttachedImage, formatAttachedImages, getAttachedImageBase64 } from "./ChatImageAttach";
 import ResponseFeedback from "./ResponseFeedback";
 import { useT, getAILanguageInstruction } from "@/lib/i18n";
 import VoiceInputButton from "./VoiceInputButton";
@@ -177,7 +177,8 @@ export default function PsychologyTab() {
   const sendMessage = async () => {
     if ((!input.trim() && attachedImages.length === 0) || loading) return;
 
-    // Append image descriptions if any images are attached
+    // Collect image base64 for direct vision API + text descriptions as fallback
+    const imageBase64List = getAttachedImageBase64(attachedImages);
     const imageCtx = formatAttachedImages(attachedImages);
     const rawInput = input.trim() || "请分析这张图片";
     const currentInput = imageCtx ? `${rawInput}\n\n${imageCtx}` : rawInput;
@@ -219,6 +220,7 @@ export default function PsychologyTab() {
           selfDescription: enrichedSelfDesc || undefined,
           conversationHistory: buildConversationHistory() || undefined,
           languageInstruction: getAILanguageInstruction(language),
+          ...(imageBase64List.length > 0 ? { images: imageBase64List } : {}),
         }),
         signal: controller.signal,
       });

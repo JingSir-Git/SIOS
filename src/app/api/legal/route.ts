@@ -5,11 +5,24 @@
 import { NextRequest } from "next/server";
 import { createStreamingResponse } from "@/lib/stream-utils";
 import { extractLLMConfig } from "@/lib/api-client";
+import Anthropic from "@anthropic-ai/sdk";
+
+type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+
+function parseDataURL(dataUrl: string): { media_type: ImageMediaType; data: string } | null {
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]+)$/);
+  if (!match) return null;
+  let mime = match[1].toLowerCase();
+  if (mime === "image/jpg") mime = "image/jpeg";
+  const allowed: ImageMediaType[] = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+  if (!allowed.includes(mime as ImageMediaType)) mime = "image/jpeg";
+  return { media_type: mime as ImageMediaType, data: match[2] };
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, conversationHistory, systemPrompt } = body;
+    const { message, conversationHistory, systemPrompt, images } = body;
 
     if (!message || typeof message !== "string") {
       return Response.json(
@@ -24,7 +37,25 @@ export async function POST(request: NextRequest) {
       userPrompt = `## 对话上下文\n${conversationHistory}\n\n## 用户新问题\n${message}`;
     }
 
-    const llmMessages = [{ role: "user" as const, content: userPrompt }];
+    // Build rich content if images are provided
+    let richContent: Anthropic.ContentBlockParam[] | undefined;
+    if (Array.isArray(images) && images.length > 0) {
+      richContent = [];
+      for (const img of images) {
+        if (typeof img === "string") {
+          const parsed = parseDataURL(img);
+          if (parsed) {
+            richContent.push({
+              type: "image",
+              source: { type: "base64", media_type: parsed.media_type, data: parsed.data },
+            });
+          }
+        }
+      }
+      richContent.push({ type: "text", text: userPrompt });
+    }
+
+    const llmMessages = [{ role: "user" as const, content: userPrompt, ...(richContent ? { richContent } : {}) }];
     const isStream = request.nextUrl.searchParams.get("stream") === "true";
     const llmConfig = extractLLMConfig(request);
 

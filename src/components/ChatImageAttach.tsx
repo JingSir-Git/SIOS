@@ -186,3 +186,8 @@ export function formatAttachedImages(images: AttachedImage[]): string {
     .map((img, i) => `【附图${i + 1}识别内容】\n${img.description}`)
     .join("\n\n");
 }
+
+/** Extract base64 image data URLs for direct LLM vision API usage */
+export function getAttachedImageBase64(images: AttachedImage[]): string[] {
+  return images.filter((i) => i.base64).map((i) => i.base64!);
+}

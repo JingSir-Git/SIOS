@@ -25,7 +25,7 @@ import MarkdownRenderer from "./MarkdownRenderer";
 import { exportChatSessionReport } from "@/lib/export-report";
 import ChatHistoryPanel from "./ChatHistoryPanel";
 import type { ChatSessionEntry } from "@/lib/types";
-import ChatImageAttach, { type AttachedImage, formatAttachedImages } from "./ChatImageAttach";
+import ChatImageAttach, { type AttachedImage, formatAttachedImages, getAttachedImageBase64 } from "./ChatImageAttach";
 import ResponseFeedback from "./ResponseFeedback";
 import { useT, getAILanguageInstruction } from "@/lib/i18n";
 import VoiceInputButton from "./VoiceInputButton";
@@ -169,7 +169,8 @@ export default function LegalAdvisor() {
     const rawText = (overrideText || input).trim();
     if (!rawText || loading) return;
 
-    // Append image descriptions if any images are attached
+    // Collect image base64 for direct vision API + text descriptions as fallback
+    const imageBase64List = getAttachedImageBase64(attachedImages);
     const imageCtx = formatAttachedImages(attachedImages);
     const text = imageCtx ? `${rawText}\n\n${imageCtx}` : rawText;
     const displayText = rawText; // Show only what user typed
@@ -208,6 +209,7 @@ export default function LegalAdvisor() {
           message: text,
           conversationHistory: history || undefined,
           systemPrompt: SYSTEM_PROMPT + domainCtx + memoryCtx + getAILanguageInstruction(language),
+          ...(imageBase64List.length > 0 ? { images: imageBase64List } : {}),
         }),
         signal: controller.signal,
       });
