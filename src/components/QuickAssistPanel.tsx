@@ -231,11 +231,7 @@ ${memoryText ? `\nAI记忆:\n${memoryText}` : ""}`;
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="text-[10px] text-zinc-500">对方说了什么？</label>
-            <VoiceInputButton
-              compact
-              onTranscript={(text) => setIncomingMessage((prev) => prev ? prev + " " + text : text)}
-              className="scale-90 origin-right"
-            />
+            {/* VoiceInputButton hidden — feature pending */}
           </div>
           <textarea
             value={incomingMessage}

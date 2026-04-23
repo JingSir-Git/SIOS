@@ -1210,40 +1210,7 @@ export default function AnalyzeTab() {
                 />
               )}
 
-              {/* Screenshot Upload for Chat OCR */}
-              <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/30 p-3 space-y-2">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] font-medium text-zinc-400">聊天截图识别（可选）</span>
-                  <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 font-medium">Beta</span>
-                </div>
-                <ImageUpload
-                  images={uploadedImages}
-                  onChange={setUploadedImages}
-                  showOCR
-                  onOCR={handleImageOCR}
-                  compact
-                  maxCount={6}
-                  placeholder="上传聊天截图，AI自动识别文字"
-                />
-                {uploadedImages.length > 0 && uploadedImages.some((i) => i.base64 && !i.ocrText) && (
-                  <button
-                    onClick={handleBatchOCR}
-                    disabled={ocrProcessing}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all",
-                      ocrProcessing
-                        ? "bg-violet-500/10 text-violet-400 cursor-wait"
-                        : "bg-violet-500/15 text-violet-300 hover:bg-violet-500/25 border border-violet-500/30"
-                    )}
-                  >
-                    {ocrProcessing ? (
-                      <><Loader2 className="h-3 w-3 animate-spin" /> 正在识别...</>
-                    ) : (
-                      <><FileImage className="h-3 w-3" /> 一键识别全部截图</>
-                    )}
-                  </button>
-                )}
-              </div>
+              {/* Screenshot Upload hidden — feature pending */}
 
               <div className="relative">
                 <textarea
@@ -1266,16 +1233,7 @@ export default function AnalyzeTab() {
                   className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-violet-500/50 focus:outline-none focus:ring-1 focus:ring-violet-500/20 resize-none font-mono leading-relaxed"
                 />
                 <div className="absolute bottom-3 right-3 flex items-center gap-2">
-                  <VoiceInputButton
-                    compact
-                    onTranscript={(text) => setConversation((prev) => prev ? prev + "\n" + text : text)}
-                    onComplete={(_text, metrics) => {
-                      if (metrics.duration > 5 && inputMode === "single") {
-                        const hint = `\n[语音特征：${Math.floor(metrics.duration)}秒, ${metrics.pauseCount}次停顿, ${metrics.wordsPerMinute}字/分${metrics.confidence < 0.7 ? ", 识别不确定" : ""}]`;
-                        setContext((prev) => prev + hint);
-                      }
-                    }}
-                  />
+                  {/* VoiceInputButton hidden — feature pending */}
                   <span className="text-[10px] text-zinc-600">
                     {conversation.length} 字 · {conversation.split("\n").filter((l) => l.trim()).length} 行
                   </span>

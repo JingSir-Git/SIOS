@@ -481,31 +481,20 @@ export default function LegalAdvisor() {
           </div>
         )}
         <div className="flex gap-2 items-end">
-          <ChatImageAttach
-            images={attachedImages}
-            onChange={setAttachedImages}
-            maxCount={3}
-            disabled={loading}
-            ocrMode="chat"
-            compact
-          />
+          {/* ChatImageAttach hidden — feature pending */}
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-            placeholder={attachedImages.length > 0 ? t.common.describeImage : t.legal.inputPlaceholder}
+            placeholder={t.legal.inputPlaceholder}
             className="flex-1 rounded-xl border border-zinc-700/50 bg-zinc-800/50 px-4 py-2.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-blue-500/50 transition-colors"
             disabled={loading}
           />
-          <VoiceInputButton
-            onTranscript={(text) => setInput((prev) => prev + text)}
-            lang={language === "en" ? "en-US" : "zh-CN"}
-            compact
-          />
+          {/* VoiceInputButton hidden — feature pending */}
           <button
             onClick={() => sendMessage()}
-            disabled={(!input.trim() && attachedImages.length === 0) || loading}
+            disabled={!input.trim() || loading}
             className={cn(
               "flex items-center justify-center w-10 h-10 rounded-xl transition-all shrink-0",
               (input.trim() || attachedImages.length > 0) && !loading

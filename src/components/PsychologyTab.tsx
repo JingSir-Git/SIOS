@@ -732,14 +732,7 @@ export default function PsychologyTab() {
         {/* Input Bar */}
         <div className="border-t border-zinc-800 px-6 py-3">
           <div className="flex gap-2 items-end">
-            <ChatImageAttach
-              images={attachedImages}
-              onChange={setAttachedImages}
-              maxCount={3}
-              disabled={loading}
-              ocrMode="chat"
-              compact
-            />
+            {/* ChatImageAttach hidden — feature pending */}
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -753,15 +746,10 @@ export default function PsychologyTab() {
               rows={2}
               className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800/50 px-4 py-3 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-rose-500/50 resize-none"
             />
-            <div className="flex flex-col gap-1.5 shrink-0">
-              <VoiceInputButton
-                onTranscript={(text) => setInput((prev) => prev + text)}
-                compact
-              />
-            </div>
+            {/* VoiceInputButton hidden — feature pending */}
             <button
               onClick={sendMessage}
-              disabled={loading || (!input.trim() && attachedImages.length === 0)}
+              disabled={loading || !input.trim()}
               className="shrink-0 rounded-xl bg-rose-600 p-3 text-white hover:bg-rose-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-rose-500/20"
             >
               {loading ? (

@@ -1824,9 +1824,9 @@ export default function DivinationTab() {
                 )}
                 {selectedCategory === "mianxiang" && (
                   <>
-                    <QuickPrompt text="我额头较宽、鼻梁挺直，请分析我的面相" onSend={setInput} />
-                    <QuickPrompt text="请帮我看手相，我的感情线和事业线如何" onSend={setInput} />
-                    <QuickPrompt text="我的面相适合做生意还是上班" onSend={setInput} />
+                    <QuickPrompt text="我圆脸、额头饱满、眉毛浓密、鼻梁高挺、嘴唇偏厚，眉间有一颗小痣，请分析面相" onSend={setInput} />
+                    <QuickPrompt text="右手生命线长且深、感情线延伸到食指下方、智慧线和生命线起点相连、有明显的事业线" onSend={setInput} />
+                    <QuickPrompt text="我国字脸、三停均匀、耳垂较大、眼睛细长、法令纹明显，请综合分析运势" onSend={setInput} />
                   </>
                 )}
                 {selectedCategory === "dream" && (
@@ -1903,37 +1903,55 @@ export default function DivinationTab() {
           </div>
         )}
 
-        {/* Mianxiang: Photo upload for face/palm reading */}
-        {selectedCategory === "mianxiang" && (
+        {/* Mianxiang: Text description guide for face/palm reading */}
+        {selectedCategory === "mianxiang" && messages.length === 0 && (
           <div className="mb-3 rounded-xl border border-rose-500/20 bg-rose-500/5 p-4 space-y-3">
             <div className="flex items-center gap-2">
               <Eye className="h-4 w-4 text-rose-400" />
-              <span className="text-xs font-medium text-rose-300">上传面相/手相照片（可选）</span>
-              <span className="text-[9px] text-zinc-500">AI将自动分析面部/掌纹特征</span>
+              <span className="text-xs font-medium text-rose-300">面相/手相特征描述</span>
+              <span className="text-[9px] text-zinc-500">请尽可能详细地描述，AI将根据文字分析</span>
             </div>
-            <ImageUpload
-              images={faceImages}
-              onChange={setFaceImages}
-              showOCR
-              onOCR={handleFaceOCR}
-              maxCount={3}
-              placeholder="上传正面照或手掌照片"
-              accept="image/png,image/jpeg,image/webp"
-            />
-            {faceOcrResult && (
-              <div className="rounded-lg border border-rose-500/10 bg-zinc-900/50 p-3">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-[9px] text-rose-400 font-medium">AI 面容/掌纹描述:</p>
-                  <span className="text-[8px] text-zinc-600 italic">可编辑修正</span>
+            {faceReadingType !== "palm" && (
+              <div className="rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-3 space-y-1.5">
+                <p className="text-[10px] text-rose-300 font-medium">面相描述参考要点：</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[9px] text-zinc-500">
+                  <span>• 脸型（圆/方/长/瓜子/国字）</span>
+                  <span>• 额头（宽窄/高低/饱满程度）</span>
+                  <span>• 眉毛（浓淡/长短/形状/间距）</span>
+                  <span>• 眼睛（大小/单双/眼距/眼尾）</span>
+                  <span>• 鼻子（高低/大小/鼻翼/鼻梁）</span>
+                  <span>• 嘴巴（大小/唇厚薄/唇色）</span>
+                  <span>• 耳朵（大小/耳垂/耳廓形态）</span>
+                  <span>• 下巴（尖圆/长短/有无双下巴）</span>
+                  <span>• 法令纹（深浅/长短/是否明显）</span>
+                  <span>• 痣的位置（如眉间/鼻尖/嘴角等）</span>
+                  <span>• 皮肤（肤色/光泽/纹路）</span>
+                  <span>• 三停比例（上中下是否均匀）</span>
                 </div>
-                <textarea
-                  value={faceOcrResult}
-                  onChange={(e) => setFaceOcrResult(e.target.value)}
-                  className="w-full text-[10px] text-zinc-400 leading-relaxed bg-transparent border border-zinc-800/50 rounded-md px-2 py-1.5 resize-y min-h-[48px] max-h-32 focus:border-rose-500/30 focus:outline-none transition-colors"
-                  rows={3}
-                />
               </div>
             )}
+            {faceReadingType !== "face" && (
+              <div className="rounded-lg border border-zinc-800/50 bg-zinc-900/50 p-3 space-y-1.5">
+                <p className="text-[10px] text-rose-300 font-medium">手相描述参考要点：</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[9px] text-zinc-500">
+                  <span>• 左手/右手（右手为主，左手为辅）</span>
+                  <span>• 生命线（长短/深浅/弧度/分叉）</span>
+                  <span>• 智慧线（长短/走向/是否分叉）</span>
+                  <span>• 感情线（长短/弯曲/起止位置）</span>
+                  <span>• 事业线（有无/深浅/起点位置）</span>
+                  <span>• 婚姻线（条数/长短/深浅）</span>
+                  <span>• 太阳线（有无/长短/清晰度）</span>
+                  <span>• 手指（长短/粗细/指节/指甲形状）</span>
+                  <span>• 手掌（厚薄/软硬/掌色/掌丘饱满度）</span>
+                  <span>• 特殊纹路（岛纹/十字纹/星纹等）</span>
+                </div>
+              </div>
+            )}
+            <div className="rounded-lg bg-zinc-800/30 px-3 py-2">
+              <p className="text-[9px] text-zinc-500 leading-relaxed">
+                提示：不必全部描述，描述越详细分析越准确。可以在下方输入框中直接描述特征，也可以先选好看相类型和关注方向后再输入。
+              </p>
+            </div>
           </div>
         )}
 
@@ -2026,11 +2044,7 @@ export default function DivinationTab() {
                 : "border-zinc-700 focus:border-violet-500/50"
             )}
           />
-          <VoiceInputButton
-            onTranscript={(text) => setInput((prev) => prev + text)}
-            lang={language === "en" ? "en-US" : "zh-CN"}
-            compact
-          />
+          {/* VoiceInputButton hidden — feature pending */}
           <button
             onClick={handleSend}
             disabled={!input.trim() || loading}
