@@ -6,14 +6,8 @@ import {
   Loader2,
   Scale,
   User,
-  Bot,
-  BookOpen,
-  Shield,
   AlertTriangle,
-  ChevronDown,
-  ChevronUp,
   RotateCcw,
-  FileText,
   Gavel,
   FileDown,
   History,
@@ -21,7 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { apiFetch } from "@/lib/api-fetch";
-import MarkdownRenderer from "./MarkdownRenderer";
+import SectionedMarkdown from "./SectionedMarkdown";
 import { exportChatSessionReport } from "@/lib/export-report";
 import ChatHistoryPanel from "./ChatHistoryPanel";
 import type { ChatSessionEntry } from "@/lib/types";
@@ -424,45 +418,42 @@ export default function LegalAdvisor() {
 
         {/* Message list */}
         {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={cn(
-              "flex gap-3",
-              msg.role === "user" ? "justify-end" : "justify-start"
-            )}
-          >
-            {msg.role === "advisor" && (
-              <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 shrink-0 mt-1">
-                <Scale className="h-3.5 w-3.5 text-blue-400" />
+          <div key={msg.id}>
+            {msg.role === "user" ? (
+              <div className="flex gap-3 justify-end">
+                <div className="rounded-2xl rounded-br-md bg-violet-500/10 border border-violet-500/20 px-4 py-3 max-w-[75%]">
+                  <p className="text-xs text-violet-100 leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                </div>
+                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-violet-500/10 border border-violet-500/20 shrink-0 mt-1">
+                  <User className="h-3.5 w-3.5 text-violet-400" />
+                </div>
               </div>
-            )}
-            <div className={cn(
-              "rounded-xl px-4 py-3 max-w-[85%] border",
-              msg.role === "user"
-                ? "bg-violet-500/10 border-violet-500/20 text-violet-100"
-                : "bg-zinc-800/60 border-zinc-700/40 text-zinc-200"
-            )}>
-              {msg.role === "advisor" && msg.content ? (
-                <div>
-                  <div className="text-xs leading-relaxed">
-                    <MarkdownRenderer content={msg.content} />
+            ) : (
+              <div className="space-y-2">
+                <div className="flex gap-3 max-w-[92%]">
+                  <div className="shrink-0 mt-1">
+                    <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                      <Scale className="h-3.5 w-3.5 text-blue-400" />
+                    </div>
                   </div>
-                  <div className="flex justify-end mt-1.5 border-t border-zinc-700/30 pt-1">
-                    <ResponseFeedback messageId={msg.id} module="legal" responseSnippet={msg.content} compact />
+                  <div className="flex-1 min-w-0">
+                    {msg.content ? (
+                      <div>
+                        <SectionedMarkdown content={msg.content} />
+                        <div className="flex justify-end mt-2 pt-1.5">
+                          <ResponseFeedback messageId={msg.id} module="legal" responseSnippet={msg.content} compact />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl rounded-bl-md bg-zinc-800/50 border border-zinc-700/50 px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-400" />
+                          <span className="text-[10px] text-zinc-500">正在查阅法律条文...</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              ) : msg.role === "advisor" && !msg.content ? (
-                <div className="flex items-center gap-2 py-1">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-400" />
-                  <span className="text-[10px] text-zinc-500">正在查阅法律条文...</span>
-                </div>
-              ) : (
-                <p className="text-xs leading-relaxed">{msg.content}</p>
-              )}
-            </div>
-            {msg.role === "user" && (
-              <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-violet-500/10 border border-violet-500/20 shrink-0 mt-1">
-                <User className="h-3.5 w-3.5 text-violet-400" />
               </div>
             )}
           </div>

@@ -31,7 +31,7 @@ import { useAppStore } from "@/lib/store";
 import ChatHistoryPanel from "./ChatHistoryPanel";
 import type { ChatSessionEntry } from "@/lib/types";
 import StreamingIndicator from "./StreamingIndicator";
-import MarkdownRenderer from "./MarkdownRenderer";
+import SectionedMarkdown from "./SectionedMarkdown";
 import ImageUpload, { type UploadedImage } from "./ImageUpload";
 import ResponseFeedback from "./ResponseFeedback";
 import { CoinTossRitual, TarotDrawRitual, QimenRitual, FortuneStickRitual, CharacterWriteRitual } from "./DivinationRituals";
@@ -1202,7 +1202,7 @@ export default function DivinationTab() {
                               </div>
                             )}
                             <div className="max-h-60 overflow-y-auto">
-                              <MarkdownRenderer content={rec.answer} />
+                              <SectionedMarkdown content={rec.answer} />
                             </div>
                           </div>
                         )}
@@ -1988,7 +1988,7 @@ export default function DivinationTab() {
                   <span className="text-[10px] font-medium text-zinc-400">{category?.label || "解读"} · AI 解析</span>
                 </div>
                 <div className="px-5 py-4">
-                  <MarkdownRenderer content={msg.content} />
+                  <SectionedMarkdown content={msg.content} />
                 </div>
                 <div className="flex justify-end px-4 py-1.5 border-t border-zinc-700/30">
                   <ResponseFeedback messageId={`div_${i}`} module="divination" responseSnippet={msg.content} compact />
@@ -2006,7 +2006,7 @@ export default function DivinationTab() {
                 <span className="text-[10px] font-medium text-zinc-400">{category?.label || "解读"} · 推演中...</span>
               </div>
               <div className="px-5 py-4">
-                <MarkdownRenderer content={streamingText} />
+                <SectionedMarkdown content={streamingText} />
               </div>
             </div>
           </div>
