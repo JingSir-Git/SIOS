@@ -204,7 +204,7 @@ export default function DashboardTab() {
       { name: moduleNames[3], count: profileMemories.length, color: "#f472b6" },
       { name: moduleNames[4], count: eqScores.length, color: "#facc15" },
       { name: moduleNames[5], count: chatSessionCount, color: "#38bdf8" },
-    ].filter((m) => m.count > 0);
+    ];
 
     // Profile dimension averages (across all profiles)
     const dimAverages: { key: DimensionKey; label: string; avg: number }[] = DIMENSION_KEYS.map((key) => {
@@ -460,7 +460,7 @@ export default function DashboardTab() {
     }
   }, [stats, eqScores.length, insightLoading]);
 
-  const isEmpty = stats.totalConversations === 0 && stats.totalProfiles === 0 && stats.divinationCount === 0;
+  const isEmpty = stats.totalConversations === 0 && stats.totalProfiles === 0 && stats.divinationCount === 0 && stats.chatSessionCount === 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -475,8 +475,8 @@ export default function DashboardTab() {
               <p className="text-[10px] text-zinc-500">{t.dashboard.subtitle}</p>
             </div>
           </div>
-          {!isEmpty && (
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            {!isEmpty && (<>
               <button
                 onClick={() => {
                   const alertsHtml = alerts.map((a) => {
@@ -553,21 +553,43 @@ export default function DashboardTab() {
                 <Share2 className="h-3.5 w-3.5" />
                 {language === "en" ? "Share" : "分享"}
               </button>
-            </div>
-          )}
+            </>)}
+          </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-5xl mx-auto px-6 py-6 space-y-6">
-          {isEmpty ? (
-            <div className="text-center py-20">
-              <BarChart3 className="h-12 w-12 text-zinc-700 mx-auto mb-4" />
-              <p className="text-sm text-zinc-500">{t.common.noData}</p>
-              <p className="text-xs text-zinc-600 mt-1">{t.dashboard.noDataHint}</p>
+          {isEmpty && (
+            <div className="rounded-xl border border-dashed border-violet-500/30 bg-gradient-to-br from-violet-500/5 via-transparent to-blue-500/5 p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-violet-500/10 border border-violet-500/20 shrink-0">
+                  <Compass className="h-6 w-6 text-violet-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-zinc-200 mb-1">{language === "en" ? "Welcome to Your Data Dashboard" : "欢迎来到你的数据大盘"}</h3>
+                  <p className="text-[11px] text-zinc-500 leading-relaxed">
+                    {language === "en"
+                      ? "Start by analyzing conversations, creating profiles, or exploring other modules. Your data will populate these charts in real time."
+                      : "开始分析对话、创建人物画像或探索其他功能模块后，下方图表将实时展示你的数据洞察。当前所有图表已就绪，等待数据注入。"}
+                  </p>
+                  <div className="flex items-center gap-3 mt-3">
+                    <button onClick={() => setActiveTab("analyze")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 text-violet-400 border border-violet-500/30 text-[10px] font-medium hover:bg-violet-600/30 transition-colors">
+                      <MessageSquare className="h-3 w-3" /> {language === "en" ? "Analyze Chat" : "分析对话"}
+                    </button>
+                    <button onClick={() => setActiveTab("profiles")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-400 border border-zinc-700 text-[10px] font-medium hover:text-zinc-200 hover:border-zinc-600 transition-colors">
+                      <Users className="h-3 w-3" /> {language === "en" ? "Create Profile" : "创建画像"}
+                    </button>
+                    <button onClick={() => setActiveTab("divination")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-400 border border-zinc-700 text-[10px] font-medium hover:text-zinc-200 hover:border-zinc-600 transition-colors">
+                      <Sparkles className="h-3 w-3" /> {language === "en" ? "Divination" : "风水玄学"}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-          ) : (
-            <>
+          )}
+
+          <>
               {/* Trend Alerts */}
               {alerts.length > 0 && (
                 <div className="space-y-2">
@@ -702,27 +724,26 @@ export default function DashboardTab() {
               {/* ─── Row 2: Dimension Radar + Module Usage Radar ─── */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Dimension Radar */}
-                {stats.totalProfiles > 0 && (
-                  <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <Fingerprint className="h-4 w-4 text-amber-400" />
-                        <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">人物维度雷达</h3>
-                      </div>
-                      <span className="text-[8px] text-zinc-600 font-mono">n={stats.totalProfiles} profiles</span>
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <Fingerprint className="h-4 w-4 text-amber-400" />
+                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{language === "en" ? "Dimension Radar" : "人物维度雷达"}</h3>
                     </div>
-                    <p className="text-[8px] text-zinc-600 mb-2 italic">所有画像维度均值分布 (0-100)</p>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <RadarChart data={stats.dimAverages} cx="50%" cy="50%" outerRadius="75%">
-                        <PolarGrid stroke="#3f3f46" strokeDasharray="3 3" />
-                        <PolarAngleAxis dataKey="label" tick={{ fontSize: 8, fill: "#71717a" }} />
-                        <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 7, fill: "#52525b" }} axisLine={false} />
-                        <Radar name="均值" dataKey="avg" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.15} strokeWidth={1.5} dot={{ r: 2.5, fill: "#f59e0b" }} />
-                        <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: "8px", fontSize: "10px" }} />
-                      </RadarChart>
-                    </ResponsiveContainer>
+                    <span className="text-[8px] text-zinc-600 font-mono">n={stats.totalProfiles} profiles</span>
                   </div>
-                )}
+                  <p className="text-[8px] text-zinc-600 mb-2 italic">{language === "en" ? "Average dimension distribution across all profiles (0-100)" : "所有画像维度均值分布 (0-100)"}</p>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <RadarChart data={stats.dimAverages} cx="50%" cy="50%" outerRadius="75%">
+                      <PolarGrid stroke="#3f3f46" strokeDasharray="3 3" />
+                      <PolarAngleAxis dataKey="label" tick={{ fontSize: 8, fill: "#71717a" }} />
+                      <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 7, fill: "#52525b" }} axisLine={false} />
+                      <Radar name={language === "en" ? "Average" : "均值"} dataKey="avg" stroke="#f59e0b" fill="#f59e0b" fillOpacity={stats.totalProfiles > 0 ? 0.15 : 0.03} strokeWidth={1.5} dot={{ r: 2.5, fill: "#f59e0b" }} />
+                      <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: "8px", fontSize: "10px" }} />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                  {stats.totalProfiles === 0 && <p className="text-[9px] text-zinc-700 text-center -mt-2 italic">{language === "en" ? "Create profiles to populate this chart" : "创建人物画像后数据将自动填充"}</p>}
+                </div>
 
                 {/* Module Usage Radar */}
                 <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
@@ -967,46 +988,44 @@ export default function DashboardTab() {
               </div>
 
               {/* ─── Row 5: Dimension Detail Grid (sparkline-style) ─── */}
-              {stats.totalProfiles > 0 && (
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Fingerprint className="h-4 w-4 text-amber-400" />
-                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{t.dashboard.dimDetail}</h3>
-                    </div>
-                    <span className="text-[8px] text-zinc-600 font-mono">{stats.dimAverages.length} dimensions</span>
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Fingerprint className="h-4 w-4 text-amber-400" />
+                    <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{t.dashboard.dimDetail}</h3>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {stats.dimAverages.map((d) => {
-                      const color = d.avg > 65 ? "#34d399" : d.avg < 35 ? "#f87171" : "#a1a1aa";
-                      return (
-                        <div key={d.key} className="rounded-lg border border-zinc-800/60 bg-zinc-800/20 p-3">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[9px] text-zinc-500">{d.label}</span>
-                            <span className="text-sm font-bold font-mono" style={{ color }}>{d.avg}</span>
-                          </div>
-                          {/* Mini distribution bar with needle */}
-                          <div className="relative h-2 rounded-full bg-zinc-800 mt-1">
-                            <div className="absolute inset-0 rounded-full overflow-hidden">
-                              <div className="h-full rounded-full" style={{ width: `${d.avg}%`, background: `linear-gradient(to right, ${d.avg < 35 ? "#f87171" : "#3f3f46"}, ${color})`, opacity: 0.4 }} />
-                            </div>
-                            <div className="absolute top-[-1px] w-1 h-3 rounded-sm" style={{ left: `${d.avg}%`, transform: "translateX(-50%)", backgroundColor: color }} />
-                          </div>
-                          <div className="flex justify-between mt-1 text-[7px] text-zinc-700">
-                            <span>0</span>
-                            <span>50</span>
-                            <span>100</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <span className="text-[8px] text-zinc-600 font-mono">{stats.dimAverages.length} dimensions</span>
                 </div>
-              )}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {stats.dimAverages.map((d) => {
+                    const hasData = stats.totalProfiles > 0;
+                    const color = !hasData ? "#3f3f46" : d.avg > 65 ? "#34d399" : d.avg < 35 ? "#f87171" : "#a1a1aa";
+                    return (
+                      <div key={d.key} className="rounded-lg border border-zinc-800/60 bg-zinc-800/20 p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[9px] text-zinc-500">{d.label}</span>
+                          <span className="text-sm font-bold font-mono" style={{ color }}>{hasData ? d.avg : "—"}</span>
+                        </div>
+                        {/* Mini distribution bar with needle */}
+                        <div className="relative h-2 rounded-full bg-zinc-800 mt-1">
+                          <div className="absolute inset-0 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${hasData ? d.avg : 50}%`, background: `linear-gradient(to right, ${!hasData ? "#27272a" : d.avg < 35 ? "#f87171" : "#3f3f46"}, ${color})`, opacity: hasData ? 0.4 : 0.15 }} />
+                          </div>
+                          {hasData && <div className="absolute top-[-1px] w-1 h-3 rounded-sm" style={{ left: `${d.avg}%`, transform: "translateX(-50%)", backgroundColor: color }} />}
+                        </div>
+                        <div className="flex justify-between mt-1 text-[7px] text-zinc-700">
+                          <span>0</span>
+                          <span>50</span>
+                          <span>100</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
 
               {/* ─── Row 6: Activity Heatmap ─── */}
-              {stats.heatmap.some((h) => h.count > 0) && (
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <CalendarDays className="h-4 w-4 text-emerald-400" />
@@ -1066,8 +1085,7 @@ export default function DashboardTab() {
                     ))}
                     <span>{t.dashboard.more}</span>
                   </div>
-                </div>
-              )}
+              </div>
 
               {/* ─── Row 7: Dimension Correlation Matrix (N2) ─── */}
               <DimensionCorrelation />
@@ -1110,8 +1128,7 @@ export default function DashboardTab() {
                   </div>
                 ) : null}
               </div>
-            </>
-          )}
+          </>
         </div>
       </div>
 
