@@ -112,6 +112,7 @@ export default function LegalAdvisor() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+  const [streamingCharCount, setStreamingCharCount] = useState(0);
 
   const ensureSession = useCallback((): string => {
     if (activeSessionId) return activeSessionId;
@@ -185,7 +186,6 @@ export default function LegalAdvisor() {
     abortRef.current = controller;
 
     const advisorMsgId = (Date.now() + 1).toString();
-    setMessages((prev) => [...prev, { id: advisorMsgId, role: "advisor", content: "" }]);
 
     try {
       const history = messages.map((m) => `${m.role === "user" ? "用户" : "顾问"}: ${m.content}`).join("\n");
@@ -216,6 +216,7 @@ export default function LegalAdvisor() {
       let buffer = "";
       let streamedText = "";
 
+      // Accumulate text silently — no incremental UI updates
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -228,42 +229,32 @@ export default function LegalAdvisor() {
             const event = JSON.parse(line.slice(6).trim());
             if (event.type === "progress" && event.text) {
               streamedText += event.text;
-              // Strip <think>...</think> reasoning blocks for display
-              const display = streamedText.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<think>[\s\S]*$/g, "").trim();
-              setMessages((prev) =>
-                prev.map((m) => m.id === advisorMsgId ? { ...m, content: display } : m)
-              );
+              // Update character count for the loading indicator
+              setStreamingCharCount(streamedText.length);
             } else if (event.type === "result" && event.data) {
               const d = event.data as Record<string, unknown>;
               const raw = (d.text as string) || streamedText;
-              const finalText = raw.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-              setMessages((prev) =>
-                prev.map((m) => m.id === advisorMsgId ? { ...m, content: finalText } : m)
-              );
+              streamedText = raw;
             }
           } catch { /* ignore parse errors */ }
         }
       }
 
+      // Render the complete response at once
       const cleanedText = streamedText ? streamedText.replace(/<think>[\s\S]*?<\/think>/g, "").trim() : "";
       const finalContent = cleanedText || "抱歉，暂时无法获取回复。请重试。";
-      if (!streamedText) {
-        setMessages((prev) =>
-          prev.map((m) => m.id === advisorMsgId ? { ...m, content: finalContent } : m)
-        );
-      }
+      setMessages((prev) => [...prev, { id: advisorMsgId, role: "advisor", content: finalContent }]);
       // Persist assistant message
       appendChatMessage(sessionId, { id: advisorMsgId, role: "assistant", content: finalContent, timestamp: new Date().toISOString() });
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") return;
       const errContent = "⚠️ 网络请求失败，请检查网络后重试。";
-      setMessages((prev) =>
-        prev.map((m) => m.id === advisorMsgId ? { ...m, content: errContent } : m)
-      );
+      setMessages((prev) => [...prev, { id: advisorMsgId, role: "advisor", content: errContent }]);
       appendChatMessage(sessionId, { id: advisorMsgId, role: "assistant", content: errContent, timestamp: new Date().toISOString() });
       addToast?.({ type: "error", title: "请求失败", message: "法律顾问网络请求失败" });
     } finally {
       setLoading(false);
+      setStreamingCharCount(0);
       abortRef.current = null;
     }
   };
@@ -458,6 +449,52 @@ export default function LegalAdvisor() {
             )}
           </div>
         ))}
+
+        {/* Streaming loading indicator — shown while accumulating response */}
+        {loading && (
+          <div className="flex gap-3 max-w-[92%]">
+            <div className="shrink-0 mt-1">
+              <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                <Scale className="h-3.5 w-3.5 text-blue-400 animate-pulse" />
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="rounded-xl bg-zinc-800/40 border border-zinc-700/40 px-5 py-6">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center">
+                      <Gavel className="h-6 w-6 text-blue-400 animate-pulse" />
+                    </div>
+                    <div className="absolute -inset-1 rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 animate-ping opacity-20" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs font-medium text-zinc-300">正在查阅法律条文并撰写分析...</p>
+                    {streamingCharCount > 0 && (
+                      <p className="text-[10px] text-zinc-500 mt-1">已生成 {streamingCharCount.toLocaleString()} 字符</p>
+                    )}
+                  </div>
+                  <div className="w-40 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full" style={{ width: "100%", animation: "legalShimmer 1.5s ease-in-out infinite" }} />
+                  </div>
+                  <button
+                    onClick={abortStreaming}
+                    className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors px-3 py-1 rounded border border-zinc-800 hover:border-zinc-600"
+                  >
+                    取消生成
+                  </button>
+                </div>
+              </div>
+              <style jsx>{`
+                @keyframes legalShimmer {
+                  0% { opacity: 0.4; transform: translateX(-100%); }
+                  50% { opacity: 1; transform: translateX(0); }
+                  100% { opacity: 0.4; transform: translateX(100%); }
+                }
+              `}</style>
+            </div>
+          </div>
+        )}
+
         <div ref={chatEndRef} />
       </div>
 

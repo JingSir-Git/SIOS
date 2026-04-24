@@ -24,13 +24,13 @@ import {
   CloudMoon,
   FileDown,
   History,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-fetch";
 import { useAppStore } from "@/lib/store";
 import ChatHistoryPanel from "./ChatHistoryPanel";
 import type { ChatSessionEntry } from "@/lib/types";
-import StreamingIndicator from "./StreamingIndicator";
 import SectionedMarkdown from "./SectionedMarkdown";
 import ImageUpload, { type UploadedImage } from "./ImageUpload";
 import ResponseFeedback from "./ResponseFeedback";
@@ -991,6 +991,7 @@ export default function DivinationTab() {
       const decoder = new TextDecoder();
       let fullText = "";
 
+      // Accumulate text silently — no incremental UI updates
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -1006,15 +1007,13 @@ export default function DivinationTab() {
               const parsed = JSON.parse(data);
               if (parsed.text) {
                 fullText += parsed.text;
-                const display = fullText.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<think>[\s\S]*$/g, "").trim();
-                setStreamingText(display);
-                messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+                // Update character count for loading indicator
+                setStreamingText(String(fullText.length));
               }
             } catch {
               if (data.trim()) {
                 fullText += data;
-                setStreamingText(fullText);
-                messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+                setStreamingText(String(fullText.length));
               }
             }
           }
@@ -1050,7 +1049,6 @@ export default function DivinationTab() {
       setLoading(false);
       setStreamingText("");
       abortRef.current = null;
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     }
   };
 
@@ -1998,22 +1996,51 @@ export default function DivinationTab() {
           </div>
         ))}
 
-        {loading && streamingText && (
+        {loading && (
           <div className="mb-4">
             <div className="rounded-xl bg-zinc-800/40 border border-zinc-700/40 overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-2 border-b border-zinc-700/30 bg-zinc-800/60">
                 {category && <category.icon className={cn("h-3.5 w-3.5 animate-pulse", category.color)} />}
                 <span className="text-[10px] font-medium text-zinc-400">{category?.label || "解读"} · 推演中...</span>
               </div>
-              <div className="px-5 py-4">
-                <SectionedMarkdown content={streamingText} />
+              <div className="px-5 py-8">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="relative">
+                    <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-violet-500/20 to-amber-500/20 flex items-center justify-center">
+                      <Sparkles className="h-7 w-7 text-amber-400 animate-pulse" />
+                    </div>
+                    <div className="absolute -inset-1 rounded-xl bg-gradient-to-br from-violet-500/10 to-amber-500/10 animate-ping opacity-20" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs font-medium text-zinc-300">
+                      {language === "en" ? "Interpreting the signs..." : "正在推演解读中..."}
+                    </p>
+                    {streamingText && Number(streamingText) > 0 && (
+                      <p className="text-[10px] text-zinc-500 mt-1">
+                        {language === "en" ? `Generated ${Number(streamingText).toLocaleString()} chars` : `已生成 ${Number(streamingText).toLocaleString()} 字符`}
+                      </p>
+                    )}
+                  </div>
+                  <div className="w-40 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-violet-500 to-amber-500 rounded-full" style={{ width: "100%", animation: "divShimmer 1.5s ease-in-out infinite" }} />
+                  </div>
+                  <button
+                    onClick={() => { abortRef.current?.abort(); setLoading(false); }}
+                    className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors px-3 py-1 rounded border border-zinc-800 hover:border-zinc-600"
+                  >
+                    {language === "en" ? "Cancel" : "取消生成"}
+                  </button>
+                </div>
               </div>
+              <style jsx>{`
+                @keyframes divShimmer {
+                  0% { opacity: 0.4; transform: translateX(-100%); }
+                  50% { opacity: 1; transform: translateX(0); }
+                  100% { opacity: 0.4; transform: translateX(100%); }
+                }
+              `}</style>
             </div>
           </div>
-        )}
-
-        {loading && !streamingText && (
-          <StreamingIndicator text="" label={language === "en" ? "Computing..." : "正在推算中"} onAbort={() => { abortRef.current?.abort(); setLoading(false); }} />
         )}
         </div>
 
