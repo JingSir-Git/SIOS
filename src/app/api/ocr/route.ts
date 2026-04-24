@@ -1,14 +1,69 @@
 // ============================================================
-// API Route: /api/ocr — Image OCR via LLM Vision (Anthropic SDK)
+// API Route: /api/ocr — Unified OCR endpoint
 // ============================================================
-// Accepts base64 image data OR image URL.
-// Uses the Anthropic SDK (MiniMax-compatible) for native vision support.
-// Supports: chat screenshot recognition, document OCR, face/palm description.
+// For chat/document modes: uses Tencent Cloud OCR (高精度版)
+// For face/palm modes: uses LLM Vision (Anthropic SDK)
 // ============================================================
 
 import { NextRequest } from "next/server";
 import { extractLLMConfig } from "@/lib/api-client";
 import Anthropic from "@anthropic-ai/sdk";
+
+// ---- Tencent Cloud OCR Client ----
+let _tencentOcrClient: any = null;
+
+async function getTencentOCRClient() {
+  if (_tencentOcrClient) return _tencentOcrClient;
+
+  const tencentcloud = require("tencentcloud-sdk-nodejs");
+  const OcrClient = tencentcloud.ocr.v20181119.Client;
+
+  const secretId = process.env.TENCENT_SECRET_ID;
+  const secretKey = process.env.TENCENT_SECRET_KEY;
+
+  if (!secretId || !secretKey) {
+    throw new Error("未配置腾讯云 OCR 密钥");
+  }
+
+  _tencentOcrClient = new OcrClient({
+    credential: { secretId, secretKey },
+    region: "ap-shanghai",
+    profile: {
+      signMethod: "TC3-HMAC-SHA256",
+      httpProfile: { reqMethod: "POST", reqTimeout: 30 },
+    },
+  });
+
+  return _tencentOcrClient;
+}
+
+/** Strip data URL prefix and return raw base64 string */
+function stripDataURLPrefix(dataUrl: string): string {
+  const match = dataUrl.match(/^data:image\/[a-zA-Z0-9.+-]+;base64,([\s\S]+)$/);
+  return match ? match[1] : dataUrl;
+}
+
+/** Handle OCR via Tencent Cloud for text-heavy modes (chat, document, general) */
+async function handleTencentOCR(image?: string, imageUrl?: string): Promise<string> {
+  const client = await getTencentOCRClient();
+
+  const params: Record<string, any> = {};
+  if (image && typeof image === "string") {
+    params.ImageBase64 = stripDataURLPrefix(image);
+  } else if (imageUrl && typeof imageUrl === "string") {
+    params.ImageUrl = imageUrl;
+  }
+
+  const result = await client.GeneralAccurateOCR(params);
+
+  if (!result || !result.TextDetections || result.TextDetections.length === 0) {
+    return "";
+  }
+
+  return result.TextDetections
+    .map((d: any) => d.DetectedText)
+    .join("\n");
+}
 
 // Cache clients to avoid re-creating
 const ocrClientCache = new Map<string, Anthropic>();
@@ -103,6 +158,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ---- Tencent Cloud OCR for text-heavy modes ----
+    const tencentModes = ["chat", "document", "general"];
+    if (tencentModes.includes(mode)) {
+      try {
+        const text = await handleTencentOCR(image, imageUrl);
+        return Response.json({ text, mode, provider: "tencent" });
+      } catch (tencentErr: any) {
+        console.error("[OCR] Tencent OCR failed, falling back to LLM:", tencentErr?.message);
+        // Fall through to LLM-based OCR as fallback
+      }
+    }
+
+    // ---- LLM Vision for face/palm or Tencent fallback ----
     const llmConfig = extractLLMConfig(request);
     const client = getOCRClient(llmConfig);
     const model = llmConfig.model || process.env.ANTHROPIC_MODEL || "MiniMax-M2.7-highspeed";

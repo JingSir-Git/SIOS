@@ -900,9 +900,8 @@ export default function AnalyzeTab() {
         body: JSON.stringify({ image: img.base64, mode: "chat" }),
       });
 
-      if (!res.ok) throw new Error("OCR请求失败");
-
       const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "OCR请求失败");
       const ocrText = data.text || "";
 
       setUploadedImages((prev) =>
@@ -1210,7 +1209,40 @@ export default function AnalyzeTab() {
                 />
               )}
 
-              {/* Screenshot Upload hidden — feature pending */}
+              {/* Screenshot Upload for Chat OCR (Tencent Cloud) */}
+              <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/30 p-3 space-y-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-medium text-zinc-400">聊天截图识别（可选）</span>
+                  <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-medium">腾讯云OCR</span>
+                </div>
+                <ImageUpload
+                  images={uploadedImages}
+                  onChange={setUploadedImages}
+                  showOCR
+                  onOCR={handleImageOCR}
+                  compact
+                  maxCount={6}
+                  placeholder="上传聊天截图，AI自动识别文字"
+                />
+                {uploadedImages.length > 0 && uploadedImages.some((i) => i.base64 && !i.ocrText) && (
+                  <button
+                    onClick={handleBatchOCR}
+                    disabled={ocrProcessing}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all",
+                      ocrProcessing
+                        ? "bg-violet-500/10 text-violet-400 cursor-wait"
+                        : "bg-violet-500/15 text-violet-300 hover:bg-violet-500/25 border border-violet-500/30"
+                    )}
+                  >
+                    {ocrProcessing ? (
+                      <><Loader2 className="h-3 w-3 animate-spin" /> 正在识别...</>
+                    ) : (
+                      <><FileImage className="h-3 w-3" /> 一键识别全部截图</>
+                    )}
+                  </button>
+                )}
+              </div>
 
               <div className="relative">
                 <textarea

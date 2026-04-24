@@ -84,6 +84,8 @@ echo "   ✓ Files extracted"
 APIKEY=$(grep ANTHROPIC_API_KEY "${REMOTE_DIR}/.env.local" | cut -d= -f2)
 BASEURL=$(grep ANTHROPIC_BASE_URL "${REMOTE_DIR}/.env.local" | cut -d= -f2)
 MODEL=$(grep ANTHROPIC_MODEL "${REMOTE_DIR}/.env.local" | cut -d= -f2)
+TENCENT_SID=$(grep TENCENT_SECRET_ID "${REMOTE_DIR}/.env.local" | cut -d= -f2)
+TENCENT_SKEY=$(grep TENCENT_SECRET_KEY "${REMOTE_DIR}/.env.local" | cut -d= -f2)
 
 cat > "${REMOTE_DIR}/ecosystem.config.js" << ECOEOF
 module.exports = {
@@ -99,6 +101,8 @@ module.exports = {
       ANTHROPIC_BASE_URL: '${BASEURL}',
       ANTHROPIC_API_KEY: '${APIKEY}',
       ANTHROPIC_MODEL: '${MODEL}',
+      TENCENT_SECRET_ID: '${TENCENT_SID}',
+      TENCENT_SECRET_KEY: '${TENCENT_SKEY}',
     },
   }],
 };
