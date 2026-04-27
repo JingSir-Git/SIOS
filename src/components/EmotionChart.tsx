@@ -21,15 +21,17 @@ export default function EmotionChart({ data }: EmotionChartProps) {
 
   return (
     <ResponsiveContainer width="100%" height={220}>
-      <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+      <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
         <XAxis
           dataKey="label"
           tick={{ fill: "#71717a", fontSize: 10 }}
           interval={0}
-          angle={-30}
+          angle={-35}
           textAnchor="end"
-          height={50}
+          height={70}
+          dy={5}
+          tickFormatter={(v: string) => v && v.length > 8 ? v.slice(0, 8) + "…" : v}
         />
         <YAxis
           domain={[-1, 1]}
