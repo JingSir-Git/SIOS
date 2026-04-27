@@ -41,6 +41,16 @@ export async function POST(request: NextRequest) {
         messages: llmMessages,
         maxTokens: 16000,
         config: llmConfig,
+        validate: (parsed) => {
+          const required = ["surfaceFeatures", "discourseStructure", "interactionPatterns", "semanticContent", "summary"];
+          const missing = required.filter(
+            (key) => !(key in parsed) || (key !== "summary" && typeof parsed[key] !== "object")
+          );
+          if (missing.length > 0) {
+            return `缺少关键字段: ${missing.join("、")}`;
+          }
+          return null;
+        },
         postProcess: (parsed) => ({
           analysis: {
             ...parsed,

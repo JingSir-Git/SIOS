@@ -68,6 +68,7 @@ export function createStreamingResponse({
   postProcess,
   config,
   rawTextMode = false,
+  validate,
 }: {
   system: string;
   messages: LLMMessage[];
@@ -76,6 +77,8 @@ export function createStreamingResponse({
   config?: LLMConfig;
   /** When true, skip JSON parsing — send raw accumulated text as the result */
   rawTextMode?: boolean;
+  /** Optional validator — return null if valid, or an error string listing missing fields */
+  validate?: (parsed: Record<string, unknown>) => string | null;
 }): Response {
   const encoder = new TextEncoder();
   let cancelled = false;
@@ -171,6 +174,80 @@ export function createStreamingResponse({
           // Parse the complete response (strip <think> blocks first)
           const cleanForParse = raw.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
           let { data: parsed, error: parseError } = extractJSON(cleanForParse);
+
+          // ---- Validation gate: parsed JSON might be valid but incomplete ----
+          // If parsed OK but validate() reports missing fields, attempt completion
+          if (parsed && !parseError && validate) {
+            const validationError = validate(parsed as Record<string, unknown>);
+            if (validationError) {
+              console.warn(
+                `[stream-utils] Parsed JSON is incomplete: ${validationError}. Attempting completion...`
+              );
+
+              // Try asking the model to fill in missing fields
+              try {
+                const completionResult = await callLLMStreaming({
+                  system,
+                  messages: [
+                    ...messages,
+                    { role: "assistant" as const, content: cleanForParse },
+                    {
+                      role: "user" as const,
+                      content: `你输出的JSON不完整，${validationError}。请重新输出完整的JSON，包含所有必需字段。直接输出完整JSON，不要解释。`,
+                    },
+                  ],
+                  maxTokens,
+                  onChunk: (text) => {
+                    chunkCount++;
+                    enqueue({ type: "progress", text });
+                  },
+                  config,
+                });
+
+                // Handle continuation for the completion call too
+                let completionRaw = completionResult.text;
+                if (completionResult.stopReason === "max_tokens" || looksLikeTruncatedJSON(completionRaw)) {
+                  // One more continuation for the completion
+                  try {
+                    const contResult = await callLLMStreaming({
+                      system,
+                      messages: [
+                        ...messages,
+                        { role: "assistant" as const, content: completionRaw },
+                        { role: "user" as const, content: "继续输出剩余的JSON内容，从截断处继续，不要重复。" },
+                      ],
+                      maxTokens,
+                      onChunk: (text) => { chunkCount++; enqueue({ type: "progress", text }); },
+                      config,
+                    });
+                    completionRaw += contResult.text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+                  } catch { /* ignore continuation failure */ }
+                }
+
+                const cleanCompletion = completionRaw.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+                const completionParsed = extractJSON(cleanCompletion);
+                if (completionParsed.data) {
+                  const revalidation = validate(completionParsed.data as Record<string, unknown>);
+                  if (!revalidation) {
+                    parsed = completionParsed.data;
+                    parseError = null;
+                    console.info("[stream-utils] Completion produced valid complete JSON");
+                  } else {
+                    console.warn(`[stream-utils] Completion still incomplete: ${revalidation}`);
+                    // Use whichever has more top-level keys
+                    const origKeys = Object.keys(parsed as Record<string, unknown>).length;
+                    const newKeys = Object.keys(completionParsed.data as Record<string, unknown>).length;
+                    if (newKeys > origKeys) {
+                      parsed = completionParsed.data;
+                      console.info(`[stream-utils] Using completion result (${newKeys} keys > ${origKeys} keys)`);
+                    }
+                  }
+                }
+              } catch (completionErr) {
+                console.warn("[stream-utils] Completion attempt failed:", completionErr);
+              }
+            }
+          }
 
           // Retry: if initial parse fails, attempt a second LLM call to repair the JSON
           if (!parsed && parseError && raw.length > 200) {
