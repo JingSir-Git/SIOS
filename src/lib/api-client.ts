@@ -99,6 +99,11 @@ export async function callLLM({
   return result;
 }
 
+export interface LLMStreamResult {
+  text: string;
+  stopReason: string | null;
+}
+
 export async function callLLMStreaming({
   system,
   messages,
@@ -111,7 +116,7 @@ export async function callLLMStreaming({
   maxTokens?: number;
   onChunk: (text: string) => void;
   config?: LLMConfig;
-}): Promise<string> {
+}): Promise<LLMStreamResult> {
   const client = getClient(config);
   const model = getModel(config);
 
@@ -126,6 +131,7 @@ export async function callLLMStreaming({
   });
 
   let result = "";
+  let stopReason: string | null = null;
   try {
     for await (const event of stream) {
       if (
@@ -137,14 +143,24 @@ export async function callLLMStreaming({
         result += text;
         onChunk(text);
       }
+      // Capture stop_reason from message_delta event
+      if (
+        event.type === "message_delta" &&
+        "delta" in event &&
+        event.delta &&
+        typeof event.delta === "object" &&
+        "stop_reason" in event.delta
+      ) {
+        stopReason = (event.delta as { stop_reason: string }).stop_reason;
+      }
     }
   } catch (streamErr: unknown) {
     // If we got partial content, return it so extractJSON can attempt repair
     if (result.length > 0) {
       console.warn("[callLLMStreaming] Stream interrupted with partial content, attempting recovery.", streamErr);
-      return result;
+      return { text: result, stopReason: "error" };
     }
     throw streamErr;
   }
-  return result;
+  return { text: result, stopReason };
 }
