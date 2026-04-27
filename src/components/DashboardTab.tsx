@@ -12,7 +12,6 @@ import {
   Heart,
   Zap,
   Clock,
-  Target,
   Fingerprint,
   Activity,
   AlertTriangle,
@@ -27,8 +26,6 @@ import {
   CalendarDays,
 } from "lucide-react";
 import {
-  AreaChart,
-  Area,
   XAxis,
   YAxis,
   Tooltip,
@@ -684,40 +681,95 @@ export default function DashboardTab() {
                   )}
                 </div>
 
-                {/* EQ Growth Curve with Confidence Band */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <Target className="h-4 w-4 text-emerald-400" />
-                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{t.dashboard.eqGrowth}</h3>
-                      <span className="text-[7px] text-zinc-600 border border-zinc-700 rounded px-1">{t.dashboard.fromAnalysis}</span>
+                {/* Social Intelligence Power Score — animated ring gauge */}
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 relative overflow-hidden">
+                  {/* Background glow */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-transparent to-cyan-500/5 pointer-events-none" />
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Zap className="h-4 w-4 text-amber-400" />
+                        <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{language === "en" ? "Social Intelligence Score" : "社交智能指数"}</h3>
+                      </div>
+                      <span className="text-[8px] text-zinc-600 font-mono">composite</span>
                     </div>
-                    {stats.avgEQ > 0 && <span className="text-[9px] text-zinc-500 font-mono">μ={stats.avgEQ}</span>}
+                    {(() => {
+                      // Compute composite score from available data
+                      const dataRichness = Math.min(100, (stats.totalConversations * 5 + stats.totalProfiles * 15 + stats.divinationCount * 3 + stats.chatSessionCount * 4));
+                      const analysisCoverage = stats.engagementRate;
+                      const profileDepth = Math.min(100, stats.totalProfiles > 0 ? stats.dimAverages.reduce((s, d) => s + (d.avg !== 50 ? 1 : 0), 0) / stats.dimAverages.length * 100 : 0);
+                      const engagementConsistency = Math.min(100, stats.daysSpan > 1 ? (stats.heatmap.filter(h => h.count > 0).length / Math.min(stats.daysSpan, 112)) * 100 : stats.totalConversations > 0 ? 30 : 0);
+                      const networkSize = Math.min(100, stats.relationshipsCount * 20 + stats.totalProfiles * 12);
+
+                      const metrics = [
+                        { label: language === "en" ? "Data" : "数据量", value: dataRichness, color: "#60a5fa" },
+                        { label: language === "en" ? "Coverage" : "分析率", value: analysisCoverage, color: "#8b5cf6" },
+                        { label: language === "en" ? "Depth" : "深度", value: profileDepth, color: "#f59e0b" },
+                        { label: language === "en" ? "Active" : "活跃度", value: engagementConsistency, color: "#34d399" },
+                        { label: language === "en" ? "Network" : "社交网", value: networkSize, color: "#f472b6" },
+                      ];
+                      const compositeScore = Math.round(metrics.reduce((s, m) => s + m.value, 0) / metrics.length);
+                      const circumference = 2 * Math.PI * 58;
+
+                      return (
+                        <div className="flex items-center gap-5">
+                          {/* Ring gauge */}
+                          <div className="relative shrink-0">
+                            <svg width="140" height="140" viewBox="0 0 140 140">
+                              <defs>
+                                <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                  <stop offset="0%" stopColor="#8b5cf6" />
+                                  <stop offset="50%" stopColor="#06b6d4" />
+                                  <stop offset="100%" stopColor="#34d399" />
+                                </linearGradient>
+                                <filter id="glow">
+                                  <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                                  <feMerge><feMergeNode in="coloredBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                                </filter>
+                              </defs>
+                              {/* Background track */}
+                              <circle cx="70" cy="70" r="58" fill="none" stroke="#27272a" strokeWidth="8" />
+                              {/* Score arc */}
+                              <circle
+                                cx="70" cy="70" r="58" fill="none"
+                                stroke="url(#scoreGrad)" strokeWidth="8" strokeLinecap="round"
+                                strokeDasharray={circumference}
+                                strokeDashoffset={circumference * (1 - compositeScore / 100)}
+                                transform="rotate(-90 70 70)"
+                                filter="url(#glow)"
+                                style={{ transition: "stroke-dashoffset 1.5s ease-out" }}
+                              />
+                              {/* Center text */}
+                              <text x="70" y="62" textAnchor="middle" fill="#e4e4e7" fontSize="28" fontWeight="bold" fontFamily="monospace">{compositeScore}</text>
+                              <text x="70" y="80" textAnchor="middle" fill="#71717a" fontSize="9">{language === "en" ? "/ 100" : "/ 100 分"}</text>
+                            </svg>
+                          </div>
+                          {/* Metric breakdown bars */}
+                          <div className="flex-1 space-y-2.5">
+                            {metrics.map((m) => (
+                              <div key={m.label}>
+                                <div className="flex items-center justify-between mb-0.5">
+                                  <span className="text-[9px] text-zinc-500">{m.label}</span>
+                                  <span className="text-[9px] font-mono" style={{ color: m.color }}>{Math.round(m.value)}</span>
+                                </div>
+                                <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{
+                                      width: `${m.value}%`,
+                                      backgroundColor: m.color,
+                                      opacity: 0.7,
+                                      transition: "width 1.2s ease-out",
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
-                  <p className="text-[8px] text-zinc-600 mb-3 italic">{t.dashboard.shadowBand}</p>
-                  {stats.eqTrend.length >= 2 ? (
-                    <ResponsiveContainer width="100%" height={170}>
-                      <AreaChart data={stats.eqTrend} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
-                        <defs>
-                          <linearGradient id="eqBand" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#34d399" stopOpacity={0.15} />
-                            <stop offset="95%" stopColor="#34d399" stopOpacity={0.02} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                        <XAxis dataKey="label" tick={{ fontSize: 9, fill: "#52525b" }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} />
-                        <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: "#52525b" }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} />
-                        <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: "8px", fontSize: "10px" }} formatter={(val: any, name: any) => [`${val}`, name === "score" ? "实际得分" : name === "upper" ? "上界(+1σ)" : "下界(-1σ)"]} />
-                        <Area type="monotone" dataKey="upper" stroke="none" fill="url(#eqBand)" />
-                        <Area type="monotone" dataKey="lower" stroke="none" fill="#18181b" />
-                        <Line type="monotone" dataKey="score" stroke="#34d399" strokeWidth={2} dot={{ fill: "#34d399", r: 3 }} activeDot={{ r: 5 }} />
-                        <Line type="monotone" dataKey="mean" stroke="#34d399" strokeWidth={1} strokeDasharray="4 4" dot={false} opacity={0.5} />
-                        {stats.avgEQ > 0 && <ReferenceLine y={stats.avgEQ} stroke="#52525b" strokeDasharray="2 2" label={{ value: `μ=${stats.avgEQ}`, position: "right", style: { fontSize: 8, fill: "#52525b" } }} />}
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex items-center justify-center h-[170px] text-[10px] text-zinc-600">完成2次以上EQ训练后显示</div>
-                  )}
                 </div>
               </div>
 

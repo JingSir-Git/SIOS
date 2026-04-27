@@ -27,11 +27,8 @@ export default function EmotionChart({ data }: EmotionChartProps) {
           dataKey="label"
           tick={{ fill: "#71717a", fontSize: 10 }}
           interval={0}
-          angle={-35}
-          textAnchor="end"
-          height={70}
-          dy={5}
-          tickFormatter={(v: string) => v && v.length > 8 ? v.slice(0, 8) + "…" : v}
+          tickFormatter={(v: string) => v && v.length > 4 ? v.slice(0, 4) : v}
+          height={32}
         />
         <YAxis
           domain={[-1, 1]}
