@@ -358,6 +358,24 @@ export default function DashboardTab() {
     }
     const heatmapMax = Math.max(1, ...heatmap.map(h => h.count));
 
+    // Conversation length distribution (buckets: 1-5, 6-10, 11-20, 21-50, 50+)
+    const lengthBuckets = [
+      { label: "1-5", min: 1, max: 5, count: 0, color: "#60a5fa" },
+      { label: "6-10", min: 6, max: 10, count: 0, color: "#8b5cf6" },
+      { label: "11-20", min: 11, max: 20, count: 0, color: "#f59e0b" },
+      { label: "21-50", min: 21, max: 50, count: 0, color: "#34d399" },
+      { label: "50+", min: 51, max: Infinity, count: 0, color: "#f472b6" },
+    ];
+    for (const c of conversations) {
+      const len = c.messages.length;
+      const bucket = lengthBuckets.find(b => len >= b.min && len <= b.max);
+      if (bucket) bucket.count++;
+    }
+
+    // Module usage donut data
+    const moduleDonut = moduleUsage.filter(m => m.count > 0);
+    const moduleTotal = moduleDonut.reduce((s, m) => s + m.count, 0) || 1;
+
     return {
       totalMessages,
       totalProfiles,
@@ -388,6 +406,9 @@ export default function DashboardTab() {
       feedbackUpCount,
       feedbackDownCount,
       feedbackPositiveRate,
+      lengthBuckets,
+      moduleDonut,
+      moduleTotal,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profiles, conversations, mbtiResults, eqScores, relationships, profileMemories, divinationRecords, moduleHistory, chatSessions, responseFeedback, language]);
@@ -1036,6 +1057,127 @@ export default function DashboardTab() {
                   ) : (
                     <div className="flex items-center justify-center h-[150px] text-[10px] text-zinc-600">{t.dashboard.noTrend}</div>
                   )}
+                </div>
+              </div>
+
+              {/* ─── Row 4.5: Module Usage Donut + Conversation Length Distribution ─── */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Module Usage Donut Chart */}
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/3 via-transparent to-violet-500/3 pointer-events-none" />
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Layers className="h-4 w-4 text-cyan-400" />
+                        <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{language === "en" ? "Module Usage" : "功能使用分布"}</h3>
+                      </div>
+                      <span className="text-[8px] text-zinc-600 font-mono">n={stats.moduleTotal}</span>
+                    </div>
+                    {stats.moduleDonut.length > 0 ? (
+                      <div className="flex items-center gap-4">
+                        <div className="relative shrink-0">
+                          <svg width="130" height="130" viewBox="0 0 130 130">
+                            {(() => {
+                              const cx = 65, cy = 65, r = 50, r2 = 32;
+                              let cumulativeAngle = -Math.PI / 2;
+                              return stats.moduleDonut.map((m, i) => {
+                                const angle = (m.count / stats.moduleTotal) * 2 * Math.PI;
+                                const startAngle = cumulativeAngle;
+                                cumulativeAngle += angle;
+                                const endAngle = cumulativeAngle;
+                                const largeArc = angle > Math.PI ? 1 : 0;
+                                const x1 = cx + r * Math.cos(startAngle);
+                                const y1 = cy + r * Math.sin(startAngle);
+                                const x2 = cx + r * Math.cos(endAngle);
+                                const y2 = cy + r * Math.sin(endAngle);
+                                const x3 = cx + r2 * Math.cos(endAngle);
+                                const y3 = cy + r2 * Math.sin(endAngle);
+                                const x4 = cx + r2 * Math.cos(startAngle);
+                                const y4 = cy + r2 * Math.sin(startAngle);
+                                return (
+                                  <path
+                                    key={i}
+                                    d={`M${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} L${x3},${y3} A${r2},${r2} 0 ${largeArc},0 ${x4},${y4} Z`}
+                                    fill={m.color}
+                                    fillOpacity={0.7}
+                                    stroke="#18181b"
+                                    strokeWidth={1.5}
+                                    className="hover:fill-opacity-100 transition-all cursor-pointer"
+                                  >
+                                    <title>{m.name}: {m.count} ({Math.round(m.count / stats.moduleTotal * 100)}%)</title>
+                                  </path>
+                                );
+                              });
+                            })()}
+                            <text x="65" y="62" textAnchor="middle" fill="#e4e4e7" fontSize="18" fontWeight="bold" fontFamily="monospace">{stats.moduleTotal}</text>
+                            <text x="65" y="76" textAnchor="middle" fill="#71717a" fontSize="8">{language === "en" ? "total" : "总计"}</text>
+                          </svg>
+                        </div>
+                        <div className="flex-1 space-y-1.5">
+                          {stats.moduleDonut.map((m) => (
+                            <div key={m.name} className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: m.color }} />
+                              <span className="text-[9px] text-zinc-400 flex-1 truncate">{m.name}</span>
+                              <span className="text-[9px] font-mono text-zinc-500">{m.count}</span>
+                              <span className="text-[8px] font-mono" style={{ color: m.color }}>{Math.round(m.count / stats.moduleTotal * 100)}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-[130px] text-[10px] text-zinc-600">{language === "en" ? "No usage data yet" : "暂无使用数据"}</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Conversation Length Distribution */}
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-bl from-amber-500/3 via-transparent to-pink-500/3 pointer-events-none" />
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4 text-amber-400" />
+                        <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{language === "en" ? "Conversation Depth" : "对话深度分布"}</h3>
+                      </div>
+                      <span className="text-[8px] text-zinc-600 font-mono">{language === "en" ? "msgs/convo" : "消息数/对话"}</span>
+                    </div>
+                    {stats.totalConversations > 0 ? (
+                      <div className="space-y-2.5">
+                        {stats.lengthBuckets.map((b) => {
+                          const maxCount = Math.max(1, ...stats.lengthBuckets.map(x => x.count));
+                          const pct = stats.totalConversations > 0 ? Math.round(b.count / stats.totalConversations * 100) : 0;
+                          return (
+                            <div key={b.label} className="group">
+                              <div className="flex items-center gap-3">
+                                <span className="text-[9px] text-zinc-500 w-8 text-right font-mono shrink-0">{b.label}</span>
+                                <div className="flex-1 h-5 rounded-md bg-zinc-800/60 overflow-hidden relative">
+                                  <div
+                                    className="h-full rounded-md relative overflow-hidden"
+                                    style={{
+                                      width: `${Math.max(b.count > 0 ? 4 : 0, (b.count / maxCount) * 100)}%`,
+                                      transition: "width 1s ease-out",
+                                    }}
+                                  >
+                                    <div className="absolute inset-0" style={{ background: `linear-gradient(90deg, ${b.color}88, ${b.color})` }} />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/10" />
+                                  </div>
+                                  {b.count > 0 && (
+                                    <span className="absolute inset-y-0 flex items-center text-[8px] font-mono text-zinc-300 pl-2" style={{ left: `${Math.max(4, (b.count / maxCount) * 100)}%` }}>
+                                      {b.count}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[8px] font-mono w-8 text-right shrink-0" style={{ color: b.color }}>{pct}%</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <p className="text-[8px] text-zinc-600 italic mt-1 text-center">{language === "en" ? `avg ${stats.avgMsgsPerConvo} msgs · ${stats.totalConversations} conversations` : `平均 ${stats.avgMsgsPerConvo} 条/对话 · 共 ${stats.totalConversations} 场对话`}</p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-[130px] text-[10px] text-zinc-600">{language === "en" ? "No conversations yet" : "暂无对话数据"}</div>
+                    )}
+                  </div>
                 </div>
               </div>
 

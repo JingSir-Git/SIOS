@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       return createStreamingResponse({
         system: systemPrompt || "你是一位中国法律顾问，用Markdown格式回复。",
         messages: llmMessages,
-        maxTokens: 4000,
+        maxTokens: 8000,
         config: llmConfig,
         rawTextMode: true,
       });
