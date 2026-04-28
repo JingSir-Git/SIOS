@@ -577,7 +577,7 @@ export default function DashboardTab() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto px-6 py-6 space-y-6">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
           {isEmpty && (
             <div className="rounded-xl border border-dashed border-violet-500/30 bg-gradient-to-br from-violet-500/5 via-transparent to-blue-500/5 p-6">
               <div className="flex items-start gap-4">
@@ -651,7 +651,7 @@ export default function DashboardTab() {
               )}
 
               {/* ─── Statistical Summary Ribbon ─── */}
-              <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
                 {[
                   { label: t.dashboard.profiles, val: stats.totalProfiles, unit: t.dashboard.personUnit, c: "text-violet-400" },
                   { label: t.dashboard.conversations, val: stats.totalConversations, unit: t.dashboard.convUnit, c: "text-blue-400" },
@@ -662,17 +662,17 @@ export default function DashboardTab() {
                   { label: t.dashboard.chatSessions, val: stats.chatSessionCount, unit: t.dashboard.timesUnit, c: "text-sky-400" },
                   { label: t.dashboard.feedbackRate, val: stats.feedbackTotal > 0 ? `${stats.feedbackPositiveRate}%` : "-", unit: "", c: "text-emerald-400" },
                 ].map((s) => (
-                  <div key={s.label} className="rounded-lg border border-zinc-800/60 bg-zinc-900/40 px-3 py-2.5 text-center">
-                    <p className={cn("text-xl font-bold tracking-tight", s.c)}>{s.val}<span className="text-[9px] text-zinc-600 ml-0.5">{s.unit}</span></p>
-                    <p className="text-[9px] text-zinc-600 mt-0.5">{s.label}</p>
+                  <div key={s.label} className="rounded-lg border border-zinc-800/60 bg-zinc-900/40 px-2 sm:px-3 py-2 sm:py-2.5 text-center">
+                    <p className={cn("text-lg sm:text-xl font-bold tracking-tight", s.c)}>{s.val}<span className="text-[8px] sm:text-[9px] text-zinc-600 ml-0.5">{s.unit}</span></p>
+                    <p className="text-[8px] sm:text-[9px] text-zinc-600 mt-0.5 truncate">{s.label}</p>
                   </div>
                 ))}
               </div>
 
-              {/* ─── Row 1: Activity Scatter + EQ with Confidence Band ─── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* ─── Row 1: Activity Scatter + Social Intelligence Score ─── */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
                 {/* Activity Timeline Scatter */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 sm:p-5">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <Activity className="h-4 w-4 text-blue-400" />
@@ -703,7 +703,7 @@ export default function DashboardTab() {
                 </div>
 
                 {/* Social Intelligence Power Score — animated ring gauge */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 relative overflow-hidden">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 sm:p-5 relative overflow-hidden">
                   {/* Background glow */}
                   <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-transparent to-cyan-500/5 pointer-events-none" />
                   <div className="relative">
@@ -795,9 +795,9 @@ export default function DashboardTab() {
               </div>
 
               {/* ─── Row 2: Dimension Radar + Module Usage Radar ─── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
                 {/* Dimension Radar */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 sm:p-5">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <Fingerprint className="h-4 w-4 text-amber-400" />
@@ -819,7 +819,7 @@ export default function DashboardTab() {
                 </div>
 
                 {/* Module Usage Radar */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 sm:p-5">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <Layers className="h-4 w-4 text-cyan-400" />
@@ -841,9 +841,9 @@ export default function DashboardTab() {
               </div>
 
               {/* ─── Row 3: Sentiment Scatter + Statistical Panel ─── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
                 {/* Sentiment Emotion Scatter */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 sm:p-5">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <Heart className="h-4 w-4 text-pink-400" />
@@ -925,7 +925,7 @@ export default function DashboardTab() {
                 </div>
 
                 {/* Statistical Insights Panel */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 sm:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <Brain className="h-4 w-4 text-violet-400" />
                     <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{t.dashboard.statisticalInsight}</h3>
@@ -997,10 +997,10 @@ export default function DashboardTab() {
                 </div>
               </div>
 
-              {/* ─── Row 4: Profile Activity Line + Weekly Trend Line ─── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* ─── Row 4: Profile Activity + Weekly Trend ─── */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
                 {/* Profile Activity Ranked (dot plot) */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 sm:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <Users className="h-4 w-4 text-violet-400" />
                     <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{t.dashboard.topProfiles}</h3>
@@ -1033,7 +1033,7 @@ export default function DashboardTab() {
                 </div>
 
                 {/* Adaptive Weekly/Daily Trend Line */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 sm:p-5">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-blue-400" />
@@ -1061,9 +1061,9 @@ export default function DashboardTab() {
               </div>
 
               {/* ─── Row 4.5: Module Usage Donut + Conversation Length Distribution ─── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
                 {/* Module Usage Donut Chart */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 relative overflow-hidden">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 sm:p-5 relative overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/3 via-transparent to-violet-500/3 pointer-events-none" />
                   <div className="relative">
                     <div className="flex items-center justify-between mb-3">
@@ -1131,7 +1131,7 @@ export default function DashboardTab() {
                 </div>
 
                 {/* Conversation Length Distribution */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 relative overflow-hidden">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 sm:p-5 relative overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-bl from-amber-500/3 via-transparent to-pink-500/3 pointer-events-none" />
                   <div className="relative">
                     <div className="flex items-center justify-between mb-3">
@@ -1181,45 +1181,47 @@ export default function DashboardTab() {
                 </div>
               </div>
 
-              {/* ─── Row 5: Dimension Detail Grid (sparkline-style) ─── */}
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Fingerprint className="h-4 w-4 text-amber-400" />
-                    <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{t.dashboard.dimDetail}</h3>
+              {/* ─── Row 5: Dimension Detail + Activity Heatmap ─── */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Dimension Detail Grid (sparkline-style) */}
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 sm:p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Fingerprint className="h-4 w-4 text-amber-400" />
+                      <h3 className="text-[11px] font-semibold text-zinc-300 tracking-wide">{t.dashboard.dimDetail}</h3>
+                    </div>
+                    <span className="text-[8px] text-zinc-600 font-mono">{stats.dimAverages.length} dimensions</span>
                   </div>
-                  <span className="text-[8px] text-zinc-600 font-mono">{stats.dimAverages.length} dimensions</span>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {stats.dimAverages.map((d) => {
-                    const hasData = stats.totalProfiles > 0;
-                    const color = !hasData ? "#3f3f46" : d.avg > 65 ? "#34d399" : d.avg < 35 ? "#f87171" : "#a1a1aa";
-                    return (
-                      <div key={d.key} className="rounded-lg border border-zinc-800/60 bg-zinc-800/20 p-3">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[9px] text-zinc-500">{d.label}</span>
-                          <span className="text-sm font-bold font-mono" style={{ color }}>{hasData ? d.avg : "—"}</span>
-                        </div>
-                        {/* Mini distribution bar with needle */}
-                        <div className="relative h-2 rounded-full bg-zinc-800 mt-1">
-                          <div className="absolute inset-0 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full" style={{ width: `${hasData ? d.avg : 50}%`, background: `linear-gradient(to right, ${!hasData ? "#27272a" : d.avg < 35 ? "#f87171" : "#3f3f46"}, ${color})`, opacity: hasData ? 0.4 : 0.15 }} />
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                    {stats.dimAverages.map((d) => {
+                      const hasData = stats.totalProfiles > 0;
+                      const color = !hasData ? "#3f3f46" : d.avg > 65 ? "#34d399" : d.avg < 35 ? "#f87171" : "#a1a1aa";
+                      return (
+                        <div key={d.key} className="rounded-lg border border-zinc-800/60 bg-zinc-800/20 p-2 sm:p-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[8px] sm:text-[9px] text-zinc-500 truncate mr-1">{d.label}</span>
+                            <span className="text-xs sm:text-sm font-bold font-mono shrink-0" style={{ color }}>{hasData ? d.avg : "—"}</span>
                           </div>
-                          {hasData && <div className="absolute top-[-1px] w-1 h-3 rounded-sm" style={{ left: `${d.avg}%`, transform: "translateX(-50%)", backgroundColor: color }} />}
+                          {/* Mini distribution bar with needle */}
+                          <div className="relative h-2 rounded-full bg-zinc-800 mt-1">
+                            <div className="absolute inset-0 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${hasData ? d.avg : 50}%`, background: `linear-gradient(to right, ${!hasData ? "#27272a" : d.avg < 35 ? "#f87171" : "#3f3f46"}, ${color})`, opacity: hasData ? 0.4 : 0.15 }} />
+                            </div>
+                            {hasData && <div className="absolute top-[-1px] w-1 h-3 rounded-sm" style={{ left: `${d.avg}%`, transform: "translateX(-50%)", backgroundColor: color }} />}
+                          </div>
+                          <div className="flex justify-between mt-1 text-[7px] text-zinc-700">
+                            <span>0</span>
+                            <span>50</span>
+                            <span>100</span>
+                          </div>
                         </div>
-                        <div className="flex justify-between mt-1 text-[7px] text-zinc-700">
-                          <span>0</span>
-                          <span>50</span>
-                          <span>100</span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
 
-              {/* ─── Row 6: Activity Heatmap ─── */}
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                {/* Activity Heatmap */}
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 sm:p-5">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <CalendarDays className="h-4 w-4 text-emerald-400" />
@@ -1280,12 +1282,15 @@ export default function DashboardTab() {
                     <span>{t.dashboard.more}</span>
                   </div>
               </div>
+              </div>
 
-              {/* ─── Row 7: Dimension Correlation Matrix (N2) ─── */}
-              <DimensionCorrelation />
+              {/* ─── Row 6: Correlation + AI Insight ─── */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Dimension Correlation Matrix */}
+                <DimensionCorrelation />
 
-              {/* ─── Row 8: AI Data Insight ─── */}
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                {/* AI Data Insight */}
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 sm:p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-amber-400" />
@@ -1321,6 +1326,7 @@ export default function DashboardTab() {
                     {t.dashboard.clickGenerate}
                   </div>
                 ) : null}
+              </div>
               </div>
           </>
         </div>
